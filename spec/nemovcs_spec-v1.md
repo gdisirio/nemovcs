@@ -350,6 +350,58 @@ For Git, the standalone browser should initially support:
 For SVN, a future backend could provide remote repository browsing similar to
 RabbitVCS' browser.
 
+## Future Repository Metadata Filesystem
+
+A narrower VFS/FUSE idea is to expose repository metadata only, not repository
+file contents.
+
+This would let Nemo browse Git concepts as ordinary directories while avoiding
+most of the complexity of presenting every file at every revision.
+
+Possible read-only layout:
+
+```text
+NemoVCS/
+  repositories/
+    project-name/
+      branches/
+      tags/
+      remotes/
+      stashes/
+      commits/
+      worktrees/
+      submodules/
+```
+
+Each leaf could expose small text or desktop files with useful metadata:
+
+- branch name, upstream, ahead/behind counts,
+- tag name, target object, annotation,
+- remote name and URLs,
+- stash subject and commit IDs,
+- recent commit summaries,
+- linked worktree paths,
+- submodule paths and status.
+
+This metadata filesystem should be read-only initially. It should be considered
+a browser/navigation aid, not a way to perform Git operations by editing files.
+
+Compared with exposing complete repository snapshots, metadata-only VFS has a
+smaller surface:
+
+- fewer path encoding and file content edge cases,
+- less pressure to implement full POSIX semantics,
+- easier caching,
+- lower risk of confusing users about write behavior.
+
+Open questions:
+
+- FUSE mount versus GVfs backend.
+- Whether metadata entries should be text files, desktop files, or directories.
+- How to discover repositories.
+- How to avoid stale mounts.
+- How this interacts with the future status daemon cache.
+
 ## Future Status Daemon
 
 A status daemon is not part of v1.
