@@ -238,6 +238,8 @@ parts of tools such as TortoiseSVN.
 
 Core responsibilities:
 
+- Provide two primary work areas: a commit message editor and a changed-file
+  checklist.
 - Discover changed, untracked, deleted, renamed, and conflicted files for the
   selected repository or selected paths.
 - Present the discovered files as the central part of the dialog.
@@ -248,7 +250,9 @@ Core responsibilities:
 - Show file status, path, and optionally staged/unstaged indicators.
 - Open the selected file diff in Meld.
 - Open the selected file in the file manager or default editor where useful.
-- Provide a commit message editor with enough vertical space for real messages.
+- Give the commit message editor enough vertical space for real messages, not
+  just a single-line entry.
+- Keep the commit message visible while the user reviews and toggles files.
 - Prevent committing with an empty selection or empty message unless Git allows
   the requested mode explicitly.
 - Show command progress and results through the GUI logger.
