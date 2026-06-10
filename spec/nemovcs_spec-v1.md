@@ -596,6 +596,38 @@ Open questions:
 - How to avoid stale mounts.
 - How this interacts with the future status daemon cache.
 
+### Optional AI Assistance
+
+AI integration is a future concept, not part of v1 and not required for normal
+VCS operations.
+
+Possible uses:
+
+- Suggest commit messages from selected staged changes.
+- Summarize a diff or a group of changed files.
+- Explain merge conflicts in user-facing language.
+- Suggest conflict resolution options while leaving final edits to the user.
+- Summarize update/pull results and likely next actions.
+- Help classify large change sets before commit.
+
+Guardrails:
+
+- AI features must be explicitly opt-in.
+- NemoVCS must remain fully usable without network access or AI services.
+- Repository content must not be sent to external services without clear user
+  consent.
+- Suggested commit messages and conflict resolutions are advisory only.
+- The user must review and apply any generated text or code changes.
+- AI integration must not add mandatory runtime dependencies to the core tool.
+
+Open questions:
+
+- Local model support versus external API integration.
+- Configuration and credential storage.
+- How to show exactly which files, diffs, or conflict hunks would be shared.
+- Whether AI features belong in the commit dialog, logger, conflict helper, or a
+  separate assistant window.
+
 ## Compatibility with RabbitVCS
 
 NemoVCS should coexist with RabbitVCS during development.
