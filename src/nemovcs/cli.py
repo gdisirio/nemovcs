@@ -74,6 +74,22 @@ def cmd_commit(args: argparse.Namespace) -> int:
     return exit_code
 
 
+def cmd_run_terminal(args: argparse.Namespace) -> int:
+    nested_args = list(args.args)
+    if not nested_args:
+        print("missing command for run-terminal", file=sys.stderr)
+        return 2
+
+    try:
+        rc = main(nested_args)
+    finally:
+        try:
+            input("\nPress Enter to close this window...")
+        except EOFError:
+            pass
+    return rc
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="nemovcs")
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
@@ -105,6 +121,13 @@ def build_parser() -> argparse.ArgumentParser:
     commit.add_argument("-m", "--message")
     commit.add_argument("paths", nargs="*")
     commit.set_defaults(func=cmd_commit)
+
+    run_terminal = subparsers.add_parser(
+        "run-terminal",
+        help="run a NemoVCS command and pause before the terminal closes",
+    )
+    run_terminal.add_argument("args", nargs=argparse.REMAINDER)
+    run_terminal.set_defaults(func=cmd_run_terminal)
 
     return parser
 
