@@ -1,8 +1,8 @@
 [Nemo Action]
-Name=Commit
+Name=Commit...
 Comment=Stage the selected path and open Git commit
 Exec=nemovcs run-terminal commit %F
-Icon-Name=git
+Icon-Name=<nemovcs-icons/rabbitvcs/actions/rabbitvcs-commit.svg>
 Selection=notnone
 Extensions=any;
 Dependencies=git;nemovcs;

@@ -1,8 +1,8 @@
 [Nemo Action]
-Name=Diff
+Name=Diff...
 Comment=Show Git diff for the selected path
 Exec=nemovcs run-terminal diff %F
-Icon-Name=git
+Icon-Name=<nemovcs-icons/rabbitvcs/actions/rabbitvcs-diff.svg>
 Selection=notnone
 Extensions=any;
 Dependencies=git;nemovcs;

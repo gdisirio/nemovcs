@@ -1,8 +1,8 @@
 [Nemo Action]
-Name=Log
+Name=Log...
 Comment=Show Git log for the selected path
 Exec=nemovcs run-terminal log %F
-Icon-Name=git
+Icon-Name=<nemovcs-icons/rabbitvcs/actions/rabbitvcs-show_log.svg>
 Selection=notnone
 Extensions=any;
 Dependencies=git;nemovcs;

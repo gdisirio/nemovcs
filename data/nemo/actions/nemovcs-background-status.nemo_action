@@ -1,8 +1,8 @@
 [Nemo Action]
-Name=Status
+Name=Status...
 Comment=Show Git status for this folder
 Exec=nemovcs run-terminal status %P
-Icon-Name=git
+Icon-Name=<nemovcs-icons/rabbitvcs/apps/rabbitvcs.svg>
 Selection=none
 Extensions=any;
 Dependencies=git;nemovcs;

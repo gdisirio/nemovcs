@@ -2,11 +2,10 @@
 Name=Settings...
 Comment=Show NemoVCS settings
 Exec=nemovcs run-terminal settings
-Icon-Name=preferences-system
+Icon-Name=<nemovcs-icons/rabbitvcs/actions/rabbitvcs-settings.svg>
 Selection=notnone
 Extensions=any;
 Dependencies=git;nemovcs;
 UriScheme=file
 Conditions=exec nemovcs action-visible inside-worktree %F
 Terminal=true
-

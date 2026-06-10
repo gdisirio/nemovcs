@@ -2,11 +2,10 @@
 Name=About...
 Comment=Show NemoVCS information
 Exec=nemovcs run-terminal about
-Icon-Name=help-about
+Icon-Name=<nemovcs-icons/rabbitvcs/actions/rabbitvcs-about.svg>
 Selection=none
 Extensions=any;
 Dependencies=git;nemovcs;
 UriScheme=file
 Conditions=exec nemovcs action-visible inside-worktree %P
 Terminal=true
-
