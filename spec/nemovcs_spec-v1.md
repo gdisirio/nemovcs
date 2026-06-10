@@ -337,6 +337,8 @@ Expected responsibilities:
 
 - Show command title, repository root, and selected paths.
 - Stream stdout and stderr from Git commands.
+- Preserve the exact command output for troubleshooting.
+- Show parsed command results when structured data is available.
 - Show exit status and elapsed time.
 - Keep output visible after completion.
 - Allow copying output to clipboard.
@@ -344,6 +346,17 @@ Expected responsibilities:
 - Support canceling long-running commands where possible.
 - Present errors in a user-readable way without Python tracebacks.
 - Support multiple command phases, such as `git add` followed by `git commit`.
+
+Initial tab model:
+
+- `Summary`: structured, command-specific results when available, such as
+  changed files, branch movement, ahead/behind state, or commit result.
+- `Output`: raw stdout and stderr from Git and NemoVCS helper steps.
+
+If a command does not yet have structured parsing, `Summary` can show a compact
+completion state and direct the user to `Output` for details. The raw output tab
+should always be available because it is the most useful troubleshooting view
+and preserves exactly what Git reported.
 
 The logger should be reusable by Nemo Actions, future plugin actions, and any
 standalone repository browser.
