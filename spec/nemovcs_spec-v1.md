@@ -242,7 +242,7 @@ Core responsibilities:
   checklist.
 - Discover changed, untracked, deleted, renamed, and conflicted files for the
   selected repository or selected paths.
-- Present the discovered files as the central part of the dialog.
+- Present the discovered files as a flat list in the initial dialog.
 - Allow including or excluding each file through checkboxes.
 - Make it clear whether a checked file will be staged, committed, or both.
 - Support selecting all, selecting none, and toggling common groups such as
@@ -265,6 +265,8 @@ Git state model:
 - Avoid hidden broad staging operations such as `git add .`.
 - Treat untracked files as opt-in, not automatically included.
 - Surface conflicts clearly and avoid committing conflicted paths.
+- Keep the status data model independent from the file-list presentation, so a
+  hierarchical display can be added later without changing Git parsing.
 
 Partial hunk staging is out of scope for the first GUI commit dialog. It can be
 evaluated later, likely by delegating to Git's interactive patch mode or a
@@ -595,6 +597,30 @@ Open questions:
 - How to discover repositories.
 - How to avoid stale mounts.
 - How this interacts with the future status daemon cache.
+
+### Hierarchical Commit File View
+
+The first commit/staging dialog should use a flat changed-file list. A
+hierarchical tree view is worth evaluating later for repositories with many
+changed files spread across several directories.
+
+Possible behavior:
+
+- Display changed paths grouped by directory.
+- Allow expanding and collapsing directory rows.
+- Let checking a directory toggle all visible changed children.
+- Show per-directory counts such as modified, added, deleted, untracked, and
+  conflicted.
+- Keep file-level actions such as Meld diff on leaf rows.
+- Preserve checked state when switching between flat and hierarchical views.
+
+Implementation notes:
+
+- GTK3 can represent this with `Gtk.TreeStore` and `Gtk.TreeView`.
+- A true mixed/indeterminate checkbox state for directory rows may require a
+  custom cell renderer or a secondary status indicator.
+- The underlying Git status model should remain flat and path-based; the tree
+  should be a display projection only.
 
 ### Optional AI Assistance
 
