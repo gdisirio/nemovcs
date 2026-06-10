@@ -229,6 +229,43 @@ Behavior:
 This command is intentionally basic in v1. A GUI commit dialog is a future
 feature, not required for the first milestone.
 
+## Future Commit And Staging Dialog
+
+The commit/staging dialog is one of the most important GUI surfaces for the full
+tool. RabbitVCS can be used as a practical reference because its commit window
+was functional, but NemoVCS should aim for a cleaner workflow closer to the best
+parts of tools such as TortoiseSVN.
+
+Core responsibilities:
+
+- Discover changed, untracked, deleted, renamed, and conflicted files for the
+  selected repository or selected paths.
+- Present the discovered files as the central part of the dialog.
+- Allow including or excluding each file through checkboxes.
+- Make it clear whether a checked file will be staged, committed, or both.
+- Support selecting all, selecting none, and toggling common groups such as
+  modified, added, deleted, untracked, and conflicted.
+- Show file status, path, and optionally staged/unstaged indicators.
+- Open the selected file diff in Meld.
+- Open the selected file in the file manager or default editor where useful.
+- Provide a commit message editor with enough vertical space for real messages.
+- Prevent committing with an empty selection or empty message unless Git allows
+  the requested mode explicitly.
+- Show command progress and results through the GUI logger.
+
+Git state model:
+
+- Use `git status --porcelain=v2 -z` as the primary input.
+- Preserve the distinction between staged and unstaged changes.
+- Let users stage only the checked paths before committing.
+- Avoid hidden broad staging operations such as `git add .`.
+- Treat untracked files as opt-in, not automatically included.
+- Surface conflicts clearly and avoid committing conflicted paths.
+
+Partial hunk staging is out of scope for the first GUI commit dialog. It can be
+evaluated later, likely by delegating to Git's interactive patch mode or a
+purpose-built patch UI.
+
 ### `nemovcs update`
 
 Purpose: update the current Git repository.
