@@ -1,0 +1,124 @@
+"""Command-line entry point for NemoVCS."""
+
+from __future__ import annotations
+
+import argparse
+import subprocess
+import sys
+from typing import Callable, Sequence
+
+from . import __version__
+from . import git
+
+
+def _print_results(results: list[git.GitResult]) -> int:
+    exit_code = 0
+    for idx, result in enumerate(results):
+        if idx:
+            print()
+        if len(results) > 1:
+            print(f"# {result.cwd}")
+        if result.stdout:
+            print(result.stdout, end="")
+        if result.stderr:
+            print(result.stderr, end="", file=sys.stderr)
+        if not result.ok:
+            exit_code = result.returncode or 1
+    return exit_code
+
+
+def cmd_action_visible(args: argparse.Namespace) -> int:
+    if args.predicate == "inside-worktree":
+        if not args.paths:
+            return 1
+        return 0 if all(git.is_inside_worktree(path) for path in args.paths) else 1
+
+    print(f"unknown visibility predicate: {args.predicate}", file=sys.stderr)
+    return 2
+
+
+def cmd_status(args: argparse.Namespace) -> int:
+    return _print_results(git.status(args.paths))
+
+
+def cmd_diff(args: argparse.Namespace) -> int:
+    return _print_results(git.diff(args.paths))
+
+
+def cmd_log(args: argparse.Namespace) -> int:
+    return _print_results(git.log(args.paths, limit=args.limit))
+
+
+def cmd_commit(args: argparse.Namespace) -> int:
+    paths = args.paths or ["."]
+    grouped = git.group_by_repo(paths)
+    if not grouped:
+        print("not inside a Git working tree", file=sys.stderr)
+        return 1
+
+    exit_code = 0
+    for root, relpaths in grouped.items():
+        add_result = git.run_git(root, ["add", "--", *relpaths])
+        if not add_result.ok:
+            _print_results([add_result])
+            exit_code = add_result.returncode or 1
+            continue
+
+        commit_args = ["commit"]
+        if args.message:
+            commit_args.extend(["-m", args.message])
+        result = git.run_git(root, commit_args, timeout=3600)
+        rc = _print_results([result])
+        if rc:
+            exit_code = rc
+    return exit_code
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(prog="nemovcs")
+    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
+
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    action_visible = subparsers.add_parser(
+        "action-visible",
+        help="check whether a Nemo action should be visible",
+    )
+    action_visible.add_argument("predicate", choices=["inside-worktree"])
+    action_visible.add_argument("paths", nargs="*")
+    action_visible.set_defaults(func=cmd_action_visible)
+
+    status = subparsers.add_parser("status", help="show Git status")
+    status.add_argument("paths", nargs="*")
+    status.set_defaults(func=cmd_status)
+
+    diff = subparsers.add_parser("diff", help="show Git diff")
+    diff.add_argument("paths", nargs="*")
+    diff.set_defaults(func=cmd_diff)
+
+    log = subparsers.add_parser("log", help="show Git log")
+    log.add_argument("-n", "--limit", type=int, default=50)
+    log.add_argument("paths", nargs="*")
+    log.set_defaults(func=cmd_log)
+
+    commit = subparsers.add_parser("commit", help="stage selected paths and commit")
+    commit.add_argument("-m", "--message")
+    commit.add_argument("paths", nargs="*")
+    commit.set_defaults(func=cmd_commit)
+
+    return parser
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    handler: Callable[[argparse.Namespace], int] = args.func
+    try:
+        return handler(args)
+    except subprocess.TimeoutExpired as exc:
+        print(f"git command timed out: {exc}", file=sys.stderr)
+        return 124
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

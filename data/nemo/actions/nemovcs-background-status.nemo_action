@@ -1,0 +1,12 @@
+[Nemo Action]
+Name=NemoVCS Status
+Comment=Show Git status for this folder
+Exec=nemovcs status %P
+Icon-Name=git
+Selection=none
+Extensions=any;
+Dependencies=git;nemovcs;
+UriScheme=file
+Conditions=exec nemovcs action-visible inside-worktree %P
+Terminal=true
+
