@@ -350,7 +350,36 @@ For Git, the standalone browser should initially support:
 For SVN, a future backend could provide remote repository browsing similar to
 RabbitVCS' browser.
 
-## Future Repository Metadata Filesystem
+## Future Status Daemon
+
+A status daemon is not part of v1.
+
+Expected daemon name:
+
+```text
+nemovcs-statusd
+```
+
+Expected direction:
+
+- Discover repositories from Nemo on-visit events.
+- Run one initial status scan per repository root.
+- Cache status by repository root and relative path.
+- Return cached, stale, loading, or error states quickly.
+- Watch worktree and `.git` changes.
+- Debounce refreshes.
+- Refresh once per burst of filesystem events.
+- Notify the Nemo plugin so visible items can invalidate and repaint.
+
+The daemon should avoid continuous polling and should not scan arbitrary home
+directories.
+
+## Ideas Under Evaluation
+
+This section is for ideas that may be useful later but are not committed product
+direction yet.
+
+### Repository Metadata Filesystem
 
 A narrower VFS/FUSE idea is to expose repository metadata only, not repository
 file contents.
@@ -383,7 +412,7 @@ Each leaf could expose small text or desktop files with useful metadata:
 - linked worktree paths,
 - submodule paths and status.
 
-This metadata filesystem should be read-only initially. It should be considered
+This metadata filesystem would be read-only initially. It should be considered
 a browser/navigation aid, not a way to perform Git operations by editing files.
 
 Compared with exposing complete repository snapshots, metadata-only VFS has a
@@ -401,30 +430,6 @@ Open questions:
 - How to discover repositories.
 - How to avoid stale mounts.
 - How this interacts with the future status daemon cache.
-
-## Future Status Daemon
-
-A status daemon is not part of v1.
-
-Expected daemon name:
-
-```text
-nemovcs-statusd
-```
-
-Expected direction:
-
-- Discover repositories from Nemo on-visit events.
-- Run one initial status scan per repository root.
-- Cache status by repository root and relative path.
-- Return cached, stale, loading, or error states quickly.
-- Watch worktree and `.git` changes.
-- Debounce refreshes.
-- Refresh once per burst of filesystem events.
-- Notify the Nemo plugin so visible items can invalidate and repaint.
-
-The daemon should avoid continuous polling and should not scan arbitrary home
-directories.
 
 ## Compatibility with RabbitVCS
 
