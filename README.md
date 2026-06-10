@@ -2,6 +2,9 @@
 
 NemoVCS is a small Git integration for the Nemo file manager.
 
+Status: pre-alpha design scaffold. The command skeleton and Nemo Action files
+exist, but this is not ready for daily use yet.
+
 The first target is intentionally narrow:
 
 - Git only
@@ -57,4 +60,3 @@ so they only appear for paths inside Git working trees.
 2. Add small GTK dialogs only where terminal output is not enough.
 3. Add a Nemo plugin for emblems, columns, and dynamic menu behavior.
 4. Add `nemovcs-statusd` for cached on-visit status with filesystem invalidation.
-
