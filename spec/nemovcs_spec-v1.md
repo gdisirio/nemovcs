@@ -283,10 +283,72 @@ Expected plugin responsibilities:
 - Implement `Nemo.InfoProvider.update_file_info()` for on-visit status.
 - Add emblems for visible files/folders.
 - Add optional columns.
+- Add a repository-related property page in Nemo's file properties dialog.
 - Add dynamic menus if Nemo Actions become too limited.
 - Keep Nemo UI callbacks fast.
 
 The plugin should not run expensive Git commands directly on the UI path.
+
+## Future Property Page
+
+A Nemo property page is not part of v1, but it is a required feature for the
+full tool.
+
+Expected provider:
+
+```text
+Nemo.PropertyPageProvider
+```
+
+The page should appear only for paths inside supported working copies.
+
+Initial Git information:
+
+- VCS type.
+- Repository root.
+- Current branch.
+- HEAD commit.
+- Upstream branch.
+- Ahead/behind counts when available.
+- Selected path relative to repository root.
+- Selected path status summary.
+- Remote URLs.
+
+The property page should use cached status data when a status daemon exists.
+Before then, it should run only cheap Git commands and avoid blocking Nemo's UI.
+
+## Future Repository Browser
+
+A repository browser is required after the core action workflow is usable.
+
+There are two plausible designs:
+
+- Standalone NemoVCS browser application.
+- Repository content exposed to Nemo as browsable files/directories.
+
+The standalone browser is the preferred first implementation. RabbitVCS has a
+standalone GTK SVN browser that can be used as reference material, but it should
+not be copied wholesale: it is SVN-focused and tied to RabbitVCS internals.
+
+Using Nemo itself as the browser is an open research item. A normal Nemo
+extension can add menus, emblems, columns, and property pages, but it does not
+by itself provide a new filesystem. To make Nemo browse repository content that
+is not already present in the working tree, NemoVCS would likely need one of:
+
+- a GVfs backend or custom URI/mount integration,
+- a FUSE filesystem,
+- a temporary materialized checkout/tree view,
+- or a simpler action that opens local working-tree paths in Nemo.
+
+For Git, the standalone browser should initially support:
+
+- browse tracked files at a revision,
+- choose branch/tag/commit,
+- open or export a file,
+- compare selected revision/path with working tree when applicable.
+
+For SVN, a future backend could provide remote repository browsing similar to
+RabbitVCS' browser.
 
 ## Future Status Daemon
 
