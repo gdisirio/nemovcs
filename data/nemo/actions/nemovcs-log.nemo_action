@@ -1,5 +1,5 @@
 [Nemo Action]
-Name=NemoVCS Log
+Name=Log
 Comment=Show Git log for the selected path
 Exec=nemovcs run-terminal log %F
 Icon-Name=git

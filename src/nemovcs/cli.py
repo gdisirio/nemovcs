@@ -49,6 +49,10 @@ def cmd_log(args: argparse.Namespace) -> int:
     return _print_results(git.log(args.paths, limit=args.limit))
 
 
+def cmd_update(args: argparse.Namespace) -> int:
+    return _print_results(git.update(args.paths))
+
+
 def cmd_commit(args: argparse.Namespace) -> int:
     paths = args.paths or ["."]
     grouped = git.group_by_repo(paths)
@@ -72,6 +76,19 @@ def cmd_commit(args: argparse.Namespace) -> int:
         if rc:
             exit_code = rc
     return exit_code
+
+
+def cmd_settings(args: argparse.Namespace) -> int:
+    print("NemoVCS settings are not implemented yet.")
+    print("This placeholder is installed to validate the Nemo menu layout.")
+    return 0
+
+
+def cmd_about(args: argparse.Namespace) -> int:
+    print(f"NemoVCS {__version__}")
+    print("Git integration for the Nemo file manager.")
+    print("Project: https://github.com/gdisirio/nemovcs")
+    return 0
 
 
 def cmd_run_terminal(args: argparse.Namespace) -> int:
@@ -117,10 +134,20 @@ def build_parser() -> argparse.ArgumentParser:
     log.add_argument("paths", nargs="*")
     log.set_defaults(func=cmd_log)
 
+    update = subparsers.add_parser("update", help="update the current Git repository")
+    update.add_argument("paths", nargs="*")
+    update.set_defaults(func=cmd_update)
+
     commit = subparsers.add_parser("commit", help="stage selected paths and commit")
     commit.add_argument("-m", "--message")
     commit.add_argument("paths", nargs="*")
     commit.set_defaults(func=cmd_commit)
+
+    settings = subparsers.add_parser("settings", help="show NemoVCS settings")
+    settings.set_defaults(func=cmd_settings)
+
+    about = subparsers.add_parser("about", help="show NemoVCS information")
+    about.set_defaults(func=cmd_about)
 
     run_terminal = subparsers.add_parser(
         "run-terminal",

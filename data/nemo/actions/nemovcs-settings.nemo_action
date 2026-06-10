@@ -1,11 +1,12 @@
 [Nemo Action]
-Name=Diff
-Comment=Show Git diff for the selected path
-Exec=nemovcs run-terminal diff %F
-Icon-Name=git
+Name=Settings...
+Comment=Show NemoVCS settings
+Exec=nemovcs run-terminal settings
+Icon-Name=preferences-system
 Selection=notnone
 Extensions=any;
 Dependencies=git;nemovcs;
 UriScheme=file
 Conditions=exec nemovcs action-visible inside-worktree %F
 Terminal=true
+

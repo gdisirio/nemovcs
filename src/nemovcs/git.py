@@ -150,3 +150,10 @@ def diff(paths: Sequence[str | Path]) -> list[GitResult]:
         results.append(run_git(root, args))
     return results
 
+
+def update(paths: Sequence[str | Path]) -> list[GitResult]:
+    grouped = group_by_repo(paths or [Path.cwd()])
+    results: list[GitResult] = []
+    for root in grouped:
+        results.append(run_git(root, ["pull", "--ff-only"], timeout=300))
+    return results

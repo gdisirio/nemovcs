@@ -1,7 +1,7 @@
 [Nemo Action]
-Name=Diff
-Comment=Show Git diff for the selected path
-Exec=nemovcs run-terminal diff %F
+Name=Update
+Comment=Update this Git repository
+Exec=nemovcs run-terminal update %F
 Icon-Name=git
 Selection=notnone
 Extensions=any;
@@ -9,3 +9,4 @@ Dependencies=git;nemovcs;
 UriScheme=file
 Conditions=exec nemovcs action-visible inside-worktree %F
 Terminal=true
+

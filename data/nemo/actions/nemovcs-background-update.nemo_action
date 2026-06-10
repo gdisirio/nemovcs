@@ -1,7 +1,7 @@
 [Nemo Action]
-Name=Status
-Comment=Show Git status for this folder
-Exec=nemovcs run-terminal status %P
+Name=Update
+Comment=Update this Git repository
+Exec=nemovcs run-terminal update %P
 Icon-Name=git
 Selection=none
 Extensions=any;
@@ -9,3 +9,4 @@ Dependencies=git;nemovcs;
 UriScheme=file
 Conditions=exec nemovcs action-visible inside-worktree %P
 Terminal=true
+

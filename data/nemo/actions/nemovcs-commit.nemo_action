@@ -1,5 +1,5 @@
 [Nemo Action]
-Name=NemoVCS Commit
+Name=Commit
 Comment=Stage the selected path and open Git commit
 Exec=nemovcs run-terminal commit %F
 Icon-Name=git
