@@ -250,6 +250,7 @@ Core responsibilities:
 - Show file status, path, and optionally staged/unstaged indicators.
 - Open the selected file diff in Meld.
 - Open the selected file in the file manager or default editor where useful.
+- Provide a context menu on changed-file rows for quick operations.
 - Give the commit message editor enough vertical space for real messages, not
   just a single-line entry.
 - Keep the commit message visible while the user reviews and toggles files.
@@ -271,6 +272,22 @@ Git state model:
 Partial hunk staging is out of scope for the first GUI commit dialog. It can be
 evaluated later, likely by delegating to Git's interactive patch mode or a
 purpose-built patch UI.
+
+Initial changed-file context menu:
+
+- Include / Exclude from commit.
+- Diff with Meld.
+- Open file.
+- Show in Nemo.
+- Copy relative path.
+
+Later context-menu candidates:
+
+- Revert selected file.
+- Stage selected file.
+- Unstage selected file.
+- Resolve conflict.
+- Ignore untracked path.
 
 ### `nemovcs update`
 
