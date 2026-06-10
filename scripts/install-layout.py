@@ -54,7 +54,7 @@ def submenu_node(label: str, children: list[dict[str, object]]) -> dict[str, obj
     return {
         "uuid": label,
         "type": "submenu",
-        "user-label": None,
+        "user-label": label,
         "user-icon": None,
         "accelerator": None,
         "children": children,

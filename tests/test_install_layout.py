@@ -19,6 +19,7 @@ class InstallLayoutTest(unittest.TestCase):
         self.assertEqual(layout[2]["uuid"], "nemovcs-background-update.nemo_action")
         self.assertEqual(layout[3]["uuid"], "NemoVCS")
         self.assertEqual(layout[3]["type"], "submenu")
+        self.assertEqual(layout[3]["user-label"], "NemoVCS")
 
         child_uuids = [child["uuid"] for child in layout[3]["children"]]
         self.assertIn("nemovcs-status.nemo_action", child_uuids)
@@ -43,4 +44,3 @@ class InstallLayoutTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
