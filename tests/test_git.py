@@ -3,6 +3,7 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+from unittest import mock
 
 from nemovcs import git
 
@@ -55,6 +56,38 @@ class GitHelpersTest(unittest.TestCase):
         self.assertEqual(len(results), 1)
         self.assertTrue(results[0].ok)
         self.assertIn("?? new.txt", results[0].stdout)
+
+    def test_diff_uses_meld_difftool(self):
+        fake_result = git.GitResult(("git",), self.root, 0, "", "")
+        with mock.patch("nemovcs.git.group_by_repo") as group_by_repo:
+            group_by_repo.return_value = {self.root: ["tracked.txt"]}
+            with mock.patch("nemovcs.git.shutil.which", return_value="/usr/bin/meld"):
+                with mock.patch(
+                    "nemovcs.git.run_git", return_value=fake_result
+                ) as run_git:
+                    results = git.diff([self.root / "tracked.txt"])
+
+        self.assertEqual(results, [fake_result])
+        run_git.assert_called_once_with(
+            self.root,
+            [
+                "difftool",
+                "--tool=meld",
+                "--dir-diff",
+                "--no-prompt",
+                "--",
+                "tracked.txt",
+            ],
+            timeout=3600,
+        )
+
+    def test_diff_reports_missing_meld(self):
+        with mock.patch("nemovcs.git.shutil.which", return_value=None):
+            results = git.diff([self.root])
+
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0].returncode, 127)
+        self.assertIn(git.MELD_MISSING_MESSAGE, results[0].stderr)
 
 
 if __name__ == "__main__":

@@ -70,6 +70,10 @@ Required:
 - Python standard library.
 - External `git` executable.
 
+Recommended external tools:
+
+- Meld for visual diffs.
+
 Avoid runtime Python dependencies in v1.
 
 GTK, PyGObject, DBus, watchdog libraries, Dulwich, GitPython, and similar
@@ -168,7 +172,7 @@ v1 output can be terminal text.
 
 ### `nemovcs diff`
 
-Purpose: show unstaged diff for selected paths.
+Purpose: show unstaged diff for selected paths using Meld.
 
 Syntax:
 
@@ -179,10 +183,12 @@ nemovcs diff PATH...
 Expected Git command:
 
 ```text
-git -C REPO diff -- PATH...
+git -C REPO difftool --tool=meld --dir-diff --no-prompt -- PATH...
 ```
 
-v1 output can be terminal text.
+NemoVCS should use Meld for visual diffs instead of building its own diff UI.
+If Meld is not installed, the Nemo Action should be hidden through action
+dependencies and the CLI should report a clear error.
 
 ### `nemovcs log`
 
@@ -300,6 +306,9 @@ UriScheme=file
 Conditions=exec nemovcs action-visible inside-worktree ...
 ```
 
+Actions that require an external helper can add it to `Dependencies`. For
+example, `Diff...` depends on `meld`.
+
 Visibility should be contextual:
 
 - Selected-file actions should only appear when selected paths are inside a Git
@@ -370,7 +379,8 @@ The current prototype has demonstrated:
 
 - contextual Nemo Action visibility inside Git working trees,
 - native Nemo submenu layout with `Commit...` and `Update...` at top level,
-- terminal-backed `status`, `diff`, `log`, `commit`, and `update` commands,
+- terminal-backed `status`, `log`, `commit`, and `update` commands,
+- Meld-backed `diff` command,
 - temporary icons on installed menu items,
 - pause-on-exit terminal behavior for early testing.
 

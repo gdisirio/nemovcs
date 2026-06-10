@@ -30,13 +30,16 @@ Top-level actions:
 `NemoVCS` submenu actions:
 
 - `Status...`
-- `Diff...`
+- `Diff...` opens Meld
 - `Log...`
 - `Settings...`
 - `About...`
 
 Operations currently run in a terminal and pause before closing. `Settings...`
 is a placeholder, and `About...` reports project information.
+
+`Diff...` uses Meld through Git's difftool support. If Meld is not installed,
+the diff action is hidden by Nemo's action dependency handling.
 
 ## Development
 

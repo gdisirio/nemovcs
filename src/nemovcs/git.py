@@ -8,11 +8,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+import shutil
 import subprocess
 from typing import Iterable, Sequence
 
 
 DEFAULT_TIMEOUT_SECONDS = 15
+MELD_MISSING_MESSAGE = "meld is required for visual diffs"
 
 
 @dataclass(frozen=True)
@@ -146,8 +148,21 @@ def diff(paths: Sequence[str | Path]) -> list[GitResult]:
     grouped = group_by_repo(paths or [Path.cwd()])
     results: list[GitResult] = []
     for root, relpaths in grouped.items():
-        args = ["diff", "--", *relpaths]
-        results.append(run_git(root, args))
+        args = [
+            "difftool",
+            "--tool=meld",
+            "--dir-diff",
+            "--no-prompt",
+            "--",
+            *relpaths,
+        ]
+        if shutil.which("meld") is None:
+            command = ("git", "-C", str(root), *args)
+            results.append(
+                GitResult(command, root, 127, "", f"{MELD_MISSING_MESSAGE}\n")
+            )
+            continue
+        results.append(run_git(root, args, timeout=3600))
     return results
 
 
