@@ -19,13 +19,14 @@ predictable, and maintainable rather than a broad RabbitVCS-compatible clone.
 
 ## Non-Goals for v1
 
-- No SVN, Mercurial, Bazaar, or other VCS backend.
+- No SVN, Mercurial, Bazaar, or other VCS operation backend.
 - No Nautilus, Caja, Thunar, PCManFM-Qt, or Dolphin integration.
 - No live status emblems.
 - No custom Nemo columns.
 - No embedded Nemo panel.
 - No background status daemon.
 - No DBus API.
+- No user-facing menu placement configuration.
 - No attempt to preserve RabbitVCS APIs, settings, or UI behavior.
 
 ## Supported Platform
@@ -210,6 +211,28 @@ Initial actions:
 - selected path log
 - selected path commit
 
+NemoVCS should present different menu items depending on the repository type.
+Git is the only operation backend for v1, but repository detection should leave
+room for SVN and other VCS types later.
+
+Examples:
+
+- Git worktree: show Git actions.
+- SVN working copy: do not show Git actions.
+- Unknown or unsupported path: show no repository actions.
+
+Some high-frequency commands may appear at the first context-menu level. Other
+commands should appear under a `NemoVCS` submenu to avoid clutter.
+
+v1 default placement:
+
+- first level: status, diff, commit
+- `NemoVCS` submenu: log and future lower-frequency actions
+
+The first-level versus submenu placement should be modeled as action metadata,
+not hard-coded deep inside command handlers. User-configurable placement is a
+v2 feature.
+
 Actions should use:
 
 ```text
@@ -325,4 +348,3 @@ The first milestone is complete when:
 - Nemo Action files install for the current user.
 - Nemo shows the actions only inside Git worktrees.
 - Existing unit tests pass.
-
