@@ -195,6 +195,33 @@ Behavior:
 This command is intentionally basic in v1. A GUI commit dialog is a future
 feature, not required for the first milestone.
 
+### `nemovcs update`
+
+Purpose: update the current Git repository.
+
+Syntax:
+
+```text
+nemovcs update PATH...
+```
+
+Expected Git command:
+
+```text
+git -C REPO pull --ff-only
+```
+
+Behavior:
+
+- Group selected paths by repository.
+- Run one update command per repository root.
+- Treat update as a repository operation, not a path-limited operation.
+- Prefer fast-forward-only updates in the early prototype to avoid opening
+  merge conflict workflows before the GUI layer exists.
+
+This command is intentionally basic in v1. More complete pull/fetch/rebase
+policy belongs in settings and later GUI flows.
+
 ## Nemo Actions
 
 v1 action files live in:
@@ -210,6 +237,10 @@ Initial actions:
 - selected path diff
 - selected path log
 - selected path commit
+- selected path update
+- background folder update
+- settings placeholder
+- about placeholder
 
 NemoVCS should present different menu items depending on the repository type.
 Git is the only operation backend for v1, but repository detection should leave
@@ -224,10 +255,10 @@ Examples:
 Some high-frequency commands may appear at the first context-menu level. Other
 commands should appear under a `NemoVCS` submenu to avoid clutter.
 
-v1 default placement:
+current v1 default placement:
 
-- first level: status, diff, commit
-- `NemoVCS` submenu: log and future lower-frequency actions
+- first level: commit, update
+- `NemoVCS` submenu: status, diff, log, settings, about
 
 The first-level versus submenu placement should be modeled as action metadata,
 not hard-coded deep inside command handlers. User-configurable placement is a
@@ -249,6 +280,11 @@ Visibility should be contextual:
   a Git worktree.
 
 v1 actions can use `Terminal=true`.
+
+Menu items that open a terminal or future dialog should use an ellipsis in their
+label. The early prototype uses temporary RabbitVCS icons stored under
+`rsc/icons/rabbitvcs`; these assets must be replaced or license-cleared before a
+proper release.
 
 ## Error Handling
 
@@ -286,6 +322,19 @@ standalone repository browser.
 
 The logger should not be required for v1. It is the planned replacement for
 `nemovcs run-terminal` once the operation flow is proven.
+
+## Prototype Checkpoint
+
+The current prototype has demonstrated:
+
+- contextual Nemo Action visibility inside Git working trees,
+- native Nemo submenu layout with `Commit...` and `Update...` at top level,
+- terminal-backed `status`, `diff`, `log`, `commit`, and `update` commands,
+- temporary icons on installed menu items,
+- pause-on-exit terminal behavior for early testing.
+
+This does not close v1. The next major gap is replacing terminal output with a
+small GUI logger and adding better error presentation.
 
 ## Timeouts
 
@@ -488,6 +537,9 @@ The first milestone is complete when:
 - `nemovcs status PATH` works inside a Git repo.
 - `nemovcs diff PATH` works inside a Git repo.
 - `nemovcs log PATH` works inside a Git repo.
+- `nemovcs update PATH` works inside a Git repo.
+- `nemovcs commit PATH` works inside a Git repo.
 - Nemo Action files install for the current user.
 - Nemo shows the actions only inside Git worktrees.
+- Nemo shows the expected top-level items and `NemoVCS` submenu.
 - Existing unit tests pass.

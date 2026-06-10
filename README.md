@@ -2,8 +2,10 @@
 
 NemoVCS is a small Git integration for the Nemo file manager.
 
-Status: pre-alpha design scaffold. The command skeleton and Nemo Action files
-exist, but this is not ready for daily use yet.
+Status: pre-alpha functional prototype. The command skeleton, Nemo Action files,
+contextual visibility, temporary icons, and basic terminal-backed operations are
+in place. `Update...` and `Commit...` have been tested from Nemo, but this is
+still not ready for unattended daily use.
 
 The first target is intentionally narrow:
 
@@ -15,6 +17,27 @@ The first target is intentionally narrow:
 
 RabbitVCS is useful reference material, but NemoVCS is a new project.
 
+## Current Functionality
+
+The current prototype installs contextual Nemo menu items that appear only for
+paths inside Git working trees.
+
+Top-level actions:
+
+- `Commit...`
+- `Update...`
+
+`NemoVCS` submenu actions:
+
+- `Status...`
+- `Diff...`
+- `Log...`
+- `Settings...`
+- `About...`
+
+Operations currently run in a terminal and pause before closing. `Settings...`
+is a placeholder, and `About...` reports project information.
+
 ## Development
 
 Run the CLI directly from the source tree:
@@ -23,13 +46,13 @@ Run the CLI directly from the source tree:
 PYTHONPATH=src python3 -m nemovcs --help
 ```
 
-Run tests:
+Run tests from the source tree:
 
 ```sh
-python3 -m unittest discover -s tests
+PYTHONPATH=src python3 -m unittest discover -s tests
 ```
 
-Install the Python package in editable mode:
+If `pip` is available, install the Python package in editable mode:
 
 ```sh
 python3 -m pip install -e .
@@ -39,10 +62,10 @@ python3 -m pip install -e .
 
 Action files live in `data/nemo/actions`.
 
-For per-user testing, copy or symlink them into:
+For per-user testing, install the actions and temporary icons with:
 
-```text
-~/.local/share/nemo/actions
+```sh
+./scripts/install-actions.sh
 ```
 
 Then restart Nemo:
@@ -53,6 +76,9 @@ nemo --quit
 
 The actions use `Conditions=exec nemovcs action-visible inside-worktree ...`
 so they only appear for paths inside Git working trees.
+
+The installer also writes the current `NemoVCS` submenu layout into Nemo's user
+action layout file.
 
 ## Roadmap
 
