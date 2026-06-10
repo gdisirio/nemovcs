@@ -263,6 +263,30 @@ Examples:
 
 Commands should avoid Python tracebacks for expected user-facing errors.
 
+## Future GUI Output Logger
+
+The terminal pause wrapper is acceptable for early testing, but the full tool
+needs a graphical output/log window similar in spirit to RabbitVCS'
+notification/logger windows.
+
+Expected responsibilities:
+
+- Show command title, repository root, and selected paths.
+- Stream stdout and stderr from Git commands.
+- Show exit status and elapsed time.
+- Keep output visible after completion.
+- Allow copying output to clipboard.
+- Allow saving output to a file.
+- Support canceling long-running commands where possible.
+- Present errors in a user-readable way without Python tracebacks.
+- Support multiple command phases, such as `git add` followed by `git commit`.
+
+The logger should be reusable by Nemo Actions, future plugin actions, and any
+standalone repository browser.
+
+The logger should not be required for v1. It is the planned replacement for
+`nemovcs run-terminal` once the operation flow is proven.
+
 ## Timeouts
 
 Short Git probes should use a short timeout.
