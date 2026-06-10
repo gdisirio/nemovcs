@@ -75,6 +75,34 @@ Avoid runtime Python dependencies in v1.
 GTK, PyGObject, DBus, watchdog libraries, Dulwich, GitPython, and similar
 dependencies are out of scope for v1.
 
+## Git Backend Strategy
+
+NemoVCS uses the system `git` executable rather than a Python Git library.
+This keeps behavior aligned with users' configured Git, including credentials,
+hooks, signing, filters, worktrees, submodules, and distribution packaging.
+
+NemoVCS should distinguish between:
+
+- user-facing command output, which can be streamed mostly as Git produces it,
+- machine-readable repository state, which should use stable Git formats.
+
+RabbitVCS is useful reference material, but its Git support often presents raw
+Git text while its Subversion support is more polished. NemoVCS should avoid
+copying that limitation for Git status and metadata features.
+
+For repository state used by menus, emblems, property pages, and future cached
+status, prefer documented machine formats:
+
+- `git status --porcelain=v2 -z`
+- `git diff --name-status -z`
+- explicit `git log --format=...` formats
+- focused probes such as `git rev-parse`, `git branch --show-current`, and
+  `git remote get-url`
+
+Parsing ad hoc human output should be avoided. Normal Git text output remains
+acceptable for early terminal-backed operations and for the future GUI logger
+when the output is meant for the user to read directly.
+
 ## Command Line Interface
 
 The CLI command is:
