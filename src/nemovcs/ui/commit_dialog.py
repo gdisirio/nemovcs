@@ -354,18 +354,62 @@ class CommitDialog(Gtk.Window):
 
     def build_context_menu(self) -> Gtk.Menu:
         menu = Gtk.Menu()
-        for label, callback in (
-            ("Include / Exclude", self.on_context_toggle),
-            ("Diff with Meld", self.on_context_diff),
-            ("Open File", self.on_context_open),
-            ("Show in Nemo", self.on_context_show_in_nemo),
-            ("Copy Relative Path", self.on_context_copy_path),
+        for label, callback, icon_name, icon_path in (
+            (
+                "Include / Exclude",
+                self.on_context_toggle,
+                "object-select-symbolic",
+                None,
+            ),
+            (
+                "Diff with Meld",
+                self.on_context_diff,
+                None,
+                RESOURCE_ROOT / "actions" / "rabbitvcs-diff.svg",
+            ),
+            ("Open File", self.on_context_open, "document-open-symbolic", None),
+            (
+                "Show in Nemo",
+                self.on_context_show_in_nemo,
+                "folder-open-symbolic",
+                None,
+            ),
+            (
+                "Copy Relative Path",
+                self.on_context_copy_path,
+                "edit-copy-symbolic",
+                None,
+            ),
         ):
-            item = Gtk.MenuItem(label=label)
+            item = Gtk.ImageMenuItem(label=label)
+            item.set_always_show_image(True)
+            item.set_image(self.menu_image(icon_name=icon_name, icon_path=icon_path))
             item.connect("activate", callback)
             menu.append(item)
         menu.show_all()
         return menu
+
+    def menu_image(
+        self,
+        *,
+        icon_name: str | None = None,
+        icon_path: Path | None = None,
+    ) -> Gtk.Image:
+        if icon_path is not None:
+            try:
+                pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(
+                    str(icon_path),
+                    ICON_SIZE,
+                    ICON_SIZE,
+                )
+                return Gtk.Image.new_from_pixbuf(pixbuf)
+            except GLib.Error:
+                pass
+
+        if icon_name is not None:
+            return Gtk.Image.new_from_icon_name(icon_name, Gtk.IconSize.MENU)
+
+        return Gtk.Image.new_from_icon_name("image-missing", Gtk.IconSize.MENU)
 
     def on_context_toggle(self, _item: Gtk.MenuItem) -> None:
         for iter_ in self.selected_iters():
