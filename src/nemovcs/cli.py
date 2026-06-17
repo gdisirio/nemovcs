@@ -78,6 +78,12 @@ def cmd_commit(args: argparse.Namespace) -> int:
     return exit_code
 
 
+def cmd_commit_dialog(args: argparse.Namespace) -> int:
+    from .ui import commit_dialog
+
+    return commit_dialog.run(args.paths or ["."])
+
+
 def cmd_settings(args: argparse.Namespace) -> int:
     print("NemoVCS settings are not implemented yet.")
     print("This placeholder is installed to validate the Nemo menu layout.")
@@ -142,6 +148,13 @@ def build_parser() -> argparse.ArgumentParser:
     commit.add_argument("-m", "--message")
     commit.add_argument("paths", nargs="*")
     commit.set_defaults(func=cmd_commit)
+
+    commit_dialog = subparsers.add_parser(
+        "commit-dialog",
+        help="open the GTK commit dialog",
+    )
+    commit_dialog.add_argument("paths", nargs="*")
+    commit_dialog.set_defaults(func=cmd_commit_dialog)
 
     settings = subparsers.add_parser("settings", help="show NemoVCS settings")
     settings.set_defaults(func=cmd_settings)

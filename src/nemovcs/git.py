@@ -30,6 +30,28 @@ class GitResult:
         return self.returncode == 0
 
 
+@dataclass(frozen=True)
+class CommitItem:
+    root: Path
+    path: str
+    status: str
+    index_status: str
+    worktree_status: str
+    old_path: str | None = None
+    tracked: bool = True
+    conflicted: bool = False
+
+    @property
+    def default_selected(self) -> bool:
+        return self.tracked and not self.conflicted
+
+    @property
+    def stage_paths(self) -> tuple[str, ...]:
+        if self.old_path:
+            return (self.old_path, self.path)
+        return (self.path,)
+
+
 class GitError(RuntimeError):
     """Raised when a Git command fails and the caller requested checking."""
 
@@ -132,6 +154,168 @@ def status(paths: Sequence[str | Path]) -> list[GitResult]:
     for root, relpaths in grouped.items():
         args = ["status", "--short", "--branch", "--", *relpaths]
         results.append(run_git(root, args))
+    return results
+
+
+def _status_label(
+    index_status: str,
+    worktree_status: str,
+    *,
+    tracked: bool,
+    conflicted: bool,
+    old_path: str | None,
+) -> str:
+    if conflicted:
+        return "conflicted"
+    if not tracked:
+        return "untracked"
+    if old_path or index_status in {"R", "C"}:
+        return "renamed"
+    if index_status == "A":
+        return "added"
+    if index_status == "D" or worktree_status == "D":
+        return "deleted"
+    if index_status == "M" or worktree_status == "M":
+        return "modified"
+    return "changed"
+
+
+def parse_status_porcelain_v2_z(root: str | Path, data: bytes) -> list[CommitItem]:
+    """Parse `git status --porcelain=v2 -z` output for commit selection."""
+
+    root_path = Path(root)
+    records = data.split(b"\0")
+    items: list[CommitItem] = []
+    idx = 0
+    while idx < len(records):
+        record = records[idx]
+        idx += 1
+        if not record or record.startswith(b"# "):
+            continue
+
+        kind = chr(record[0])
+        text = record.decode("utf-8", errors="surrogateescape")
+
+        if kind == "?":
+            path = text[2:]
+            items.append(
+                CommitItem(
+                    root=root_path,
+                    path=path,
+                    status="untracked",
+                    index_status="?",
+                    worktree_status="?",
+                    tracked=False,
+                )
+            )
+            continue
+
+        if kind == "!":
+            continue
+
+        if kind == "u":
+            fields = text.split(" ", 10)
+            if len(fields) < 11:
+                continue
+            xy = fields[1]
+            items.append(
+                CommitItem(
+                    root=root_path,
+                    path=fields[10],
+                    status="conflicted",
+                    index_status=xy[0],
+                    worktree_status=xy[1],
+                    conflicted=True,
+                )
+            )
+            continue
+
+        if kind == "1":
+            fields = text.split(" ", 8)
+            if len(fields) < 9:
+                continue
+            xy = fields[1]
+            items.append(
+                CommitItem(
+                    root=root_path,
+                    path=fields[8],
+                    status=_status_label(
+                        xy[0], xy[1], tracked=True, conflicted=False, old_path=None
+                    ),
+                    index_status=xy[0],
+                    worktree_status=xy[1],
+                )
+            )
+            continue
+
+        if kind == "2":
+            fields = text.split(" ", 9)
+            if len(fields) < 10:
+                continue
+            old_path = None
+            if idx < len(records):
+                old_record = records[idx]
+                idx += 1
+                old_path = old_record.decode("utf-8", errors="surrogateescape")
+            xy = fields[1]
+            items.append(
+                CommitItem(
+                    root=root_path,
+                    path=fields[9],
+                    old_path=old_path,
+                    status=_status_label(
+                        xy[0], xy[1], tracked=True, conflicted=False, old_path=old_path
+                    ),
+                    index_status=xy[0],
+                    worktree_status=xy[1],
+                )
+            )
+
+    return items
+
+
+def commit_items(paths: Sequence[str | Path]) -> dict[Path, list[CommitItem]]:
+    grouped = group_by_repo(paths or [Path.cwd()])
+    items_by_root: dict[Path, list[CommitItem]] = {}
+    for root, relpaths in grouped.items():
+        result = run_git(
+            root,
+            ["status", "--porcelain=v2", "-z", "--", *relpaths],
+        )
+        if not result.ok:
+            items_by_root[root] = []
+            continue
+        items_by_root[root] = parse_status_porcelain_v2_z(
+            root,
+            result.stdout.encode("utf-8", errors="surrogateescape"),
+        )
+    return items_by_root
+
+
+def current_branch(root: str | Path) -> str:
+    result = run_git(root, ["branch", "--show-current"])
+    branch = result.stdout.strip()
+    if result.ok and branch:
+        return branch
+
+    result = run_git(root, ["rev-parse", "--short", "HEAD"])
+    commit = result.stdout.strip()
+    if result.ok and commit:
+        return f"detached at {commit}"
+    return "unknown"
+
+
+def commit_paths(root: str | Path, relpaths: Sequence[str], message: str) -> list[GitResult]:
+    if not relpaths:
+        return []
+
+    results: list[GitResult] = []
+    add_result = run_git(root, ["add", "--", *relpaths])
+    results.append(add_result)
+    if not add_result.ok:
+        return results
+
+    results.append(run_git(root, ["commit", "-m", message, "--", *relpaths], timeout=3600))
     return results
 
 

@@ -26,6 +26,14 @@ class CliParserTest(unittest.TestCase):
         self.assertEqual(parser.parse_args(["settings"]).command, "settings")
         self.assertEqual(parser.parse_args(["about"]).command, "about")
 
+    def test_commit_dialog_accepts_paths(self):
+        parser = build_parser()
+
+        args = parser.parse_args(["commit-dialog", "/tmp/example"])
+
+        self.assertEqual(args.command, "commit-dialog")
+        self.assertEqual(args.paths, ["/tmp/example"])
+
 
 if __name__ == "__main__":
     unittest.main()

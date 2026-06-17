@@ -229,9 +229,9 @@ Behavior:
 This command is intentionally basic in v1. A GUI commit dialog is a future
 feature, not required for the first milestone.
 
-## Future Commit And Staging Dialog
+## Commit And Staging Dialog
 
-The commit/staging dialog is one of the most important GUI surfaces for the full
+The commit/staging dialog is one of the most important GUI surfaces for the
 tool. RabbitVCS can be used as a practical reference because its commit window
 was functional, but NemoVCS should aim for a cleaner workflow closer to the best
 parts of tools such as TortoiseSVN.
@@ -439,6 +439,7 @@ The current prototype has demonstrated:
 
 - contextual Nemo Action visibility inside Git working trees,
 - native Nemo submenu layout with `Commit...` and `Update...` at top level,
+- first GTK commit dialog with a flat changed-file checklist,
 - terminal-backed `status`, `log`, `commit`, and `update` commands,
 - Meld-backed `diff` command,
 - temporary icons on installed menu items,

@@ -57,6 +57,38 @@ class GitHelpersTest(unittest.TestCase):
         self.assertTrue(results[0].ok)
         self.assertIn("?? new.txt", results[0].stdout)
 
+    def test_parse_status_porcelain_v2_for_commit_items(self):
+        data = (
+            b"1 .M N... 100644 100644 100644 "
+            b"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa "
+            b"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa src/app.py\0"
+            b"? notes.txt\0"
+            b"2 R. N... 100644 100644 100644 "
+            b"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb "
+            b"cccccccccccccccccccccccccccccccccccccccc R100 new.py\0old.py\0"
+            b"u UU N... 100644 100644 100644 100644 "
+            b"dddddddddddddddddddddddddddddddddddddddd "
+            b"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee "
+            b"ffffffffffffffffffffffffffffffffffffffff conflict.txt\0"
+        )
+
+        items = git.parse_status_porcelain_v2_z(self.root, data)
+
+        self.assertEqual([item.path for item in items], [
+            "src/app.py",
+            "notes.txt",
+            "new.py",
+            "conflict.txt",
+        ])
+        self.assertEqual(items[0].status, "modified")
+        self.assertTrue(items[0].default_selected)
+        self.assertEqual(items[1].status, "untracked")
+        self.assertFalse(items[1].default_selected)
+        self.assertEqual(items[2].status, "renamed")
+        self.assertEqual(items[2].stage_paths, ("old.py", "new.py"))
+        self.assertEqual(items[3].status, "conflicted")
+        self.assertFalse(items[3].default_selected)
+
     def test_diff_uses_meld_difftool(self):
         fake_result = git.GitResult(("git",), self.root, 0, "", "")
         with mock.patch("nemovcs.git.group_by_repo") as group_by_repo:
@@ -88,6 +120,31 @@ class GitHelpersTest(unittest.TestCase):
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0].returncode, 127)
         self.assertIn(git.MELD_MISSING_MESSAGE, results[0].stderr)
+
+    def test_commit_paths_commits_explicit_paths(self):
+        path = self.root / "tracked.txt"
+        path.write_text("old\n", encoding="utf-8")
+        subprocess.run(["git", "add", "tracked.txt"], cwd=self.root, check=True)
+        subprocess.run(
+            ["git", "commit", "-m", "initial"],
+            cwd=self.root,
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        path.write_text("new\n", encoding="utf-8")
+
+        results = git.commit_paths(self.root, ["tracked.txt"], "update tracked")
+
+        self.assertTrue(all(result.ok for result in results))
+        log = subprocess.run(
+            ["git", "log", "-1", "--format=%s"],
+            cwd=self.root,
+            check=True,
+            stdout=subprocess.PIPE,
+            text=True,
+        )
+        self.assertEqual(log.stdout.strip(), "update tracked")
 
 
 if __name__ == "__main__":
