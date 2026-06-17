@@ -19,12 +19,23 @@ from nemovcs import git
 
 
 COL_INCLUDED = 0
-COL_STATUS = 1
-COL_ICON = 2
-COL_PATH = 3
-COL_OLD_PATH = 4
-COL_ITEM = 5
+COL_STATUS_ICON = 1
+COL_STATUS = 2
+COL_ICON = 3
+COL_PATH = 4
+COL_OLD_PATH = 5
+COL_ITEM = 6
 ICON_SIZE = 20
+RESOURCE_ROOT = Path(__file__).resolve().parents[3] / "rsc" / "icons" / "rabbitvcs"
+STATUS_ICON_NAMES = {
+    "added": "emblem-rabbitvcs-added.svg",
+    "changed": "emblem-rabbitvcs-modified.svg",
+    "conflicted": "emblem-rabbitvcs-conflicted.svg",
+    "deleted": "emblem-rabbitvcs-deleted.svg",
+    "modified": "emblem-rabbitvcs-modified.svg",
+    "renamed": "emblem-rabbitvcs-modified.svg",
+    "untracked": "emblem-rabbitvcs-unversioned.svg",
+}
 
 
 def run(paths: Sequence[str]) -> int:
@@ -44,6 +55,7 @@ class CommitDialog(Gtk.Window):
         self.items: list[git.CommitItem] = []
         self.icon_theme = Gtk.IconTheme.get_default()
         self.icon_cache: dict[str, GdkPixbuf.Pixbuf | None] = {}
+        self.status_icon_cache: dict[str, GdkPixbuf.Pixbuf | None] = {}
 
         self.set_default_size(860, 660)
         self.set_border_width(12)
@@ -101,7 +113,15 @@ class CommitDialog(Gtk.Window):
         select_none.connect("clicked", self.on_select_none_clicked)
         files_header.pack_start(select_none, False, False, 0)
 
-        self.store = Gtk.ListStore(bool, str, GdkPixbuf.Pixbuf, str, str, object)
+        self.store = Gtk.ListStore(
+            bool,
+            GdkPixbuf.Pixbuf,
+            str,
+            GdkPixbuf.Pixbuf,
+            str,
+            str,
+            object,
+        )
         self.tree = Gtk.TreeView(model=self.store)
         self.tree.set_headers_visible(True)
         self.tree.get_selection().set_mode(Gtk.SelectionMode.MULTIPLE)
@@ -113,14 +133,18 @@ class CommitDialog(Gtk.Window):
         include_col = Gtk.TreeViewColumn("Include", toggle, active=COL_INCLUDED)
         self.tree.append_column(include_col)
 
-        for title, column, width in (("Status", COL_STATUS, 110),):
-            renderer = Gtk.CellRendererText()
-            renderer.set_property("ellipsize", Pango.EllipsizeMode.END)
-            tree_col = Gtk.TreeViewColumn(title, renderer, text=column)
-            tree_col.set_resizable(True)
-            tree_col.set_min_width(width)
-            tree_col.set_sort_column_id(column)
-            self.tree.append_column(tree_col)
+        status_col = Gtk.TreeViewColumn("Status")
+        status_icon_renderer = Gtk.CellRendererPixbuf()
+        status_col.pack_start(status_icon_renderer, False)
+        status_col.add_attribute(status_icon_renderer, "pixbuf", COL_STATUS_ICON)
+        status_renderer = Gtk.CellRendererText()
+        status_renderer.set_property("ellipsize", Pango.EllipsizeMode.END)
+        status_col.pack_start(status_renderer, True)
+        status_col.add_attribute(status_renderer, "text", COL_STATUS)
+        status_col.set_resizable(True)
+        status_col.set_min_width(130)
+        status_col.set_sort_column_id(COL_STATUS)
+        self.tree.append_column(status_col)
 
         path_col = Gtk.TreeViewColumn("Path")
         icon_renderer = Gtk.CellRendererPixbuf()
@@ -192,6 +216,7 @@ class CommitDialog(Gtk.Window):
             self.store.append(
                 [
                     item.default_selected,
+                    self.status_icon(item.status),
                     item.status,
                     self.file_icon(item),
                     item.path,
@@ -418,6 +443,20 @@ class CommitDialog(Gtk.Window):
             if icon_pixbuf is not None:
                 return icon_pixbuf
         return None
+
+    def status_icon(self, status: str) -> GdkPixbuf.Pixbuf | None:
+        if status not in self.status_icon_cache:
+            icon_name = STATUS_ICON_NAMES.get(status, "emblem-rabbitvcs-modified.svg")
+            icon_path = RESOURCE_ROOT / "emblems" / icon_name
+            try:
+                self.status_icon_cache[status] = GdkPixbuf.Pixbuf.new_from_file_at_size(
+                    str(icon_path),
+                    ICON_SIZE,
+                    ICON_SIZE,
+                )
+            except GLib.Error:
+                self.status_icon_cache[status] = None
+        return self.status_icon_cache[status]
 
     def spawn(self, command: Sequence[str]) -> None:
         try:

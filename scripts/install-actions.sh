@@ -13,6 +13,7 @@ mkdir -p "$target_icons_dir"
 cp "$src_dir"/*.nemo_action "$target_dir"/
 cp -R "$icons_dir"/actions "$target_icons_dir"/
 cp -R "$icons_dir"/apps "$target_icons_dir"/
+cp -R "$icons_dir"/emblems "$target_icons_dir"/
 python3 "$(dirname -- "$0")/install-layout.py"
 
 printf 'Installed NemoVCS actions to %s\n' "$target_dir"
