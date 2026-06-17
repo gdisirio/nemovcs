@@ -19,11 +19,9 @@ from nemovcs import git
 
 COL_INCLUDED = 0
 COL_STATUS = 1
-COL_INDEX = 2
-COL_WORKTREE = 3
-COL_PATH = 4
-COL_OLD_PATH = 5
-COL_ITEM = 6
+COL_PATH = 2
+COL_OLD_PATH = 3
+COL_ITEM = 4
 
 
 def run(paths: Sequence[str]) -> int:
@@ -98,7 +96,7 @@ class CommitDialog(Gtk.Window):
         select_none.connect("clicked", self.on_select_none_clicked)
         files_header.pack_start(select_none, False, False, 0)
 
-        self.store = Gtk.ListStore(bool, str, str, str, str, str, object)
+        self.store = Gtk.ListStore(bool, str, str, str, object)
         self.tree = Gtk.TreeView(model=self.store)
         self.tree.set_headers_visible(True)
         self.tree.get_selection().set_mode(Gtk.SelectionMode.MULTIPLE)
@@ -112,9 +110,7 @@ class CommitDialog(Gtk.Window):
 
         for title, column, width in (
             ("Status", COL_STATUS, 110),
-            ("Staged", COL_INDEX, 70),
-            ("Unstaged", COL_WORKTREE, 80),
-            ("Path", COL_PATH, 360),
+            ("Path", COL_PATH, 460),
             ("Old Path", COL_OLD_PATH, 220),
         ):
             renderer = Gtk.CellRendererText()
@@ -171,8 +167,6 @@ class CommitDialog(Gtk.Window):
                 [
                     item.default_selected,
                     item.status,
-                    self._status_char(item.index_status),
-                    self._status_char(item.worktree_status),
                     item.path,
                     item.old_path or "",
                     item,
@@ -372,10 +366,6 @@ class CommitDialog(Gtk.Window):
             subprocess.Popen(command)
         except OSError as exc:
             self.show_error(str(exc))
-
-    @staticmethod
-    def _status_char(value: str) -> str:
-        return "" if value == "." else value
 
 
 if __name__ == "__main__":
