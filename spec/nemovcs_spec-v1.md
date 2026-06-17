@@ -376,7 +376,8 @@ Visibility should be contextual:
 - Background folder actions should only appear when the current folder is inside
   a Git worktree.
 
-v1 actions can use `Terminal=true`.
+v1 actions can use `Terminal=true`. Actions that have moved to the GTK logger
+should use `Terminal=false`.
 
 Menu items that open a terminal or future dialog should use an ellipsis in their
 label. The early prototype uses temporary RabbitVCS icons stored under
@@ -396,11 +397,11 @@ Examples:
 
 Commands should avoid Python tracebacks for expected user-facing errors.
 
-## Future GUI Output Logger
+## GUI Output Logger
 
-The terminal pause wrapper is acceptable for early testing, but the full tool
-needs a graphical output/log window similar in spirit to RabbitVCS'
-notification/logger windows.
+The terminal pause wrapper is acceptable for early testing, but user-facing
+operations should move to a graphical output/log window similar in spirit to
+RabbitVCS' notification/logger windows.
 
 Expected responsibilities:
 
@@ -430,8 +431,9 @@ and preserves exactly what Git reported.
 The logger should be reusable by Nemo Actions, future plugin actions, and any
 standalone repository browser.
 
-The logger should not be required for v1. It is the planned replacement for
-`nemovcs run-terminal` once the operation flow is proven.
+The initial GTK logger is reusable across command phases and is used by the
+commit dialog and update action. It is the planned replacement for
+`nemovcs run-terminal` once each operation flow is proven.
 
 ## Prototype Checkpoint
 
@@ -440,13 +442,16 @@ The current prototype has demonstrated:
 - contextual Nemo Action visibility inside Git working trees,
 - native Nemo submenu layout with `Commit...` and `Update...` at top level,
 - first GTK commit dialog with a flat changed-file checklist,
-- terminal-backed `status`, `log`, `commit`, and `update` commands,
+- reusable GTK logger with `Summary` and `Output` tabs,
+- logger-backed commit and update flows,
+- terminal-backed `status` and `log` commands,
 - Meld-backed `diff` command,
 - temporary icons on installed menu items,
 - pause-on-exit terminal behavior for early testing.
 
-This does not close v1. The next major gap is replacing terminal output with a
-small GUI logger and adding better error presentation.
+This does not close v1. The next major gap is improving structured logger
+summaries, adding copy/save affordances, and replacing more terminal output with
+logger-backed flows.
 
 ## Timeouts
 

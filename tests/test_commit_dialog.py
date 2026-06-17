@@ -36,6 +36,35 @@ class CommitDialogCommandTest(unittest.TestCase):
         )
         self.assertNotIn("--dir-diff", command)
 
+    def test_commit_phases_are_reusable_logger_phases(self):
+        root = Path("/tmp/example")
+        dialog = CommitDialog.__new__(CommitDialog)
+        dialog.root = root
+
+        phases = dialog.commit_phases(["src/app.py"], "message")
+
+        self.assertEqual([phase.title for phase in phases], [
+            "Stage selected files",
+            "Create commit",
+        ])
+        self.assertEqual(
+            phases[0].command,
+            ("git", "-C", str(root), "add", "--", "src/app.py"),
+        )
+        self.assertEqual(
+            phases[1].command,
+            (
+                "git",
+                "-C",
+                str(root),
+                "commit",
+                "-m",
+                "message",
+                "--",
+                "src/app.py",
+            ),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -20,6 +20,14 @@ class CliParserTest(unittest.TestCase):
         self.assertEqual(args.command, "update")
         self.assertEqual(args.paths, ["/tmp/example"])
 
+    def test_update_dialog_accepts_paths(self):
+        parser = build_parser()
+
+        args = parser.parse_args(["update-dialog", "/tmp/example"])
+
+        self.assertEqual(args.command, "update-dialog")
+        self.assertEqual(args.paths, ["/tmp/example"])
+
     def test_settings_and_about_parse(self):
         parser = build_parser()
 

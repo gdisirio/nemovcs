@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+from pathlib import Path
 import subprocess
 import sys
 from typing import Callable, Sequence
@@ -51,6 +52,26 @@ def cmd_log(args: argparse.Namespace) -> int:
 
 def cmd_update(args: argparse.Namespace) -> int:
     return _print_results(git.update(args.paths))
+
+
+def update_phases(paths: Sequence[str]):
+    from .ui import logger
+
+    grouped = git.group_by_repo(paths or [Path.cwd()])
+    return [
+        logger.CommandPhase.git(f"Update {root.name}", root, ["pull", "--ff-only"])
+        for root in grouped
+    ]
+
+
+def cmd_update_dialog(args: argparse.Namespace) -> int:
+    from .ui import logger
+
+    phases = update_phases(args.paths)
+    if not phases:
+        print("not inside a Git working tree", file=sys.stderr)
+        return 1
+    return logger.run("Update", phases)
 
 
 def cmd_commit(args: argparse.Namespace) -> int:
@@ -143,6 +164,13 @@ def build_parser() -> argparse.ArgumentParser:
     update = subparsers.add_parser("update", help="update the current Git repository")
     update.add_argument("paths", nargs="*")
     update.set_defaults(func=cmd_update)
+
+    update_dialog = subparsers.add_parser(
+        "update-dialog",
+        help="update the current Git repository in a GTK logger",
+    )
+    update_dialog.add_argument("paths", nargs="*")
+    update_dialog.set_defaults(func=cmd_update_dialog)
 
     commit = subparsers.add_parser("commit", help="stage selected paths and commit")
     commit.add_argument("-m", "--message")

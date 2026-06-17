@@ -3,9 +3,9 @@
 NemoVCS is a small Git integration for the Nemo file manager.
 
 Status: pre-alpha functional prototype. The command skeleton, Nemo Action files,
-contextual visibility, temporary icons, basic terminal-backed operations, and a
-first GTK commit dialog are in place. This is still not ready for unattended
-daily use.
+contextual visibility, temporary icons, basic terminal-backed operations, a
+first GTK commit dialog, and a reusable GTK command logger are in place. This is
+still not ready for unattended daily use.
 
 The first target is intentionally narrow:
 
@@ -36,10 +36,13 @@ Top-level actions:
 - `About...`
 
 `Commit...` opens the first GTK commit dialog with a message editor, flat
-changed-file checklist, include checkboxes, and per-file context menu.
+changed-file checklist, include checkboxes, and per-file context menu. The
+stage and commit steps run through a GTK logger with `Summary` and `Output`
+tabs.
 
-Most other operations currently run in a terminal and pause before closing.
-`Settings...` is a placeholder, and `About...` reports project information.
+`Update...` runs `git pull --ff-only` through the same GTK logger. `Status...`
+and `Log...` currently run in a terminal and pause before closing. `Settings...`
+is a placeholder, and `About...` reports project information.
 
 `Diff...` uses Meld through Git's difftool support. If Meld is not installed,
 the diff action is hidden by Nemo's action dependency handling.
@@ -89,6 +92,7 @@ action layout file.
 ## Roadmap
 
 1. Implement the operation actions with robust Git command handling.
-2. Add small GTK dialogs only where terminal output is not enough.
+2. Expand the GTK logger and use it for more operations where terminal output is
+   not enough.
 3. Add a Nemo plugin for emblems, columns, and dynamic menu behavior.
 4. Add `nemovcs-statusd` for cached on-visit status with filesystem invalidation.

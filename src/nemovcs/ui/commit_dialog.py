@@ -16,6 +16,7 @@ from gi.repository import GdkPixbuf  # noqa: E402
 from gi.repository import Pango  # noqa: E402
 
 from nemovcs import git
+from nemovcs.ui import logger
 
 
 COL_INCLUDED = 0
@@ -181,9 +182,9 @@ class CommitDialog(Gtk.Window):
         button_box.set_spacing(8)
         outer.pack_start(button_box, False, False, 0)
 
-        cancel = Gtk.Button(label="Cancel")
-        cancel.connect("clicked", self.on_cancel_clicked)
-        button_box.add(cancel)
+        self.cancel_button = Gtk.Button(label="Cancel")
+        self.cancel_button.connect("clicked", self.on_cancel_clicked)
+        button_box.add(self.cancel_button)
 
         self.commit_button = Gtk.Button(label="Commit")
         self.commit_button.get_style_context().add_class("suggested-action")
@@ -316,16 +317,45 @@ class CommitDialog(Gtk.Window):
             self.show_error("Select at least one file to commit.")
             return
 
-        results = git.commit_paths(self.root, relpaths, message)
-        failed = [result for result in results if not result.ok]
-        if failed:
-            result = failed[-1]
-            self.show_error(result.stderr.strip() or result.stdout.strip())
-            return
+        window = logger.LoggerWindow(
+            "Commit",
+            self.commit_phases(relpaths, message),
+            on_complete=self.on_commit_logger_complete,
+        )
+        window.set_transient_for(self)
+        window.show_all()
+        self.commit_button.set_sensitive(False)
+        self.cancel_button.set_sensitive(False)
+        self.set_deletable(False)
 
-        detail = results[-1].stdout.strip() if results else ""
-        self.show_info("Commit completed.", detail)
-        self.destroy()
+    def commit_phases(
+        self,
+        relpaths: Sequence[str],
+        message: str,
+    ) -> list[logger.CommandPhase]:
+        if self.root is None:
+            return []
+        return [
+            logger.CommandPhase.git(
+                "Stage selected files",
+                self.root,
+                ["add", "--", *relpaths],
+            ),
+            logger.CommandPhase.git(
+                "Create commit",
+                self.root,
+                ["commit", "-m", message, "--", *relpaths],
+            ),
+        ]
+
+    def on_commit_logger_complete(self, ok: bool, _returncodes: list[int]) -> None:
+        if ok:
+            self.destroy()
+            return
+        self.set_deletable(True)
+        self.cancel_button.set_sensitive(True)
+        self.commit_button.set_sensitive(True)
+        self.load_items()
 
     def on_row_activated(
         self,
