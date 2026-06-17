@@ -16,6 +16,7 @@ The first target is intentionally narrow:
 - no background status daemon until the action flow is solid
 
 RabbitVCS is useful reference material, but NemoVCS is a new project.
+The prototype keeps each operation explicit so early behavior is easy to test.
 
 ## Current Functionality
 
