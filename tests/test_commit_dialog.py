@@ -65,6 +65,33 @@ class CommitDialogCommandTest(unittest.TestCase):
             ),
         )
 
+    def test_successful_commit_hides_dialog_until_logger_closes(self):
+        class FakeDialog:
+            def __init__(self):
+                self.commit_completed = False
+                self.hidden = False
+                self.destroyed = False
+                self.active_logger = object()
+
+            def hide(self):
+                self.hidden = True
+
+            def destroy(self):
+                self.destroyed = True
+
+        dialog = FakeDialog()
+
+        CommitDialog.on_commit_logger_complete(dialog, True, [])
+
+        self.assertTrue(dialog.commit_completed)
+        self.assertTrue(dialog.hidden)
+        self.assertFalse(dialog.destroyed)
+
+        CommitDialog.on_commit_logger_destroyed(dialog, object())
+
+        self.assertIsNone(dialog.active_logger)
+        self.assertTrue(dialog.destroyed)
+
 
 if __name__ == "__main__":
     unittest.main()

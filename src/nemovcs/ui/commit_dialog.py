@@ -54,6 +54,8 @@ class CommitDialog(Gtk.Window):
         self.exit_code = 0
         self.root: Path | None = None
         self.items: list[git.CommitItem] = []
+        self.active_logger: logger.LoggerWindow | None = None
+        self.commit_completed = False
         self.icon_theme = Gtk.IconTheme.get_default()
         self.icon_cache: dict[str, GdkPixbuf.Pixbuf | None] = {}
         self.status_icon_cache: dict[str, GdkPixbuf.Pixbuf | None] = {}
@@ -322,6 +324,8 @@ class CommitDialog(Gtk.Window):
             self.commit_phases(relpaths, message),
             on_complete=self.on_commit_logger_complete,
         )
+        self.active_logger = window
+        window.connect("destroy", self.on_commit_logger_destroyed)
         window.set_transient_for(self)
         window.show_all()
         self.commit_button.set_sensitive(False)
@@ -350,12 +354,18 @@ class CommitDialog(Gtk.Window):
 
     def on_commit_logger_complete(self, ok: bool, _returncodes: list[int]) -> None:
         if ok:
-            self.destroy()
+            self.commit_completed = True
+            self.hide()
             return
         self.set_deletable(True)
         self.cancel_button.set_sensitive(True)
         self.commit_button.set_sensitive(True)
         self.load_items()
+
+    def on_commit_logger_destroyed(self, _window: logger.LoggerWindow) -> None:
+        self.active_logger = None
+        if self.commit_completed:
+            self.destroy()
 
     def on_row_activated(
         self,
