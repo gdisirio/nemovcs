@@ -79,10 +79,11 @@ class CommitDialog(Gtk.Window):
         self.message_view.set_accepts_tab(False)
         message_scroll.add(self.message_view)
 
-        files_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        files_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        files_box.set_margin_top(14)
         paned.pack2(files_box, resize=True, shrink=False)
 
-        files_header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        files_header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
         files_box.pack_start(files_header, False, False, 0)
 
         self.status_label = Gtk.Label(xalign=0)
