@@ -396,19 +396,22 @@ class CommitDialog(Gtk.Window):
             return
         if self.root is None:
             return
-        self.spawn(
-            [
-                "git",
-                "-C",
-                str(self.root),
-                "difftool",
-                "--tool=meld",
-                "--dir-diff",
-                "--no-prompt",
-                "--",
-                item.path,
-            ]
-        )
+        self.spawn(self.file_diff_command(item))
+
+    def file_diff_command(self, item: git.CommitItem) -> list[str]:
+        if self.root is None:
+            return []
+        return [
+            "git",
+            "-C",
+            str(self.root),
+            "difftool",
+            "--tool=meld",
+            "--no-prompt",
+            "HEAD",
+            "--",
+            item.path,
+        ]
 
     def absolute_path(self, item: git.CommitItem) -> Path:
         return item.root / item.path
