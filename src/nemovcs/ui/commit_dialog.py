@@ -11,7 +11,8 @@ import gi
 
 gi.require_version("Gtk", "3.0")
 gi.require_version("Gdk", "3.0")
-from gi.repository import Gdk, Gtk  # noqa: E402
+from gi.repository import Gdk, Gio, GLib, Gtk  # noqa: E402
+from gi.repository import GdkPixbuf  # noqa: E402
 from gi.repository import Pango  # noqa: E402
 
 from nemovcs import git
@@ -19,9 +20,11 @@ from nemovcs import git
 
 COL_INCLUDED = 0
 COL_STATUS = 1
-COL_PATH = 2
-COL_OLD_PATH = 3
-COL_ITEM = 4
+COL_ICON = 2
+COL_PATH = 3
+COL_OLD_PATH = 4
+COL_ITEM = 5
+ICON_SIZE = 20
 
 
 def run(paths: Sequence[str]) -> int:
@@ -39,6 +42,8 @@ class CommitDialog(Gtk.Window):
         self.exit_code = 0
         self.root: Path | None = None
         self.items: list[git.CommitItem] = []
+        self.icon_theme = Gtk.IconTheme.get_default()
+        self.icon_cache: dict[str, GdkPixbuf.Pixbuf | None] = {}
 
         self.set_default_size(860, 660)
         self.set_border_width(12)
@@ -96,7 +101,7 @@ class CommitDialog(Gtk.Window):
         select_none.connect("clicked", self.on_select_none_clicked)
         files_header.pack_start(select_none, False, False, 0)
 
-        self.store = Gtk.ListStore(bool, str, str, str, object)
+        self.store = Gtk.ListStore(bool, str, GdkPixbuf.Pixbuf, str, str, object)
         self.tree = Gtk.TreeView(model=self.store)
         self.tree.set_headers_visible(True)
         self.tree.get_selection().set_mode(Gtk.SelectionMode.MULTIPLE)
@@ -108,11 +113,7 @@ class CommitDialog(Gtk.Window):
         include_col = Gtk.TreeViewColumn("Include", toggle, active=COL_INCLUDED)
         self.tree.append_column(include_col)
 
-        for title, column, width in (
-            ("Status", COL_STATUS, 110),
-            ("Path", COL_PATH, 460),
-            ("Old Path", COL_OLD_PATH, 220),
-        ):
+        for title, column, width in (("Status", COL_STATUS, 110),):
             renderer = Gtk.CellRendererText()
             renderer.set_property("ellipsize", Pango.EllipsizeMode.END)
             tree_col = Gtk.TreeViewColumn(title, renderer, text=column)
@@ -120,6 +121,31 @@ class CommitDialog(Gtk.Window):
             tree_col.set_min_width(width)
             tree_col.set_sort_column_id(column)
             self.tree.append_column(tree_col)
+
+        path_col = Gtk.TreeViewColumn("Path")
+        icon_renderer = Gtk.CellRendererPixbuf()
+        path_col.pack_start(icon_renderer, False)
+        path_col.add_attribute(icon_renderer, "pixbuf", COL_ICON)
+        path_renderer = Gtk.CellRendererText()
+        path_renderer.set_property("ellipsize", Pango.EllipsizeMode.END)
+        path_col.pack_start(path_renderer, True)
+        path_col.add_attribute(path_renderer, "text", COL_PATH)
+        path_col.set_resizable(True)
+        path_col.set_min_width(460)
+        path_col.set_sort_column_id(COL_PATH)
+        self.tree.append_column(path_col)
+
+        old_path_renderer = Gtk.CellRendererText()
+        old_path_renderer.set_property("ellipsize", Pango.EllipsizeMode.END)
+        old_path_col = Gtk.TreeViewColumn(
+            "Old Path",
+            old_path_renderer,
+            text=COL_OLD_PATH,
+        )
+        old_path_col.set_resizable(True)
+        old_path_col.set_min_width(220)
+        old_path_col.set_sort_column_id(COL_OLD_PATH)
+        self.tree.append_column(old_path_col)
 
         scroll = Gtk.ScrolledWindow()
         scroll.set_shadow_type(Gtk.ShadowType.IN)
@@ -167,6 +193,7 @@ class CommitDialog(Gtk.Window):
                 [
                     item.default_selected,
                     item.status,
+                    self.file_icon(item),
                     item.path,
                     item.old_path or "",
                     item,
@@ -360,6 +387,37 @@ class CommitDialog(Gtk.Window):
 
     def absolute_path(self, item: git.CommitItem) -> Path:
         return item.root / item.path
+
+    def file_icon(self, item: git.CommitItem) -> GdkPixbuf.Pixbuf | None:
+        path = self.absolute_path(item)
+        try:
+            info = Gio.File.new_for_path(str(path)).query_info(
+                "standard::icon",
+                Gio.FileQueryInfoFlags.NONE,
+                None,
+            )
+            icon = info.get_icon()
+            if isinstance(icon, Gio.ThemedIcon):
+                icon_names = icon.get_names()
+            else:
+                icon_names = ["text-x-generic", "application-x-executable"]
+        except GLib.Error:
+            icon_names = ["text-x-generic", "unknown"]
+
+        for icon_name in icon_names:
+            if icon_name not in self.icon_cache:
+                try:
+                    self.icon_cache[icon_name] = self.icon_theme.load_icon(
+                        icon_name,
+                        ICON_SIZE,
+                        Gtk.IconLookupFlags.FORCE_SIZE,
+                    )
+                except GLib.Error:
+                    self.icon_cache[icon_name] = None
+            icon_pixbuf = self.icon_cache[icon_name]
+            if icon_pixbuf is not None:
+                return icon_pixbuf
+        return None
 
     def spawn(self, command: Sequence[str]) -> None:
         try:
