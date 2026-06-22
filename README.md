@@ -98,7 +98,8 @@ action layout file.
 The status-emblem plugin is an early prototype. It installs a `nemo-python`
 `InfoProvider` that resolves local file paths, talks to the foreground status
 daemon, and applies one primary emblem for `ok`, `modified`, or `conflicted`
-status.
+status. It also listens for daemon status-change signals and invalidates
+bounded visible file items so Nemo can refresh emblems without navigating away.
 
 For per-user source-tree testing, install the extension with:
 

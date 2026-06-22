@@ -6,10 +6,13 @@ installs can point Nemo at this source tree without requiring pip install -e.
 
 from __future__ import annotations
 
+from collections import OrderedDict
 from pathlib import Path
 
 from . import status_client
 
+
+DEFAULT_MAX_VISIBLE_ITEMS = 2048
 
 PRIMARY_EMBLEMS = {
     "conflicted": "rabbitvcs-conflicted",
@@ -25,10 +28,15 @@ class NemoVCSInfoProviderCore:
         cache: status_client.StatusClientCache | None = None,
         seen=None,
         get_status=None,
+        max_visible_items: int = DEFAULT_MAX_VISIBLE_ITEMS,
     ):
+        if max_visible_items < 1:
+            raise ValueError("max_visible_items must be at least 1")
         self.cache = cache if cache is not None else status_client.StatusClientCache()
         self.seen = seen
         self.get_status = get_status
+        self.max_visible_items = max_visible_items
+        self.visible_items: OrderedDict[str, object] = OrderedDict()
         self.last_error = ""
 
     def item_path(self, item) -> str | None:
@@ -47,6 +55,7 @@ class NemoVCSInfoProviderCore:
         path = self.item_path(item)
         if path is None:
             return None
+        self.track_visible_item(path, item)
         record = self.update_path(path)
         self.apply_emblem(item, record)
         return record
@@ -79,16 +88,80 @@ class NemoVCSInfoProviderCore:
 
         return emblem
 
+    def track_visible_item(self, path: str | Path, item) -> None:
+        key = status_client.normalize_path(path)
+        if key in self.visible_items:
+            del self.visible_items[key]
+        self.visible_items[key] = item
+        self.visible_items.move_to_end(key, last=False)
+        while len(self.visible_items) > self.max_visible_items:
+            self.visible_items.popitem(last=True)
+
+    def on_status_changed(
+        self,
+        worktree_id: str,
+        changed_paths,
+    ) -> list[str]:
+        affected_paths = self.affected_visible_paths(worktree_id, changed_paths)
+        self.cache.invalidate(worktree_id, changed_paths)
+        return [
+            path
+            for path in affected_paths
+            if self.invalidate_visible_item(path)
+        ]
+
+    def affected_visible_paths(self, worktree_id: str, changed_paths) -> list[str]:
+        changed = [status_client.normalize_path(path) for path in changed_paths]
+        affected: list[str] = []
+        for path in self.visible_items:
+            record = self.cache.get(path)
+            if record is None or record.get("worktree_id") != str(worktree_id):
+                continue
+            if not changed or any(
+                status_client.paths_overlap(path, changed_path)
+                for changed_path in changed
+            ):
+                affected.append(path)
+        return affected
+
+    def invalidate_visible_item(self, path: str | Path) -> bool:
+        item = self.visible_items.get(status_client.normalize_path(path))
+        if item is None:
+            return False
+
+        invalidate = getattr(item, "invalidate_extension_info", None)
+        if invalidate is None:
+            return False
+
+        try:
+            invalidate()
+        except Exception as exc:
+            self.last_error = str(exc)
+            return False
+        return True
+
 
 class NemoVCSInfoProviderMixin:
     def __init__(self):
         self.nemovcs_core = NemoVCSInfoProviderCore()
+        self.nemovcs_signal_subscription = None
+        self.subscribe_status_changed()
 
     def update_file_info(self, item):
         from gi.repository import Nemo
 
         self.nemovcs_core.update_item(item)
         return Nemo.OperationResult.COMPLETE
+
+    def subscribe_status_changed(self) -> bool:
+        try:
+            self.nemovcs_signal_subscription = subscribe_daemon_status_changed(
+                self.nemovcs_core.on_status_changed
+            )
+        except Exception as exc:
+            self.nemovcs_core.last_error = str(exc)
+            return False
+        return True
 
 
 def default_seen(paths):
@@ -101,6 +174,15 @@ def default_get_status(paths):
     from . import statusd_dbus
 
     return statusd_dbus.call_get_status(paths)
+
+
+def subscribe_daemon_status_changed(callback):
+    import dbus.mainloop.glib
+
+    from . import statusd_dbus
+
+    dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
+    return statusd_dbus.subscribe_status_changed(callback)
 
 
 def primary_emblem(status: str) -> str | None:

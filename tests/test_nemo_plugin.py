@@ -1,5 +1,6 @@
 from pathlib import Path
 import unittest
+from unittest import mock
 
 from nemovcs import nemo_plugin
 
@@ -17,6 +18,7 @@ class FakeItem:
         self.path = path
         self.uri_scheme = uri_scheme
         self.emblems = []
+        self.invalidated = 0
 
     def get_uri_scheme(self):
         return self.uri_scheme
@@ -26,6 +28,9 @@ class FakeItem:
 
     def add_emblem(self, emblem):
         self.emblems.append(emblem)
+
+    def invalidate_extension_info(self):
+        self.invalidated += 1
 
 
 class NemoVCSInfoProviderCoreTest(unittest.TestCase):
@@ -75,6 +80,7 @@ class NemoVCSInfoProviderCoreTest(unittest.TestCase):
             core.cache.get(Path("/tmp/repo/tracked.txt"))["status"],
             "modified",
         )
+        self.assertIn("/tmp/repo/tracked.txt", core.visible_items)
 
     def test_conflicted_status_adds_conflict_emblem(self):
         core = nemo_plugin.NemoVCSInfoProviderCore(
@@ -129,6 +135,137 @@ class NemoVCSInfoProviderCoreTest(unittest.TestCase):
 
         self.assertIsNone(core.update_path("/tmp/repo/tracked.txt"))
         self.assertEqual(core.last_error, "no daemon")
+
+    def test_visible_item_cache_is_bounded_and_recent_first(self):
+        core = nemo_plugin.NemoVCSInfoProviderCore(max_visible_items=2)
+        first = FakeItem("/tmp/repo/one.txt")
+        second = FakeItem("/tmp/repo/two.txt")
+        third = FakeItem("/tmp/repo/three.txt")
+
+        core.track_visible_item(first.path, first)
+        core.track_visible_item(second.path, second)
+        core.track_visible_item(third.path, third)
+
+        self.assertEqual(
+            list(core.visible_items.keys()),
+            ["/tmp/repo/three.txt", "/tmp/repo/two.txt"],
+        )
+
+    def test_changed_file_invalidates_matching_visible_item(self):
+        core = nemo_plugin.NemoVCSInfoProviderCore()
+        item = FakeItem("/tmp/repo/tracked.txt")
+        core.track_visible_item(item.path, item)
+        core.cache.update(
+            [
+                {
+                    "path": item.path,
+                    "worktree_id": "/tmp/repo",
+                    "status": "ok",
+                }
+            ]
+        )
+
+        invalidated = core.on_status_changed("/tmp/repo", [item.path])
+
+        self.assertEqual(invalidated, [item.path])
+        self.assertEqual(item.invalidated, 1)
+        self.assertIsNone(core.cache.get(item.path))
+
+    def test_changed_child_invalidates_visible_parent_folder(self):
+        core = nemo_plugin.NemoVCSInfoProviderCore()
+        folder = FakeItem("/tmp/repo/dir")
+        core.track_visible_item(folder.path, folder)
+        core.cache.update(
+            [
+                {
+                    "path": folder.path,
+                    "worktree_id": "/tmp/repo",
+                    "status": "ok",
+                }
+            ]
+        )
+
+        invalidated = core.on_status_changed(
+            "/tmp/repo",
+            ["/tmp/repo/dir/nested.txt"],
+        )
+
+        self.assertEqual(invalidated, [folder.path])
+        self.assertEqual(folder.invalidated, 1)
+
+    def test_status_changed_ignores_other_worktree_items(self):
+        core = nemo_plugin.NemoVCSInfoProviderCore()
+        other = FakeItem("/tmp/other/tracked.txt")
+        core.track_visible_item(other.path, other)
+        core.cache.update(
+            [
+                {
+                    "path": other.path,
+                    "worktree_id": "/tmp/other",
+                    "status": "ok",
+                }
+            ]
+        )
+
+        invalidated = core.on_status_changed(
+            "/tmp/repo",
+            ["/tmp/repo/tracked.txt"],
+        )
+
+        self.assertEqual(invalidated, [])
+        self.assertEqual(other.invalidated, 0)
+        self.assertIsNotNone(core.cache.get(other.path))
+
+    def test_empty_changed_paths_invalidates_visible_worktree_items(self):
+        core = nemo_plugin.NemoVCSInfoProviderCore()
+        first = FakeItem("/tmp/repo/a.txt")
+        second = FakeItem("/tmp/repo/b.txt")
+        core.track_visible_item(first.path, first)
+        core.track_visible_item(second.path, second)
+        core.cache.update(
+            [
+                {"path": first.path, "worktree_id": "/tmp/repo", "status": "ok"},
+                {"path": second.path, "worktree_id": "/tmp/repo", "status": "ok"},
+            ]
+        )
+
+        invalidated = core.on_status_changed("/tmp/repo", [])
+
+        self.assertEqual(invalidated, [second.path, first.path])
+        self.assertEqual(first.invalidated, 1)
+        self.assertEqual(second.invalidated, 1)
+
+    def test_visible_item_without_invalidation_method_is_ignored(self):
+        core = nemo_plugin.NemoVCSInfoProviderCore()
+        path = "/tmp/repo/tracked.txt"
+        core.track_visible_item(path, object())
+        core.cache.update(
+            [{"path": path, "worktree_id": "/tmp/repo", "status": "ok"}]
+        )
+
+        invalidated = core.on_status_changed("/tmp/repo", [path])
+
+        self.assertEqual(invalidated, [])
+
+    def test_mixin_subscribes_to_status_changed_signal(self):
+        with mock.patch(
+            "nemovcs.nemo_plugin.subscribe_daemon_status_changed",
+            return_value="handle",
+        ) as subscribe:
+            provider = nemo_plugin.NemoVCSInfoProviderMixin()
+
+        self.assertEqual(provider.nemovcs_signal_subscription, "handle")
+        subscribe.assert_called_once_with(provider.nemovcs_core.on_status_changed)
+
+    def test_mixin_records_subscription_failure(self):
+        with mock.patch(
+            "nemovcs.nemo_plugin.subscribe_daemon_status_changed",
+            side_effect=RuntimeError("no dbus"),
+        ):
+            provider = nemo_plugin.NemoVCSInfoProviderMixin()
+
+        self.assertIsNone(provider.nemovcs_signal_subscription)
+        self.assertEqual(provider.nemovcs_core.last_error, "no dbus")
 
 
 if __name__ == "__main__":

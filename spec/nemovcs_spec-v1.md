@@ -815,7 +815,6 @@ Remaining Milestone 7 work:
 
 - Decide whether the clean/ok emblem is too visually noisy once broader manual
   testing covers several repositories.
-- Manual-test the extension inside Nemo.
 
 #### Milestone 7.2: Primary Status Emblems
 
@@ -843,33 +842,46 @@ Tests:
 - Clean status adds the normal emblem.
 - Loading/stale/error statuses do not add emblems.
 - Folder status records use aggregate descendant status.
-- Installer writes the user extension and the two required emblem SVGs.
+- Installer writes the user extension and the three required emblem SVGs.
 
-Tests:
+#### Milestone 7.3: Nemo Invalidation
 
-- Manual test in Nemo: modified file shows modified emblem.
-- Manual test in Nemo: conflicted file/folder shows conflict emblem.
-- Manual test linked worktree: emblems follow that worktree's own status.
-- Manual memory check: browsing many repositories does not grow plugin memory
-  without bound.
-
-#### Milestone 8: Nemo Invalidation
+Status: implemented for visible items.
 
 Goal: make emblems update when daemon status changes.
 
 Implementation:
 
 - Plugin listens for daemon `StatusChanged` signals.
-- Plugin asks Nemo to invalidate or refresh visible file info where the API
-  supports it.
-- If Nemo invalidation is limited, document the fallback behavior.
+- Plugin keeps a bounded map of recently visible `path -> Nemo item` entries.
+- Plugin invalidates only visible items whose cached worktree and path overlap
+  the daemon signal.
+- Parent folders are invalidated when a changed child path overlaps them.
+- Cache invalidation happens before `invalidate_extension_info()` so the
+  follow-up `update_file_info()` call fetches fresh daemon status.
+- The visible-item map is bounded to avoid unbounded retention of Nemo file
+  objects while browsing many repositories.
 
 Tests:
 
-- Modify a visible file and confirm the emblem updates without navigating away,
-  if the API supports it.
-- Commit or revert a visible file and confirm the emblem returns to `ok`.
-- Confirm daemon signals do not make the plugin retain stale file objects.
+- Unit tests cover bounded visible-item retention.
+- Unit tests cover changed-file invalidation.
+- Unit tests cover changed-child invalidating a visible parent folder.
+- Unit tests cover ignoring items from other worktrees.
+- Manual test: modify a visible file and confirm the emblem updates without
+  navigating away.
+- Manual test: commit or revert a visible file and confirm it returns to `ok`.
+
+#### Milestone 8: Hardening Nemo Invalidation
+
+Goal: make the live integration robust enough for daily browsing.
+
+Implementation:
+
+- Add optional diagnostics for plugin calls and invalidation counts.
+- Check linked worktrees manually in Nemo.
+- Tune the visible-item cache size if needed.
+- Document any Nemo API limits found during manual testing.
 
 ## Ideas Under Evaluation
 
