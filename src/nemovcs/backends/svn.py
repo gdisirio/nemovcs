@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+import shutil
 import subprocess
 import xml.etree.ElementTree as ET
 from typing import Iterable, Sequence
@@ -18,6 +19,7 @@ from nemovcs.backends.base import (
 
 
 DEFAULT_TIMEOUT_SECONDS = 15
+MELD_MISSING_MESSAGE = "meld is required for visual diffs"
 
 
 @dataclass(frozen=True)
@@ -88,8 +90,15 @@ class SvnBackend:
     def diff_commands(self, paths: Sequence[str | Path]) -> list[SvnResult]:
         results: list[SvnResult] = []
         for root, relpaths in self.group(paths or [Path.cwd()]).items():
-            command = ("svn", "diff", *relpaths)
-            results.append(SvnResult(command, root, 0, "", ""))
+            for relpath in relpaths:
+                target = root if relpath == "." else root / relpath
+                command = ("nemovcs", "svn-meld-diff", str(target))
+                if shutil.which("meld") is None:
+                    results.append(
+                        SvnResult(command, root, 127, "", f"{MELD_MISSING_MESSAGE}\n")
+                    )
+                    continue
+                results.append(SvnResult(command, root, 0, "", ""))
         return results
 
     def commit(
@@ -203,7 +212,7 @@ class SvnBackend:
         return []
 
     def file_diff_command(self, item: BackendChangeItem) -> list[str]:
-        return ["svn", "diff", str(item.root / item.path)]
+        return ["nemovcs", "svn-meld-diff", str(item.root / item.path)]
 
     def update(self, paths: Sequence[str | Path]) -> list[SvnResult]:
         results: list[SvnResult] = []

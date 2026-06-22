@@ -26,14 +26,14 @@ Required:
 - Python 3.10 or newer
 - python3-gi / PyGObject
 - python3-dbus
-- Git
+- Git and/or Subversion command-line clients
 
 Optional:
 
 - Meld, for the `Diff...` action.
 
-NemoVCS shells out to the `git` executable. It does not use a Python Git
-library.
+NemoVCS shells out to native VCS tools such as `git` and `svn`. It does not use
+Python VCS libraries.
 
 ## Install
 

@@ -613,6 +613,43 @@ class BackendRegistryTest(unittest.TestCase):
             ),
         )
 
+    def test_svn_backend_builds_meld_diff_commands(self):
+        backend = SvnBackend()
+        root = Path("/tmp/wc")
+
+        with mock.patch.object(backend, "group", return_value={root: ["src/app.py"]}), (
+            mock.patch("nemovcs.backends.svn.shutil.which", return_value="/usr/bin/meld")
+        ):
+            result = backend.diff_commands([root / "src/app.py"])
+
+        self.assertEqual(
+            result,
+            [
+                SvnResult(
+                    ("nemovcs", "svn-meld-diff", "/tmp/wc/src/app.py"),
+                    root,
+                    0,
+                    "",
+                    "",
+                )
+            ],
+        )
+
+    def test_svn_backend_file_diff_command_uses_meld_helper(self):
+        backend = SvnBackend()
+        root = Path("/tmp/wc")
+        item = BackendChangeItem(
+            backend_id="svn",
+            root=root,
+            path="src/app.py",
+            status="modified",
+        )
+
+        self.assertEqual(
+            backend.file_diff_command(item),
+            ["nemovcs", "svn-meld-diff", "/tmp/wc/src/app.py"],
+        )
+
     def test_svn_backend_builds_add_commit_and_update_phases(self):
         backend = SvnBackend()
         root = Path("/tmp/wc")

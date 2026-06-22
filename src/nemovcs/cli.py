@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
+import shutil
 import subprocess
 import sys
+import tempfile
 from typing import Any, Callable, Protocol, Sequence
 
 from . import __version__
@@ -111,7 +113,7 @@ def cmd_diff_dialog(args: argparse.Namespace) -> int:
         if not command.ok:
             info_dialog.show_error(
                 "Unable to open diff",
-                command.stderr.strip() or "Git difftool command could not be built.",
+                command.stderr.strip() or "Diff command could not be built.",
             )
             exit_code = command.returncode or 1
             continue
@@ -134,6 +136,40 @@ def cmd_diff_dialog(args: argparse.Namespace) -> int:
         if logger_exit:
             exit_code = logger_exit
     return exit_code
+
+
+def cmd_svn_meld_diff(args: argparse.Namespace) -> int:
+    meld = shutil.which("meld")
+    if meld is None:
+        print("meld is required for visual diffs", file=sys.stderr)
+        return 127
+
+    target = Path(args.path).expanduser()
+    if not target.is_absolute():
+        target = Path.cwd() / target
+    target = target.resolve(strict=False)
+
+    with tempfile.TemporaryDirectory(prefix="nemovcs-svn-diff-") as temp_dir:
+        base_path = Path(temp_dir) / (target.name or "working-copy")
+        export = subprocess.run(
+            ["svn", "export", "--force", "-r", "BASE", str(target), str(base_path)],
+            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if export.returncode:
+            if export.stdout:
+                print(export.stdout, end="")
+            if export.stderr:
+                print(export.stderr, end="", file=sys.stderr)
+            return export.returncode
+
+        try:
+            return subprocess.call([meld, str(base_path), str(target)])
+        except OSError as exc:
+            print(str(exc), file=sys.stderr)
+            return 127
 
 
 def cmd_log(args: argparse.Namespace) -> int:
@@ -394,9 +430,16 @@ def build_parser() -> argparse.ArgumentParser:
     diff.add_argument("paths", nargs="*")
     diff.set_defaults(func=cmd_diff)
 
-    diff_dialog = subparsers.add_parser("diff-dialog", help="show Git diff in Meld")
+    diff_dialog = subparsers.add_parser("diff-dialog", help="show VCS diff in Meld")
     diff_dialog.add_argument("paths", nargs="*")
     diff_dialog.set_defaults(func=cmd_diff_dialog)
+
+    svn_meld_diff = subparsers.add_parser(
+        "svn-meld-diff",
+        help="compare SVN BASE against the working copy in Meld",
+    )
+    svn_meld_diff.add_argument("path")
+    svn_meld_diff.set_defaults(func=cmd_svn_meld_diff)
 
     log = subparsers.add_parser("log", help="show Git log")
     log.add_argument("-n", "--limit", type=int, default=50)

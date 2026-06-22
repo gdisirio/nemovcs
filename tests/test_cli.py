@@ -1,4 +1,5 @@
 import io
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -18,6 +19,7 @@ from nemovcs.cli import (
     cmd_stage_dialog,
     cmd_status,
     cmd_status_dialog,
+    cmd_svn_meld_diff,
     cmd_update,
     log_phases,
     push_phases,
@@ -287,6 +289,14 @@ class CliParserTest(unittest.TestCase):
         self.assertEqual(args.command, "diff-dialog")
         self.assertEqual(args.paths, ["/tmp/example"])
 
+    def test_svn_meld_diff_accepts_path(self):
+        parser = build_parser()
+
+        args = parser.parse_args(["svn-meld-diff", "/tmp/example/file.txt"])
+
+        self.assertEqual(args.command, "svn-meld-diff")
+        self.assertEqual(args.path, "/tmp/example/file.txt")
+
     def test_diff_dialog_uses_backend_diff_commands(self):
         parser = build_parser()
         args = parser.parse_args(["diff-dialog", "/tmp/example"])
@@ -306,6 +316,32 @@ class CliParserTest(unittest.TestCase):
 
         diff_commands.assert_called_once_with(["/tmp/example"])
         popen.assert_called_once_with(command.args, cwd=str(command.cwd))
+
+    def test_svn_meld_diff_exports_base_then_launches_meld(self):
+        parser = build_parser()
+        args = parser.parse_args(["svn-meld-diff", "/tmp/example/file.txt"])
+        export = subprocess.CompletedProcess(
+            ["svn"],
+            0,
+            stdout="",
+            stderr="",
+        )
+
+        with mock.patch("nemovcs.cli.shutil.which", return_value="/usr/bin/meld"), (
+            mock.patch("nemovcs.cli.subprocess.run", return_value=export)
+        ) as run, mock.patch("nemovcs.cli.subprocess.call", return_value=0) as call:
+            self.assertEqual(cmd_svn_meld_diff(args), 0)
+
+        export_command = run.call_args.args[0]
+        self.assertEqual(
+            export_command[:6],
+            ["svn", "export", "--force", "-r", "BASE", "/tmp/example/file.txt"],
+        )
+        self.assertEqual(Path(export_command[6]).name, "file.txt")
+        meld_command = call.call_args.args[0]
+        self.assertEqual(meld_command[0], "/usr/bin/meld")
+        self.assertEqual(Path(meld_command[1]).name, "file.txt")
+        self.assertEqual(meld_command[2], "/tmp/example/file.txt")
 
     def test_log_dialog_accepts_limit_and_paths(self):
         parser = build_parser()
