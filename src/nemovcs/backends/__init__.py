@@ -12,9 +12,10 @@ from .base import (
     BackendWorktreeIdentity,
 )
 from .git import GitBackend
+from .svn import SvnBackend
 
 
-BACKENDS: tuple[Backend, ...] = (GitBackend(),)
+BACKENDS: tuple[Backend, ...] = (GitBackend(), SvnBackend())
 
 
 def registered_backends() -> tuple[Backend, ...]:
@@ -33,6 +34,11 @@ def detect_backend(path: str | Path) -> Backend | None:
         if backend.is_worktree(path):
             return backend
     return None
+
+
+def is_backend_worktree(path: str | Path, backend_id: str) -> bool:
+    backend = backend_by_id(backend_id)
+    return bool(backend is not None and backend.is_worktree(path))
 
 
 def detect_root(path: str | Path) -> tuple[Backend, Path] | None:

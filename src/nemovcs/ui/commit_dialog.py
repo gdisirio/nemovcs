@@ -205,7 +205,7 @@ class CommitDialog(Gtk.Window):
 
         if len(roots) != 1:
             self.root = None
-            self.repo_label.set_text("Select paths from one Git repository.")
+            self.repo_label.set_text("Select paths from one versioned repository.")
             self.status_label.set_text("No commit-ready repository found.")
             self.commit_button.set_sensitive(False)
             return
@@ -307,7 +307,7 @@ class CommitDialog(Gtk.Window):
 
     def on_commit_clicked(self, _button: Gtk.Button) -> None:
         if self.root is None:
-            self.show_error("No Git repository selected.")
+            self.show_error("No versioned repository selected.")
             return
 
         message = self.get_message()

@@ -219,7 +219,7 @@ class StatusDialog(Gtk.Window):
         elif repo_count:
             self.status_label.set_text(f"No changed files in {repo_count} repository(s).")
         else:
-            self.status_label.set_text("No Git repository selected.")
+            self.status_label.set_text("No versioned repository selected.")
             self.exit_code = 1
 
     def selected_iters(self) -> list[Gtk.TreeIter]:

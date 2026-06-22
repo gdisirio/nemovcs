@@ -1,11 +1,11 @@
 [Nemo Action]
 Name=Status...
-Comment=Show Git status for the selected path
+Comment=Show Subversion status for the selected path
 Exec=nemovcs status-dialog %F
 Icon-Name=<nemovcs-icons/nemovcs/apps/nemovcs.svg>
 Selection=notnone
 Extensions=any;
-Dependencies=git;nemovcs;
+Dependencies=svn;nemovcs;
 UriScheme=file
-Conditions=exec nemovcs action-visible inside-backend git %F
+Conditions=exec nemovcs action-visible inside-backend svn %F
 Terminal=false

@@ -1,11 +1,11 @@
 [Nemo Action]
 Name=Stage...
 Comment=Open the NemoVCS stage dialog
-Exec=nemovcs stage-dialog %F
+Exec=nemovcs stage-dialog --operation stage %F
 Icon-Name=<nemovcs-icons/nemovcs/actions/nemovcs-commit.svg>
 Selection=notnone
 Extensions=any;
 Dependencies=git;nemovcs;
 UriScheme=file
-Conditions=exec nemovcs action-visible inside-worktree %F
+Conditions=exec nemovcs action-visible inside-backend git %F
 Terminal=false

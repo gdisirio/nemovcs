@@ -11,14 +11,16 @@ from nemovcs.backends.base import (
     BackendWorktreeIdentity,
 )
 from nemovcs.backends.git import GitBackend
+from nemovcs.backends.svn import SvnBackend
 
 
 class BackendRegistryTest(unittest.TestCase):
-    def test_git_backend_is_registered(self):
+    def test_git_and_svn_backends_are_registered(self):
         registered = backends.registered_backends()
 
-        self.assertEqual([backend.id for backend in registered], ["git"])
+        self.assertEqual([backend.id for backend in registered], ["git", "svn"])
         self.assertIsInstance(registered[0], GitBackend)
+        self.assertIsInstance(registered[1], SvnBackend)
 
     def test_backend_by_id_returns_registered_backend(self):
         backend = backends.backend_by_id("git")
@@ -28,11 +30,11 @@ class BackendRegistryTest(unittest.TestCase):
         self.assertEqual(backend.id, "git")
 
     def test_backend_by_id_returns_none_for_unknown_backend(self):
-        self.assertIsNone(backends.backend_by_id("svn"))
+        self.assertIsNone(backends.backend_by_id("hg"))
 
     def test_file_diff_command_returns_empty_for_unknown_backend(self):
         item = BackendChangeItem(
-            backend_id="svn",
+            backend_id="hg",
             root=Path("/tmp/repo"),
             path="src/app.py",
             status="modified",
@@ -540,6 +542,59 @@ class BackendRegistryTest(unittest.TestCase):
             run_git.return_value = git.GitResult(("git",), Path("/tmp"), 128, "", "fatal")
 
             self.assertIsNone(backend.identity(Path("/tmp")))
+
+    def test_svn_backend_parses_xml_status(self):
+        backend = SvnBackend()
+        root = Path("/tmp/wc")
+        xml = """<?xml version="1.0"?>
+<status>
+  <target path=".">
+    <entry path="modified.txt"><wc-status item="modified"/></entry>
+    <entry path="new.txt"><wc-status item="unversioned"/></entry>
+    <entry path="conflict.txt"><wc-status item="conflicted"/></entry>
+  </target>
+</status>
+"""
+
+        result = backend.parse_status(root, xml)
+
+        self.assertEqual(
+            result,
+            [
+                BackendChangeItem(
+                    backend_id="svn",
+                    root=root,
+                    path="modified.txt",
+                    status="modified",
+                ),
+                BackendChangeItem(
+                    backend_id="svn",
+                    root=root,
+                    path="new.txt",
+                    status="untracked",
+                    tracked=False,
+                ),
+                BackendChangeItem(
+                    backend_id="svn",
+                    root=root,
+                    path="conflict.txt",
+                    status="conflicted",
+                    conflicted=True,
+                ),
+            ],
+        )
+
+    def test_svn_backend_builds_add_commit_and_update_phases(self):
+        backend = SvnBackend()
+        root = Path("/tmp/wc")
+
+        add = backend.stage_phases({root: ["new.txt"]})
+        commit = backend.commit_phases(root, ["new.txt"], "message")
+        update = backend.update_phases({root: ["."]})
+
+        self.assertEqual(add[0].command, ("svn", "add", "--parents", "new.txt"))
+        self.assertEqual(commit[0].command, ("svn", "commit", "-m", "message", "new.txt"))
+        self.assertEqual(update[0].command, ("svn", "update"))
 
 
 if __name__ == "__main__":

@@ -7,5 +7,5 @@ Selection=none
 Extensions=any;
 Dependencies=git;nemovcs;
 UriScheme=file
-Conditions=exec nemovcs action-visible inside-worktree %P
+Conditions=exec nemovcs action-visible inside-backend git %P
 Terminal=false

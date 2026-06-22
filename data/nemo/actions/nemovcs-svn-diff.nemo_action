@@ -1,11 +1,11 @@
 [Nemo Action]
 Name=Diff...
-Comment=Open Git diff for the selected path in Meld
+Comment=Show Subversion diff for the selected path
 Exec=nemovcs diff-dialog %F
 Icon-Name=<nemovcs-icons/nemovcs/actions/nemovcs-diff.svg>
 Selection=notnone
 Extensions=any;
-Dependencies=git;nemovcs;meld;
+Dependencies=svn;nemovcs;
 UriScheme=file
-Conditions=exec nemovcs action-visible inside-backend git %F
+Conditions=exec nemovcs action-visible inside-backend svn %F
 Terminal=false

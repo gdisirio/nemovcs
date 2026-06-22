@@ -80,6 +80,21 @@ class WorktreeMonitorManagerTest(unittest.TestCase):
         self.assertIn(linked.gitdir / "HEAD", paths)
         self.assertIn(linked.common_gitdir / "refs", paths)
 
+    def test_svn_paths_watch_worktree_and_wc_database(self):
+        root = Path("/tmp/svn")
+        svn = statusd.WorktreeIdentity(
+            root=root,
+            gitdir=root / ".svn",
+            common_gitdir=root / ".svn",
+            head_label="r1",
+            backend_id="svn",
+        )
+
+        self.assertEqual(
+            statusd_monitor.monitor_paths(svn),
+            [root, root / ".svn" / "wc.db"],
+        )
+
     def test_ensure_starts_monitors_once(self):
         factory = FakeMonitorFactory()
         core = statusd.StatusDaemonCore(timer=FakeTimer())

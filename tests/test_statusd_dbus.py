@@ -26,7 +26,7 @@ class StatusDaemonCoreTest(unittest.TestCase):
         self.assertEqual(len(records), 1)
         self.assertEqual(records[0]["backend"], "")
         self.assertEqual(records[0]["status"], statusd.EmblemStatus.ERROR)
-        self.assertEqual(records[0]["error"], "not inside a Git working tree")
+        self.assertEqual(records[0]["error"], "not inside a versioned working tree")
 
 
 if __name__ == "__main__":

@@ -7,7 +7,7 @@ testing and hardening before unattended daily use.
 
 ## Features
 
-- Context menu actions inside Git working trees.
+- Context menu actions inside Git and Subversion working trees.
 - GTK dialogs for stage, commit, status, update, push, log, settings, and about.
 - Meld integration for diffs.
 - Live status emblems in Nemo:
@@ -77,7 +77,7 @@ from Nemo's action layout. Unrelated Nemo actions are preserved.
 
 ## Use
 
-Open Nemo inside a Git working tree.
+Open Nemo inside a Git or Subversion working tree.
 
 Top-level actions:
 
@@ -89,6 +89,7 @@ Top-level actions:
 - `Git Clone...`
 - `SVN Checkout...`
 - `Stage...`
+- `Add...`
 - `Push...`
 - `Status...`
 - `Diff...`

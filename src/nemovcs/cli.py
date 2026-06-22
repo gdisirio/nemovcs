@@ -10,6 +10,7 @@ from typing import Any, Callable, Protocol, Sequence
 
 from . import __version__
 from . import backends
+from .backends.base import BackendCommandPhase
 
 
 class CommandResult(Protocol):
@@ -50,6 +51,17 @@ def cmd_action_visible(args: argparse.Namespace) -> int:
             return 1
         return 0 if all(backends.detect_backend(path) for path in args.paths) else 1
 
+    if args.predicate == "inside-backend":
+        if len(args.paths) < 2:
+            return 1
+        backend_id = args.paths[0]
+        paths = args.paths[1:]
+        return (
+            0
+            if all(backends.is_backend_worktree(path, backend_id) for path in paths)
+            else 1
+        )
+
     if args.predicate == "clone-target":
         if not args.paths:
             return 1
@@ -75,7 +87,7 @@ def cmd_status_dialog(args: argparse.Namespace) -> int:
     from .ui import status_dialog
 
     if not backends.group_by_backend(args.paths or [Path.cwd()]):
-        print("not inside a Git working tree", file=sys.stderr)
+        print("not inside a versioned working tree", file=sys.stderr)
         return 1
     return status_dialog.run(args.paths or ["."])
 
@@ -86,12 +98,14 @@ def cmd_diff(args: argparse.Namespace) -> int:
 
 def cmd_diff_dialog(args: argparse.Namespace) -> int:
     from .ui import info_dialog
+    from .ui import logger
 
     commands = backends.diff_commands(args.paths)
     if not commands:
-        print("not inside a Git working tree", file=sys.stderr)
+        print("not inside a versioned working tree", file=sys.stderr)
         return 1
 
+    text_phases: list[BackendCommandPhase] = []
     exit_code = 0
     for command in commands:
         if not command.ok:
@@ -101,11 +115,24 @@ def cmd_diff_dialog(args: argparse.Namespace) -> int:
             )
             exit_code = command.returncode or 1
             continue
+        if command.args and command.args[0] == "svn":
+            text_phases.append(
+                BackendCommandPhase(
+                    title=f"Diff {command.cwd.name}",
+                    cwd=command.cwd,
+                    command=command.args,
+                )
+            )
+            continue
         try:
             subprocess.Popen(command.args, cwd=str(command.cwd))
         except OSError as exc:
             info_dialog.show_error("Unable to open diff", str(exc))
             exit_code = 127
+    if text_phases:
+        logger_exit = logger.run("Diff", text_phases)
+        if logger_exit:
+            exit_code = logger_exit
     return exit_code
 
 
@@ -122,7 +149,7 @@ def cmd_log_dialog(args: argparse.Namespace) -> int:
 
     phases = log_phases(args.paths, args.limit)
     if not phases:
-        print("not inside a Git working tree", file=sys.stderr)
+        print("not inside a versioned working tree", file=sys.stderr)
         return 1
     return logger.run("Log", phases)
 
@@ -140,7 +167,7 @@ def cmd_update_dialog(args: argparse.Namespace) -> int:
 
     phases = update_phases(args.paths)
     if not phases:
-        print("not inside a Git working tree", file=sys.stderr)
+        print("not inside a versioned working tree", file=sys.stderr)
         return 1
     return logger.run("Update", phases)
 
@@ -158,7 +185,7 @@ def cmd_push_dialog(args: argparse.Namespace) -> int:
 
     phases = push_phases(args.paths)
     if not phases:
-        print("not inside a Git working tree", file=sys.stderr)
+        print("not inside a versioned working tree", file=sys.stderr)
         return 1
     return logger.run("Push", phases)
 
@@ -166,7 +193,7 @@ def cmd_push_dialog(args: argparse.Namespace) -> int:
 def cmd_commit(args: argparse.Namespace) -> int:
     results = backends.commit(args.paths, args.message)
     if not results:
-        print("not inside a Git working tree", file=sys.stderr)
+        print("not inside a versioned working tree", file=sys.stderr)
         return 1
     return _print_results(results)
 
@@ -181,9 +208,9 @@ def cmd_stage_dialog(args: argparse.Namespace) -> int:
     from .ui import stage_dialog
 
     if not backends.group_by_backend(args.paths or [Path.cwd()]):
-        print("not inside a Git working tree", file=sys.stderr)
+        print("not inside a versioned working tree", file=sys.stderr)
         return 1
-    return stage_dialog.run(args.paths or ["."])
+    return stage_dialog.run(args.paths or ["."], operation=args.operation)
 
 
 def cmd_clone_dialog(args: argparse.Namespace) -> int:
@@ -345,7 +372,10 @@ def build_parser() -> argparse.ArgumentParser:
         "action-visible",
         help="check whether a Nemo action should be visible",
     )
-    action_visible.add_argument("predicate", choices=["inside-worktree", "clone-target"])
+    action_visible.add_argument(
+        "predicate",
+        choices=["inside-worktree", "inside-backend", "clone-target"],
+    )
     action_visible.add_argument("paths", nargs="*")
     action_visible.set_defaults(func=cmd_action_visible)
 
@@ -416,6 +446,7 @@ def build_parser() -> argparse.ArgumentParser:
         "stage-dialog",
         help="open the GTK stage dialog",
     )
+    stage_dialog.add_argument("--operation", choices=["stage", "add"], default="stage")
     stage_dialog.add_argument("paths", nargs="*")
     stage_dialog.set_defaults(func=cmd_stage_dialog)
 

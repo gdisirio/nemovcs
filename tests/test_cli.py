@@ -100,6 +100,30 @@ class CliParserTest(unittest.TestCase):
 
         self.assertEqual(cmd_action_visible(args), 1)
 
+    def test_inside_backend_predicate_uses_requested_backend(self):
+        parser = build_parser()
+        args = parser.parse_args(["action-visible", "inside-backend", "svn", "/tmp/wc"])
+
+        with mock.patch(
+            "nemovcs.cli.backends.is_backend_worktree",
+            return_value=True,
+        ) as is_backend_worktree:
+            self.assertEqual(cmd_action_visible(args), 0)
+
+        is_backend_worktree.assert_called_once_with("/tmp/wc", "svn")
+
+    def test_inside_backend_predicate_rejects_missing_backend_or_paths(self):
+        parser = build_parser()
+
+        self.assertEqual(
+            cmd_action_visible(parser.parse_args(["action-visible", "inside-backend"])),
+            1,
+        )
+        self.assertEqual(
+            cmd_action_visible(parser.parse_args(["action-visible", "inside-backend", "svn"])),
+            1,
+        )
+
     def test_clone_target_visible_accepts_non_worktree_directory(self):
         with tempfile.TemporaryDirectory() as tmp:
             with mock.patch("nemovcs.cli.backends.detect_backend", return_value=None):
@@ -400,9 +424,10 @@ class CliParserTest(unittest.TestCase):
     def test_stage_dialog_accepts_paths(self):
         parser = build_parser()
 
-        args = parser.parse_args(["stage-dialog", "/tmp/example"])
+        args = parser.parse_args(["stage-dialog", "--operation", "add", "/tmp/example"])
 
         self.assertEqual(args.command, "stage-dialog")
+        self.assertEqual(args.operation, "add")
         self.assertEqual(args.paths, ["/tmp/example"])
 
     def test_clone_dialog_accepts_paths(self):
@@ -472,7 +497,7 @@ class CliParserTest(unittest.TestCase):
 
             self.assertEqual(cmd_stage_dialog(args), 0)
 
-        run_dialog.assert_called_once_with(["/tmp/example"])
+        run_dialog.assert_called_once_with(["/tmp/example"], operation="stage")
 
     def test_stage_dialog_rejects_paths_outside_worktree(self):
         parser = build_parser()

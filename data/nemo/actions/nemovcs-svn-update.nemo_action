@@ -1,11 +1,11 @@
 [Nemo Action]
 Name=Update...
-Comment=Update this Git repository
+Comment=Update this Subversion working copy
 Exec=nemovcs update-dialog %F
 Icon-Name=<nemovcs-icons/nemovcs/actions/nemovcs-update.svg>
 Selection=notnone
 Extensions=any;
-Dependencies=git;nemovcs;
+Dependencies=svn;nemovcs;
 UriScheme=file
-Conditions=exec nemovcs action-visible inside-backend git %F
+Conditions=exec nemovcs action-visible inside-backend svn %F
 Terminal=false

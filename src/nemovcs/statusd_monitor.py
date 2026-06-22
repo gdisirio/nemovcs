@@ -57,6 +57,9 @@ class WorktreeMonitorManager:
 
 
 def monitor_paths(identity: statusd.WorktreeIdentity) -> list[Path]:
+    if identity.backend_id == "svn":
+        return list(dict.fromkeys([identity.root, identity.gitdir / "wc.db"]))
+
     candidates = [
         identity.root,
         identity.gitdir / "index",

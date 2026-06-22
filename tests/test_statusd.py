@@ -598,7 +598,7 @@ class WorktreeScanTest(unittest.TestCase):
         self.assertEqual(stderr, "")
         self.assertIn("Cache:\n1. ", stdout)
         self.assertIn("   backend: git", stdout)
-        self.assertIn(f"   gitdir: {self.root / '.git'}", stdout)
+        self.assertIn(f"   vcs-dir: {self.root / '.git'}", stdout)
         self.assertIn("   head: main", stdout)
         self.assertIn("Paths:", stdout)
         self.assertIn(
@@ -614,7 +614,7 @@ class WorktreeScanTest(unittest.TestCase):
 
         self.assertEqual(exit_code, 1)
         self.assertEqual(stdout, "")
-        self.assertEqual(stderr, "not inside a Git working tree\n")
+        self.assertEqual(stderr, "not inside a versioned working tree\n")
 
 
 if __name__ == "__main__":

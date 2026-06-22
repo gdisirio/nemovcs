@@ -53,9 +53,19 @@ class NemoActionFilesTest(unittest.TestCase):
     def test_stage_action_uses_gtk_dialog(self):
         text = (ACTION_DIR / "nemovcs-stage.nemo_action").read_text(encoding="utf-8")
 
-        self.assertIn("Exec=nemovcs stage-dialog %F", text)
+        self.assertIn("Exec=nemovcs stage-dialog --operation stage %F", text)
+        self.assertIn("Conditions=exec nemovcs action-visible inside-backend git %F", text)
         self.assertIn("Terminal=false", text)
         self.assertNotIn("run-terminal", text)
+
+    def test_svn_add_action_uses_add_operation(self):
+        text = (ACTION_DIR / "nemovcs-svn-add.nemo_action").read_text(encoding="utf-8")
+
+        self.assertIn("Name=Add...", text)
+        self.assertIn("Exec=nemovcs stage-dialog --operation add %F", text)
+        self.assertIn("Dependencies=svn;nemovcs;", text)
+        self.assertIn("Conditions=exec nemovcs action-visible inside-backend svn %F", text)
+        self.assertIn("Terminal=false", text)
 
     def test_clone_action_uses_clone_target_visibility(self):
         for name, placeholder, selection, extensions, command, dependency in (

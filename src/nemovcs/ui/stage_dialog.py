@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 import subprocess
 import sys
-from typing import Sequence
+from typing import Literal, Sequence
 
 import gi
 
@@ -39,10 +39,11 @@ STATUS_ICON_NAMES = {
     "renamed": "emblem-nemovcs-modified.svg",
     "untracked": "emblem-nemovcs-unversioned.svg",
 }
+Operation = Literal["stage", "add"]
 
 
-def run(paths: Sequence[str]) -> int:
-    window = StageDialog(paths or ["."])
+def run(paths: Sequence[str], *, operation: Operation = "stage") -> int:
+    window = StageDialog(paths or ["."], operation=operation)
     window.connect("destroy", Gtk.main_quit)
     window.show_all()
     Gtk.main()
@@ -50,8 +51,9 @@ def run(paths: Sequence[str]) -> int:
 
 
 class StageDialog(Gtk.Window):
-    def __init__(self, paths: Sequence[str]):
-        super().__init__(title="Stage")
+    def __init__(self, paths: Sequence[str], *, operation: Operation = "stage"):
+        super().__init__(title=operation_title(operation))
+        self.operation = operation
         self.paths = list(paths)
         self.exit_code = 0
         self.items_by_root: dict[Path, list[BackendChangeItem]] = {}
@@ -174,7 +176,7 @@ class StageDialog(Gtk.Window):
         self.close_button.connect("clicked", self.on_close_clicked)
         buttons.add(self.close_button)
 
-        self.stage_button = Gtk.Button(label="Stage Selected")
+        self.stage_button = Gtk.Button(label=f"{operation_title(operation)} Selected")
         self.stage_button.get_style_context().add_class("suggested-action")
         self.stage_button.connect("clicked", self.on_stage_clicked)
         buttons.add(self.stage_button)
@@ -217,7 +219,7 @@ class StageDialog(Gtk.Window):
         elif repo_count:
             self.status_label.set_text(f"No changed files in {repo_count} repository(s).")
         else:
-            self.status_label.set_text("No Git repository selected.")
+            self.status_label.set_text("No versioned repository selected.")
             self.exit_code = 1
 
         self.stage_button.set_sensitive(total > 0)
@@ -278,11 +280,11 @@ class StageDialog(Gtk.Window):
         paths_by_root = self.checked_stage_paths_by_root()
         phases = self.stage_phases(paths_by_root)
         if not phases:
-            self.show_error("Select at least one file to stage.")
+            self.show_error(f"Select at least one file to {operation_verb(self.operation)}.")
             return
 
         window = logger.LoggerWindow(
-            "Stage",
+            operation_title(self.operation),
             phases,
             on_complete=self.on_stage_logger_complete,
         )
@@ -496,6 +498,14 @@ def stage_phases(
     paths_by_root: dict[Path, Sequence[str]],
 ) -> list[BackendCommandPhase]:
     return backends.stage_phases(paths_by_root)
+
+
+def operation_title(operation: Operation) -> str:
+    return "Add" if operation == "add" else "Stage"
+
+
+def operation_verb(operation: Operation) -> str:
+    return "add" if operation == "add" else "stage"
 
 
 if __name__ == "__main__":

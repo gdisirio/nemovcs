@@ -253,7 +253,7 @@ class StatusDaemonCore:
                 "common_gitdir": "",
                 "head": "",
                 "status": EmblemStatus.ERROR,
-                "error": "not inside a Git working tree",
+                "error": "not inside a versioned working tree",
             }
 
         entry = self.cache.get(identity)
@@ -411,7 +411,7 @@ def format_cache_probe(paths: list[str | Path]) -> tuple[int, str, str]:
     cache = WorktreeCache()
     identities = cache.seen(paths)
     if not identities:
-        return 1, "", "not inside a Git working tree\n"
+        return 1, "", "not inside a versioned working tree\n"
 
     scanned_keys: set[str] = set()
     for identity in identities:
@@ -426,8 +426,8 @@ def format_cache_probe(paths: list[str | Path]) -> tuple[int, str, str]:
         identity = entry.identity
         lines.append(f"{idx}. {identity.root}")
         lines.append(f"   backend: {identity.backend_id}")
-        lines.append(f"   gitdir: {identity.gitdir}")
-        lines.append(f"   common-gitdir: {identity.common_gitdir}")
+        lines.append(f"   vcs-dir: {identity.gitdir}")
+        lines.append(f"   common-vcs-dir: {identity.common_gitdir}")
         lines.append(f"   head: {identity.head_label}")
         if entry.error:
             lines.append(f"   error: {entry.error}")
