@@ -82,6 +82,7 @@ Install Nemo action files for the current user:
 ```sh
 ./scripts/install-actions.sh
 ./scripts/install-nemo-extension.sh
+./scripts/install-statusd-service.sh
 nemo --quit
 ```
 

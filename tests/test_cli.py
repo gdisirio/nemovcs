@@ -2,7 +2,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from nemovcs.cli import build_parser, log_phases
+from nemovcs.cli import absolute_paths, build_parser, log_phases
 
 
 class CliParserTest(unittest.TestCase):
@@ -118,6 +118,12 @@ class CliParserTest(unittest.TestCase):
 
         self.assertEqual(args.command, "status-watch")
         self.assertEqual(args.paths, ["/tmp/example"])
+
+    def test_absolute_paths_resolves_relative_paths(self):
+        paths = absolute_paths([".", "/tmp/example"])
+
+        self.assertEqual(paths[0], str(Path.cwd()))
+        self.assertEqual(paths[1], "/tmp/example")
 
     def test_commit_dialog_accepts_paths(self):
         parser = build_parser()

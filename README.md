@@ -105,9 +105,12 @@ For per-user source-tree testing, install the extension with:
 
 ```sh
 ./scripts/install-nemo-extension.sh
+./scripts/install-statusd-service.sh
 ```
 
-Run the prototype daemon separately while testing:
+The status daemon is DBus-activated after installing the service. A DBus call
+to `io.github.gdisirio.NemoVCS.Statusd` starts it on demand. You can also run
+it manually while debugging:
 
 ```sh
 PYTHONPATH=src python3 -m nemovcs statusd

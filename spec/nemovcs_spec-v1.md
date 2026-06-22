@@ -883,6 +883,42 @@ Implementation:
 - Tune the visible-item cache size if needed.
 - Document any Nemo API limits found during manual testing.
 
+#### Milestone 9: Daemon Launch and Activation
+
+Goal: make the status daemon available without manual terminal startup.
+
+Direction:
+
+- Prefer session DBus activation over process-name polling.
+- Install a development `nemovcs-statusd` wrapper for source-tree testing.
+- Install a session DBus service file named after
+  `io.github.gdisirio.NemoVCS.Statusd`.
+- Let the plugin and debug CLI issue normal DBus calls; DBus should start the
+  daemon when the service is not already owned.
+- Keep plugin behavior tolerant of activation failure. Missing daemon status
+  must not block browsing or trigger direct Git commands from Nemo.
+
+#### Milestone 9.1: Development DBus Activation
+
+Status: implemented as a per-user source-tree installer.
+
+Implementation:
+
+- Add `scripts/install-statusd-service.sh`.
+- Generate `~/.local/bin/nemovcs-statusd` with `PYTHONPATH` pointing at this
+  checkout's `src` directory.
+- Generate
+  `~/.local/share/dbus-1/services/io.github.gdisirio.NemoVCS.Statusd.service`.
+- The DBus service runs the wrapper, which starts `python3 -m nemovcs statusd`.
+
+Tests:
+
+- Unit tests verify wrapper contents.
+- Unit tests verify service file contents.
+- Unit tests verify executable wrapper installation.
+- Manual test: stop the current daemon, call `nemovcs status-cache --dbus PATH`,
+  and confirm DBus starts the daemon.
+
 ## Ideas Under Evaluation
 
 This section is for ideas that may be useful later but are not committed product

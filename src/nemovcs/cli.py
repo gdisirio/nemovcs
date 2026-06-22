@@ -194,11 +194,10 @@ def cmd_status_cache(args: argparse.Namespace) -> int:
     if args.dbus:
         from . import statusd_dbus
 
+        paths = absolute_paths(args.paths or [Path.cwd()])
         try:
-            statusd_dbus.call_seen([str(path) for path in args.paths or [Path.cwd()]])
-            records = statusd_dbus.call_get_status(
-                [str(path) for path in args.paths or [Path.cwd()]]
-            )
+            statusd_dbus.call_seen(paths)
+            records = statusd_dbus.call_get_status(paths)
         except Exception as exc:
             print(f"status daemon DBus call failed: {exc}", file=sys.stderr)
             return 1
@@ -220,6 +219,10 @@ def cmd_status_cache(args: argparse.Namespace) -> int:
     return exit_code
 
 
+def absolute_paths(paths: Sequence[str | Path]) -> list[str]:
+    return [str(Path(path).expanduser().resolve(strict=False)) for path in paths]
+
+
 def print_status_record(record: dict[str, str]) -> None:
     print(
         f"{record['path']}: {record['status']} "
@@ -237,7 +240,7 @@ def cmd_status_watch(args: argparse.Namespace) -> int:
     from . import statusd_dbus
 
     dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
-    watched_paths = [str(path) for path in args.paths or [Path.cwd()]]
+    watched_paths = absolute_paths(args.paths or [Path.cwd()])
     cache = status_client.StatusClientCache()
 
     def refresh() -> None:
