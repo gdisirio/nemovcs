@@ -83,6 +83,7 @@ Top-level actions:
 
 - `Commit...`
 - `Update...`
+- `Diff...`
 
 `NemoVCS` submenu actions:
 
@@ -92,7 +93,6 @@ Top-level actions:
 - `Add...`
 - `Push...`
 - `Status...`
-- `Diff...`
 - `Log...`
 - `Settings...`
 - `About...`

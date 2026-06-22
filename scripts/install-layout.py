@@ -45,9 +45,11 @@ TOP_LEVEL_ACTIONS = [
     "nemovcs-commit.nemo_action",
     "nemovcs-update.nemo_action",
     "nemovcs-background-update.nemo_action",
+    "nemovcs-diff.nemo_action",
     "nemovcs-svn-commit.nemo_action",
     "nemovcs-svn-update.nemo_action",
     "nemovcs-background-svn-update.nemo_action",
+    "nemovcs-svn-diff.nemo_action",
 ]
 
 SUBMENU_ACTIONS = [
@@ -64,8 +66,6 @@ SUBMENU_ACTIONS = [
     "nemovcs-background-status.nemo_action",
     "nemovcs-svn-status.nemo_action",
     "nemovcs-background-svn-status.nemo_action",
-    "nemovcs-diff.nemo_action",
-    "nemovcs-svn-diff.nemo_action",
     "nemovcs-log.nemo_action",
     "nemovcs-svn-log.nemo_action",
     "nemovcs-settings.nemo_action",

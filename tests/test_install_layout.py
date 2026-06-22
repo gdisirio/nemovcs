@@ -17,14 +17,16 @@ class InstallLayoutTest(unittest.TestCase):
         self.assertEqual(layout[0]["uuid"], "nemovcs-commit.nemo_action")
         self.assertEqual(layout[1]["uuid"], "nemovcs-update.nemo_action")
         self.assertEqual(layout[2]["uuid"], "nemovcs-background-update.nemo_action")
-        self.assertEqual(layout[3]["uuid"], "nemovcs-svn-commit.nemo_action")
-        self.assertEqual(layout[4]["uuid"], "nemovcs-svn-update.nemo_action")
-        self.assertEqual(layout[5]["uuid"], "nemovcs-background-svn-update.nemo_action")
-        self.assertEqual(layout[6]["uuid"], "NemoVCS")
-        self.assertEqual(layout[6]["type"], "submenu")
-        self.assertEqual(layout[6]["user-label"], "NemoVCS")
+        self.assertEqual(layout[3]["uuid"], "nemovcs-diff.nemo_action")
+        self.assertEqual(layout[4]["uuid"], "nemovcs-svn-commit.nemo_action")
+        self.assertEqual(layout[5]["uuid"], "nemovcs-svn-update.nemo_action")
+        self.assertEqual(layout[6]["uuid"], "nemovcs-background-svn-update.nemo_action")
+        self.assertEqual(layout[7]["uuid"], "nemovcs-svn-diff.nemo_action")
+        self.assertEqual(layout[8]["uuid"], "NemoVCS")
+        self.assertEqual(layout[8]["type"], "submenu")
+        self.assertEqual(layout[8]["user-label"], "NemoVCS")
 
-        child_uuids = [child["uuid"] for child in layout[6]["children"]]
+        child_uuids = [child["uuid"] for child in layout[8]["children"]]
         self.assertEqual(
             child_uuids[:7],
             [
@@ -38,6 +40,8 @@ class InstallLayoutTest(unittest.TestCase):
             ],
         )
         self.assertEqual(child_uuids[8], "separator")
+        self.assertNotIn("nemovcs-diff.nemo_action", child_uuids)
+        self.assertNotIn("nemovcs-svn-diff.nemo_action", child_uuids)
         self.assertIn("nemovcs-status.nemo_action", child_uuids)
         self.assertIn("nemovcs-settings.nemo_action", child_uuids)
         self.assertIn("nemovcs-about.nemo_action", child_uuids)
