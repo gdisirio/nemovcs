@@ -7,7 +7,10 @@ installs can point Nemo at this source tree without requiring pip install -e.
 from __future__ import annotations
 
 from collections import OrderedDict
+import json
+import os
 from pathlib import Path
+import time
 
 from . import status_client
 
@@ -28,6 +31,7 @@ class NemoVCSInfoProviderCore:
         cache: status_client.StatusClientCache | None = None,
         seen=None,
         get_status=None,
+        diagnostics=None,
         max_visible_items: int = DEFAULT_MAX_VISIBLE_ITEMS,
     ):
         if max_visible_items < 1:
@@ -35,6 +39,11 @@ class NemoVCSInfoProviderCore:
         self.cache = cache if cache is not None else status_client.StatusClientCache()
         self.seen = seen
         self.get_status = get_status
+        self.diagnostics = (
+            diagnostics
+            if diagnostics is not None
+            else PluginDiagnostics.from_environment()
+        )
         self.max_visible_items = max_visible_items
         self.visible_items: OrderedDict[str, object] = OrderedDict()
         self.last_error = ""
@@ -42,11 +51,13 @@ class NemoVCSInfoProviderCore:
     def item_path(self, item) -> str | None:
         try:
             if item.get_uri_scheme() != "file":
+                self.log("ignore-item", reason="non-file-uri")
                 return None
             location = item.get_location()
             path = location.get_path()
         except Exception as exc:
             self.last_error = str(exc)
+            self.log("item-error", error=self.last_error)
             return None
 
         return str(Path(path).resolve(strict=False)) if path else None
@@ -57,20 +68,42 @@ class NemoVCSInfoProviderCore:
             return None
         self.track_visible_item(path, item)
         record = self.update_path(path)
-        self.apply_emblem(item, record)
+        emblem = self.apply_emblem(item, record)
+        self.log(
+            "update-item",
+            path=path,
+            status=record.get("status", "") if record else "",
+            emblem=emblem or "",
+        )
         return record
 
     def update_path(self, path: str | Path) -> dict[str, str] | None:
-        try:
-            seen = self.seen or default_seen
-            get_status = self.get_status or default_get_status
-            records = self.cache.refresh([path], seen, get_status)
-        except Exception as exc:
-            self.last_error = str(exc)
-            return None
+        seen = self.seen or default_seen
+        get_status = self.get_status or default_get_status
+        for attempt in range(1, 3):
+            try:
+                records = self.cache.refresh([path], seen, get_status)
+                break
+            except Exception as exc:
+                self.last_error = str(exc)
+                self.log(
+                    "status-error",
+                    path=str(path),
+                    attempt=attempt,
+                    error=self.last_error,
+                )
+                if attempt == 2:
+                    return None
 
         self.last_error = ""
-        return records[0] if records else None
+        record = records[0] if records else None
+        self.log(
+            "status",
+            path=str(path),
+            status=record.get("status", "") if record else "",
+            worktree_id=record.get("worktree_id", "") if record else "",
+        )
+        return record
 
     def apply_emblem(self, item, record: dict[str, str] | None) -> str | None:
         if not record:
@@ -84,6 +117,7 @@ class NemoVCSInfoProviderCore:
             item.add_emblem(emblem)
         except Exception as exc:
             self.last_error = str(exc)
+            self.log("emblem-error", emblem=emblem, error=self.last_error)
             return None
 
         return emblem
@@ -103,12 +137,21 @@ class NemoVCSInfoProviderCore:
         changed_paths,
     ) -> list[str]:
         affected_paths = self.affected_visible_paths(worktree_id, changed_paths)
-        self.cache.invalidate(worktree_id, changed_paths)
-        return [
+        removed = self.cache.invalidate(worktree_id, changed_paths)
+        invalidated = [
             path
             for path in affected_paths
             if self.invalidate_visible_item(path)
         ]
+        self.log(
+            "status-changed",
+            worktree_id=str(worktree_id),
+            changed_count=len(changed_paths),
+            affected_count=len(affected_paths),
+            removed_count=len(removed),
+            invalidated_count=len(invalidated),
+        )
+        return invalidated
 
     def affected_visible_paths(self, worktree_id: str, changed_paths) -> list[str]:
         changed = [status_client.normalize_path(path) for path in changed_paths]
@@ -137,8 +180,32 @@ class NemoVCSInfoProviderCore:
             invalidate()
         except Exception as exc:
             self.last_error = str(exc)
+            self.log("invalidate-error", path=str(path), error=self.last_error)
             return False
         return True
+
+    def log(self, event: str, **fields) -> None:
+        if self.diagnostics is not None:
+            self.diagnostics.log(event, **fields)
+
+
+class PluginDiagnostics:
+    def __init__(self, path: str | Path):
+        self.path = Path(path).expanduser()
+
+    @classmethod
+    def from_environment(cls):
+        path = os.environ.get("NEMOVCS_PLUGIN_LOG")
+        return cls(path) if path else None
+
+    def log(self, event: str, **fields) -> None:
+        record = {"time": time.time(), "event": event, **fields}
+        try:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            with self.path.open("a", encoding="utf-8") as stream:
+                stream.write(json.dumps(record, sort_keys=True) + "\n")
+        except OSError:
+            pass
 
 
 class NemoVCSInfoProviderMixin:

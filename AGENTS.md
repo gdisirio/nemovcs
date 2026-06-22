@@ -86,6 +86,13 @@ Install Nemo action files for the current user:
 nemo --quit
 ```
 
+Remove the per-user development install:
+
+```sh
+./scripts/uninstall.sh
+nemo --quit
+```
+
 ## Editing Style
 
 - Keep the initial code small and direct.

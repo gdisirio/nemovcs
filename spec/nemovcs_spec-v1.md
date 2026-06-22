@@ -919,6 +919,52 @@ Tests:
 - Manual test: stop the current daemon, call `nemovcs status-cache --dbus PATH`,
   and confirm DBus starts the daemon.
 
+#### Milestone 9.2: Plugin Activation Hardening
+
+Status: implemented.
+
+Implementation:
+
+- Keep DBus activation as the only daemon launch path; do not spawn daemon
+  processes from the plugin.
+- Retry one immediate status refresh after a daemon call failure to tolerate
+  short activation races.
+- Add optional JSON-lines plugin diagnostics controlled by
+  `NEMOVCS_PLUGIN_LOG`.
+- Log only low-volume status, emblem, error, and invalidation summaries when
+  diagnostics are enabled.
+- Swallow diagnostics write failures so logging cannot affect Nemo browsing.
+
+Tests:
+
+- Unit tests verify one retry after an initial daemon call failure.
+- Unit tests verify diagnostics writes JSON lines when enabled.
+- Unit tests verify diagnostics path comes from `NEMOVCS_PLUGIN_LOG`.
+- Unit tests verify diagnostics write errors do not escape.
+
+#### Milestone 9.3: Clean Per-User Uninstall
+
+Status: implemented.
+
+Implementation:
+
+- Add `scripts/uninstall.sh`.
+- Remove NemoVCS `.nemo_action` files copied into the user's Nemo action
+  directory.
+- Remove the copied NemoVCS action icon tree.
+- Remove the generated `NemoVCS.py` nemo-python extension.
+- Remove the copied hicolor emblem icons.
+- Remove the generated DBus service file and `nemovcs-statusd` wrapper.
+- Prune NemoVCS nodes from `~/.config/nemo/actions-tree.json` while preserving
+  unrelated actions.
+- Stop a running `python3 -m nemovcs statusd` process.
+
+Tests:
+
+- Unit tests verify NemoVCS files are removed and unrelated action files remain.
+- Unit tests verify layout pruning preserves unrelated nodes.
+- Unit tests verify status daemon stop targets matching processes.
+
 ## Ideas Under Evaluation
 
 This section is for ideas that may be useful later but are not committed product

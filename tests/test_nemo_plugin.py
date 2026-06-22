@@ -1,4 +1,6 @@
+import json
 from pathlib import Path
+import tempfile
 import unittest
 from unittest import mock
 
@@ -136,6 +138,32 @@ class NemoVCSInfoProviderCoreTest(unittest.TestCase):
         self.assertIsNone(core.update_path("/tmp/repo/tracked.txt"))
         self.assertEqual(core.last_error, "no daemon")
 
+    def test_update_path_retries_once_after_daemon_error(self):
+        seen_calls = []
+
+        def seen(paths):
+            seen_calls.append(list(paths))
+            if len(seen_calls) == 1:
+                raise RuntimeError("activating")
+            return ["/tmp/repo"]
+
+        core = nemo_plugin.NemoVCSInfoProviderCore(
+            seen=seen,
+            get_status=lambda paths: [
+                {
+                    "path": "/tmp/repo/tracked.txt",
+                    "worktree_id": "/tmp/repo",
+                    "status": "ok",
+                }
+            ],
+        )
+
+        record = core.update_path("/tmp/repo/tracked.txt")
+
+        self.assertEqual(record["status"], "ok")
+        self.assertEqual(len(seen_calls), 2)
+        self.assertEqual(core.last_error, "")
+
     def test_visible_item_cache_is_bounded_and_recent_first(self):
         core = nemo_plugin.NemoVCSInfoProviderCore(max_visible_items=2)
         first = FakeItem("/tmp/repo/one.txt")
@@ -266,6 +294,41 @@ class NemoVCSInfoProviderCoreTest(unittest.TestCase):
 
         self.assertIsNone(provider.nemovcs_signal_subscription)
         self.assertEqual(provider.nemovcs_core.last_error, "no dbus")
+
+    def test_diagnostics_writes_json_lines_when_enabled(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            log_path = Path(tmp) / "plugin.log"
+            diagnostics = nemo_plugin.PluginDiagnostics(log_path)
+            core = nemo_plugin.NemoVCSInfoProviderCore(
+                diagnostics=diagnostics,
+                seen=lambda paths: ["/tmp/repo"],
+                get_status=lambda paths: [
+                    {
+                        "path": "/tmp/repo/tracked.txt",
+                        "worktree_id": "/tmp/repo",
+                        "status": "modified",
+                    }
+                ],
+            )
+
+            core.update_item(FakeItem("/tmp/repo/tracked.txt"))
+
+            lines = log_path.read_text(encoding="utf-8").splitlines()
+            events = [json.loads(line)["event"] for line in lines]
+            self.assertIn("status", events)
+            self.assertIn("update-item", events)
+
+    def test_diagnostics_from_environment_uses_configured_path(self):
+        with mock.patch.dict("os.environ", {"NEMOVCS_PLUGIN_LOG": "/tmp/nemovcs.log"}):
+            diagnostics = nemo_plugin.PluginDiagnostics.from_environment()
+
+        self.assertEqual(diagnostics.path, Path("/tmp/nemovcs.log"))
+
+    def test_diagnostics_write_errors_do_not_escape(self):
+        diagnostics = nemo_plugin.PluginDiagnostics("/tmp/nemovcs.log")
+
+        with mock.patch("pathlib.Path.open", side_effect=OSError("denied")):
+            diagnostics.log("event")
 
 
 if __name__ == "__main__":
