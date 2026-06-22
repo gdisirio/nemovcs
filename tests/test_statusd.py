@@ -285,6 +285,19 @@ class StatusDaemonSchedulerTest(unittest.TestCase):
 
         self.assertEqual(changed, [(first.cache_key, [str(first.root)])])
 
+    def test_status_record_uses_folder_aggregate_status(self):
+        first = identity("one")
+        cache = statusd.WorktreeCache()
+        entry = cache.touch(first)
+        entry.scanned = True
+        entry.statuses["dir/nested.txt"] = statusd.EmblemStatus.MODIFIED
+        core = statusd.StatusDaemonCore(cache)
+
+        with mock.patch("nemovcs.statusd.identify_worktree", return_value=first):
+            record = core.status_record(first.root / "dir")
+
+        self.assertEqual(record["status"], statusd.EmblemStatus.MODIFIED)
+
 
 @unittest.skipUnless(have_git(), "git executable is required")
 class WorktreeCacheIntegrationTest(unittest.TestCase):

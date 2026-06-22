@@ -771,6 +771,9 @@ Tests:
 
 #### Milestone 7: Minimal Nemo Plugin
 
+Status: started. Milestone 7.1 and the first 7.2 primary-emblem pass are
+implemented.
+
 Goal: render one primary emblem in Nemo from cached daemon state.
 
 Implementation:
@@ -780,6 +783,66 @@ Implementation:
 - Apply one primary emblem using priority `conflicted > modified > ok`.
 - If daemon status is `loading`, return without blocking and rely on later
   invalidation.
+
+#### Milestone 7.1: Loadable InfoProvider Skeleton
+
+Status: implemented.
+
+Goal: make Nemo load a NemoVCS `InfoProvider` that talks to the status daemon
+without applying emblems yet.
+
+Implementation:
+
+- Add a small testable core for resolving Nemo file items to local paths.
+- Ignore non-`file://` items.
+- Call daemon `Seen` and `GetStatus` through the existing client cache.
+- Swallow daemon/DBus errors and return `COMPLETE` to Nemo, because missing
+  status must not break file browsing.
+- Add a source-tree installer that writes `NemoVCS.py` into the per-user
+  `nemo-python/extensions` directory and points it at this checkout's `src`
+  directory.
+
+Tests:
+
+- File items resolve to absolute local paths.
+- Non-file items are ignored.
+- Status lookup calls the injected daemon methods and caches the returned
+  record.
+- Daemon failures are recorded but do not escape.
+- Installer writes the expected `NemoVCS.py` entry point.
+
+Remaining Milestone 7 work:
+
+- Decide whether `ok` should render a clean emblem or no emblem. The first
+  primary-emblem pass intentionally renders no emblem for `ok` to avoid visual
+  noise and because the current temporary icon set has no clean icon in-tree.
+- Manual-test the extension inside Nemo.
+
+#### Milestone 7.2: Primary Modified/Conflict Emblems
+
+Status: implemented for `modified` and `conflicted`.
+
+Goal: show one primary emblem in Nemo from cached daemon state.
+
+Implementation:
+
+- Map cached `modified` status to the temporary `rabbitvcs-modified` emblem.
+- Map cached `conflicted` status to the temporary `rabbitvcs-conflicted`
+  emblem.
+- Render no emblem for `ok`, `loading`, `stale`, or `error` in this first pass.
+- Install the temporary modified/conflict emblem SVGs into the user's hicolor
+  icon theme so `NemoVCS.py` can call `item.add_emblem()` with normal emblem
+  names.
+- Return aggregate status from daemon status records so folders can inherit
+  modified/conflicted state from descendants.
+
+Tests:
+
+- Modified status adds the modified emblem.
+- Conflicted status adds the conflict emblem.
+- Clean/loading/stale/error statuses do not add emblems.
+- Folder status records use aggregate descendant status.
+- Installer writes the user extension and the two required emblem SVGs.
 
 Tests:
 

@@ -93,6 +93,31 @@ so they only appear for paths inside Git working trees.
 The installer also writes the current `NemoVCS` submenu layout into Nemo's user
 action layout file.
 
+## Nemo Plugin
+
+The status-emblem plugin is an early prototype. It installs a `nemo-python`
+`InfoProvider` that resolves local file paths, talks to the foreground status
+daemon, and applies one primary emblem for `modified` or `conflicted` status.
+Clean paths currently get no emblem.
+
+For per-user source-tree testing, install the extension with:
+
+```sh
+./scripts/install-nemo-extension.sh
+```
+
+Run the prototype daemon separately while testing:
+
+```sh
+PYTHONPATH=src python3 -m nemovcs statusd
+```
+
+Then restart Nemo:
+
+```sh
+nemo --quit
+```
+
 ## Roadmap
 
 1. Implement the operation actions with robust Git command handling.

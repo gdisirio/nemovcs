@@ -273,7 +273,7 @@ class StatusDaemonCore:
             "gitdir": str(identity.gitdir),
             "common_gitdir": str(identity.common_gitdir),
             "head": identity.head_label,
-            "status": path_status(entry, path),
+            "status": aggregate_status(entry, path),
             "error": entry.error,
         }
 

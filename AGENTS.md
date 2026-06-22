@@ -81,6 +81,7 @@ Install Nemo action files for the current user:
 
 ```sh
 ./scripts/install-actions.sh
+./scripts/install-nemo-extension.sh
 nemo --quit
 ```
 
@@ -96,4 +97,3 @@ nemo --quit
   - future daemon: `nemovcs-statusd`
   - config dir: `~/.config/nemovcs`
   - cache dir: `~/.cache/nemovcs`
-
