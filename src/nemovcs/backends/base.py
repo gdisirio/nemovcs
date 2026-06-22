@@ -15,6 +15,20 @@ class BackendWorktreeIdentity:
     head_label: str
 
 
+@dataclass(frozen=True)
+class BackendStatusItem:
+    path: str
+    old_path: str | None = None
+    conflicted: bool = False
+
+
+@dataclass(frozen=True)
+class BackendStatusScan:
+    ok: bool
+    items: tuple[BackendStatusItem, ...] = ()
+    error: str = ""
+
+
 class Backend(Protocol):
     id: str
     label: str
@@ -28,6 +42,8 @@ class Backend(Protocol):
     def group(self, paths: Iterable[str | Path]) -> dict[Path, list[str]]: ...
 
     def status(self, paths: Sequence[str | Path]) -> list[Any]: ...
+
+    def scan_status(self, root: str | Path) -> BackendStatusScan: ...
 
     def commit_items(self, paths: Sequence[str | Path]) -> dict[Path, list[Any]]: ...
 

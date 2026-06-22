@@ -6,6 +6,7 @@ import unittest
 from unittest import mock
 
 from nemovcs import statusd
+from nemovcs.backends.base import BackendStatusScan
 
 
 def have_git() -> bool:
@@ -527,23 +528,38 @@ class WorktreeScanTest(unittest.TestCase):
 
     def test_failed_scan_records_error(self):
         failed = statusd.WorktreeEntry(self.entry.identity)
-        with mock.patch("nemovcs.statusd.git.run_git") as run_git:
-            run_git.return_value = statusd.git.GitResult(
-                ("git",),
-                self.root,
-                128,
-                "",
-                "fatal: failed\n",
-            )
+        backend = mock.Mock()
+        backend.scan_status.return_value = BackendStatusScan(
+            ok=False,
+            error="fatal: failed",
+        )
+        with mock.patch("nemovcs.statusd.backends.backend_by_id", return_value=backend):
 
             statusd.scan_worktree(failed)
 
+        backend.scan_status.assert_called_once_with(self.root)
         self.assertTrue(failed.scanned)
         self.assertEqual(failed.error, "fatal: failed")
         self.assertEqual(
             statusd.path_status(failed, self.root / "tracked.txt"),
             statusd.EmblemStatus.ERROR,
         )
+
+    def test_scan_records_error_for_unknown_backend(self):
+        failed = statusd.WorktreeEntry(
+            statusd.WorktreeIdentity(
+                root=self.root,
+                gitdir=self.root / ".git",
+                common_gitdir=self.root / ".git",
+                head_label="main",
+                backend_id="svn",
+            )
+        )
+        with mock.patch("nemovcs.statusd.backends.backend_by_id", return_value=None):
+            statusd.scan_worktree(failed)
+
+        self.assertTrue(failed.scanned)
+        self.assertEqual(failed.error, "unknown backend: svn")
 
     def test_linked_worktree_scan_updates_only_linked_entry(self):
         linked = Path(self.tmp.name) / "linked"

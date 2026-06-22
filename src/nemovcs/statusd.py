@@ -14,7 +14,7 @@ from enum import StrEnum
 from pathlib import Path
 
 from . import backends
-from . import git
+from .backends.base import BackendStatusItem
 
 
 DEFAULT_MAX_WORKTREES = 12
@@ -301,19 +301,22 @@ def identify_worktree(path: str | Path) -> WorktreeIdentity | None:
 
 
 def scan_worktree(entry: WorktreeEntry) -> None:
-    result = git.run_git(entry.identity.root, ["status", "--porcelain=v2", "-z"])
+    backend = backends.backend_by_id(entry.identity.backend_id)
+    if backend is None:
+        entry.statuses.clear()
+        entry.scanned = True
+        entry.error = f"unknown backend: {entry.identity.backend_id}"
+        return
+
+    result = backend.scan_status(entry.identity.root)
     if not result.ok:
         entry.statuses.clear()
         entry.scanned = True
-        entry.error = result.stderr.strip() or result.stdout.strip()
+        entry.error = result.error
         return
 
-    items = git.parse_status_porcelain_v2_z(
-        entry.identity.root,
-        result.stdout.encode("utf-8", errors="surrogateescape"),
-    )
     statuses: dict[str, EmblemStatus] = {}
-    for item in items:
+    for item in result.items:
         status = item_to_emblem_status(item)
         statuses[item.path] = status
         if item.old_path:
@@ -324,8 +327,8 @@ def scan_worktree(entry: WorktreeEntry) -> None:
     entry.error = ""
 
 
-def item_to_emblem_status(item: git.CommitItem) -> EmblemStatus:
-    if item.conflicted or item.status == "conflicted":
+def item_to_emblem_status(item: BackendStatusItem) -> EmblemStatus:
+    if item.conflicted:
         return EmblemStatus.CONFLICTED
     return EmblemStatus.MODIFIED
 

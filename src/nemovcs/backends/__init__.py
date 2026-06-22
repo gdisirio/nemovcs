@@ -16,6 +16,13 @@ def registered_backends() -> tuple[Backend, ...]:
     return BACKENDS
 
 
+def backend_by_id(backend_id: str) -> Backend | None:
+    for backend in BACKENDS:
+        if backend.id == backend_id:
+            return backend
+    return None
+
+
 def detect_backend(path: str | Path) -> Backend | None:
     for backend in BACKENDS:
         if backend.is_worktree(path):

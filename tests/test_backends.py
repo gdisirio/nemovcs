@@ -4,7 +4,7 @@ from unittest import mock
 
 from nemovcs import backends
 from nemovcs import git
-from nemovcs.backends.base import BackendWorktreeIdentity
+from nemovcs.backends.base import BackendStatusItem, BackendWorktreeIdentity
 from nemovcs.backends.git import GitBackend
 
 
@@ -14,6 +14,16 @@ class BackendRegistryTest(unittest.TestCase):
 
         self.assertEqual([backend.id for backend in registered], ["git"])
         self.assertIsInstance(registered[0], GitBackend)
+
+    def test_backend_by_id_returns_registered_backend(self):
+        backend = backends.backend_by_id("git")
+
+        self.assertIsNotNone(backend)
+        assert backend is not None
+        self.assertEqual(backend.id, "git")
+
+    def test_backend_by_id_returns_none_for_unknown_backend(self):
+        self.assertIsNone(backends.backend_by_id("svn"))
 
     def test_detect_backend_returns_git_for_git_worktree(self):
         with mock.patch("nemovcs.git.is_inside_worktree", return_value=True):
@@ -73,6 +83,69 @@ class BackendRegistryTest(unittest.TestCase):
 
         self.assertIs(result, expected)
         status.assert_called_once_with([Path("/tmp/repo")])
+
+    def test_git_backend_scan_status_translates_porcelain_items(self):
+        backend = GitBackend()
+        root = Path("/tmp/repo")
+
+        with mock.patch("nemovcs.git.run_git") as run_git, mock.patch(
+            "nemovcs.git.parse_status_porcelain_v2_z"
+        ) as parse_status:
+            run_git.return_value = git.GitResult(("git",), root, 0, "raw", "")
+            parse_status.return_value = [
+                git.CommitItem(
+                    root=root,
+                    path="tracked.txt",
+                    status="modified",
+                    index_status=".",
+                    worktree_status="M",
+                ),
+                git.CommitItem(
+                    root=root,
+                    path="renamed.txt",
+                    old_path="old.txt",
+                    status="renamed",
+                    index_status="R",
+                    worktree_status=".",
+                ),
+                git.CommitItem(
+                    root=root,
+                    path="conflicted.txt",
+                    status="conflicted",
+                    index_status="U",
+                    worktree_status="U",
+                    conflicted=True,
+                ),
+            ]
+
+            result = backend.scan_status(root)
+
+        self.assertTrue(result.ok)
+        self.assertEqual(
+            result.items,
+            (
+                BackendStatusItem(path="tracked.txt"),
+                BackendStatusItem(path="renamed.txt", old_path="old.txt"),
+                BackendStatusItem(path="conflicted.txt", conflicted=True),
+            ),
+        )
+        parse_status.assert_called_once_with(
+            root,
+            b"raw",
+        )
+
+    def test_git_backend_scan_status_reports_command_error(self):
+        backend = GitBackend()
+        root = Path("/tmp/repo")
+
+        with mock.patch("nemovcs.git.run_git") as run_git:
+            run_git.return_value = git.GitResult(("git",), root, 128, "", "fatal\n")
+
+            result = backend.scan_status(root)
+
+        self.assertFalse(result.ok)
+        self.assertEqual(result.error, "fatal")
+        self.assertEqual(result.items, ())
 
     def test_git_backend_builds_identity_from_rev_parse(self):
         backend = GitBackend()

@@ -11,7 +11,11 @@ from pathlib import Path
 from typing import Iterable, Sequence
 
 from nemovcs import git
-from nemovcs.backends.base import BackendWorktreeIdentity
+from nemovcs.backends.base import (
+    BackendStatusItem,
+    BackendStatusScan,
+    BackendWorktreeIdentity,
+)
 
 
 class GitBackend:
@@ -54,6 +58,30 @@ class GitBackend:
 
     def status(self, paths: Sequence[str | Path]) -> list[git.GitResult]:
         return git.status(paths)
+
+    def scan_status(self, root: str | Path) -> BackendStatusScan:
+        result = git.run_git(root, ["status", "--porcelain=v2", "-z"])
+        if not result.ok:
+            return BackendStatusScan(
+                ok=False,
+                error=result.stderr.strip() or result.stdout.strip(),
+            )
+
+        items = git.parse_status_porcelain_v2_z(
+            root,
+            result.stdout.encode("utf-8", errors="surrogateescape"),
+        )
+        return BackendStatusScan(
+            ok=True,
+            items=tuple(
+                BackendStatusItem(
+                    path=item.path,
+                    old_path=item.old_path,
+                    conflicted=item.conflicted or item.status == "conflicted",
+                )
+                for item in items
+            ),
+        )
 
     def commit_items(
         self,
