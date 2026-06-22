@@ -6,14 +6,22 @@ import argparse
 from pathlib import Path
 import subprocess
 import sys
-from typing import Callable, Sequence
+from typing import Any, Callable, Protocol, Sequence
 
 from . import __version__
 from . import backends
 from . import git
 
 
-def _print_results(results: list[git.GitResult]) -> int:
+class CommandResult(Protocol):
+    cwd: Path
+    returncode: int
+    stdout: str
+    stderr: str
+    ok: bool
+
+
+def _print_results(results: Sequence[CommandResult]) -> int:
     exit_code = 0
     for idx, result in enumerate(results):
         if idx:
@@ -27,6 +35,14 @@ def _print_results(results: list[git.GitResult]) -> int:
         if not result.ok:
             exit_code = result.returncode or 1
     return exit_code
+
+
+def _backend_results(paths: Sequence[str | Path], operation: str) -> list[Any]:
+    selected_paths = paths or [Path.cwd()]
+    results: list[Any] = []
+    for backend in backends.group_by_backend(selected_paths):
+        results.extend(getattr(backend, operation)(selected_paths))
+    return results
 
 
 def cmd_action_visible(args: argparse.Namespace) -> int:
@@ -53,7 +69,7 @@ def clone_target_visible(path: str | Path) -> bool:
 
 
 def cmd_status(args: argparse.Namespace) -> int:
-    return _print_results(git.status(args.paths))
+    return _print_results(_backend_results(args.paths, "status"))
 
 
 def cmd_status_dialog(args: argparse.Namespace) -> int:
@@ -123,7 +139,7 @@ def cmd_log_dialog(args: argparse.Namespace) -> int:
 
 
 def cmd_update(args: argparse.Namespace) -> int:
-    return _print_results(git.update(args.paths))
+    return _print_results(_backend_results(args.paths, "update"))
 
 
 def update_phases(paths: Sequence[str]):
@@ -147,7 +163,7 @@ def cmd_update_dialog(args: argparse.Namespace) -> int:
 
 
 def cmd_push(args: argparse.Namespace) -> int:
-    return _print_results(git.push(args.paths))
+    return _print_results(_backend_results(args.paths, "push"))
 
 
 def push_phases(paths: Sequence[str]):

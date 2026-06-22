@@ -4,15 +4,40 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
+from nemovcs import git
 from nemovcs.cli import (
     absolute_paths,
     build_parser,
     clone_target_visible,
     cmd_action_visible,
+    cmd_push,
     cmd_stage_dialog,
+    cmd_status,
+    cmd_update,
     log_phases,
     push_phases,
 )
+
+
+class FakeBackend:
+    id = "fake"
+    label = "Fake"
+
+    def __init__(self):
+        self.calls: list[tuple[str, list[str]]] = []
+        self.result = git.GitResult(("fake",), Path("/tmp/example"), 0, "ok\n", "")
+
+    def status(self, paths):
+        self.calls.append(("status", list(paths)))
+        return [self.result]
+
+    def update(self, paths):
+        self.calls.append(("update", list(paths)))
+        return [self.result]
+
+    def push(self, paths):
+        self.calls.append(("push", list(paths)))
+        return [self.result]
 
 
 class CliParserTest(unittest.TestCase):
@@ -107,6 +132,46 @@ class CliParserTest(unittest.TestCase):
 
         self.assertEqual(args.command, "push-dialog")
         self.assertEqual(args.paths, ["/tmp/example"])
+
+    def test_status_uses_backend_registry(self):
+        parser = build_parser()
+        args = parser.parse_args(["status", "/tmp/example"])
+        backend = FakeBackend()
+
+        with mock.patch(
+            "nemovcs.cli.backends.group_by_backend",
+            return_value={backend: {Path("/tmp/example"): ["."]}},
+        ), mock.patch("sys.stdout", new=io.StringIO()) as stdout:
+            self.assertEqual(cmd_status(args), 0)
+
+        self.assertEqual(backend.calls, [("status", ["/tmp/example"])])
+        self.assertEqual(stdout.getvalue(), "ok\n")
+
+    def test_update_uses_backend_registry(self):
+        parser = build_parser()
+        args = parser.parse_args(["update", "/tmp/example"])
+        backend = FakeBackend()
+
+        with mock.patch(
+            "nemovcs.cli.backends.group_by_backend",
+            return_value={backend: {Path("/tmp/example"): ["."]}},
+        ), mock.patch("sys.stdout", new=io.StringIO()):
+            self.assertEqual(cmd_update(args), 0)
+
+        self.assertEqual(backend.calls, [("update", ["/tmp/example"])])
+
+    def test_push_uses_backend_registry(self):
+        parser = build_parser()
+        args = parser.parse_args(["push", "/tmp/example"])
+        backend = FakeBackend()
+
+        with mock.patch(
+            "nemovcs.cli.backends.group_by_backend",
+            return_value={backend: {Path("/tmp/example"): ["."]}},
+        ), mock.patch("sys.stdout", new=io.StringIO()):
+            self.assertEqual(cmd_push(args), 0)
+
+        self.assertEqual(backend.calls, [("push", ["/tmp/example"])])
 
     def test_status_dialog_accepts_paths(self):
         parser = build_parser()

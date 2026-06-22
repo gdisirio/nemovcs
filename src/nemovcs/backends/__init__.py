@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Iterable
 
-from .base import Backend
+from .base import Backend, BackendWorktreeIdentity
 from .git import GitBackend
 
 
@@ -28,6 +28,16 @@ def detect_root(path: str | Path) -> tuple[Backend, Path] | None:
         root = backend.root(path)
         if root is not None:
             return backend, root
+    return None
+
+
+def detect_worktree_identity(
+    path: str | Path,
+) -> tuple[Backend, BackendWorktreeIdentity] | None:
+    for backend in BACKENDS:
+        identity = backend.identity(path)
+        if identity is not None:
+            return backend, identity
     return None
 
 

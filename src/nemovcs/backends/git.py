@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Iterable, Sequence
 
 from nemovcs import git
+from nemovcs.backends.base import BackendWorktreeIdentity
 
 
 class GitBackend:
@@ -19,6 +20,31 @@ class GitBackend:
 
     def is_worktree(self, path: str | Path) -> bool:
         return git.is_inside_worktree(path)
+
+    def identity(self, path: str | Path) -> BackendWorktreeIdentity | None:
+        probe = git.run_git(
+            path,
+            [
+                "rev-parse",
+                "--path-format=absolute",
+                "--show-toplevel",
+                "--git-dir",
+                "--git-common-dir",
+            ],
+        )
+        if not probe.ok:
+            return None
+
+        lines = [line.strip() for line in probe.stdout.splitlines()]
+        if len(lines) < 3:
+            return None
+
+        return BackendWorktreeIdentity(
+            root=Path(lines[0]).resolve(strict=False),
+            vcs_dir=Path(lines[1]).resolve(strict=False),
+            common_dir=Path(lines[2]).resolve(strict=False),
+            head_label=self._head_label(path),
+        )
 
     def root(self, path: str | Path) -> Path | None:
         return git.repo_root(path)
@@ -43,3 +69,18 @@ class GitBackend:
 
     def push(self, paths: Sequence[str | Path]) -> list[git.GitResult]:
         return git.push(paths)
+
+    def _head_label(self, path: str | Path) -> str:
+        branch = git.run_git(path, ["symbolic-ref", "--quiet", "--short", "HEAD"])
+        if branch.ok:
+            name = branch.stdout.strip()
+            if name:
+                return name
+
+        commit = git.run_git(path, ["rev-parse", "--short", "HEAD"])
+        if commit.ok:
+            sha = commit.stdout.strip()
+            if sha:
+                return f"detached at {sha}"
+
+        return "unknown"

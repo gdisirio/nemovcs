@@ -2,8 +2,17 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable, Protocol, Sequence
+
+
+@dataclass(frozen=True)
+class BackendWorktreeIdentity:
+    root: Path
+    vcs_dir: Path
+    common_dir: Path
+    head_label: str
 
 
 class Backend(Protocol):
@@ -11,6 +20,8 @@ class Backend(Protocol):
     label: str
 
     def is_worktree(self, path: str | Path) -> bool: ...
+
+    def identity(self, path: str | Path) -> BackendWorktreeIdentity | None: ...
 
     def root(self, path: str | Path) -> Path | None: ...
 

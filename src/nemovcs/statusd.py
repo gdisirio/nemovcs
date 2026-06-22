@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
 
+from . import backends
 from . import git
 
 
@@ -283,45 +284,20 @@ class StatusDaemonCore:
 
 
 def identify_worktree(path: str | Path) -> WorktreeIdentity | None:
-    """Return the Git worktree identity for `path`, or None outside Git."""
+    """Return the worktree identity for `path`, or None outside known VCS roots."""
 
-    probe = git.run_git(
-        path,
-        [
-            "rev-parse",
-            "--path-format=absolute",
-            "--show-toplevel",
-            "--git-dir",
-            "--git-common-dir",
-        ],
+    detected = backends.detect_worktree_identity(path)
+    if detected is None:
+        return None
+
+    backend, identity = detected
+    return WorktreeIdentity(
+        root=identity.root,
+        gitdir=identity.vcs_dir,
+        common_gitdir=identity.common_dir,
+        head_label=identity.head_label,
+        backend_id=backend.id,
     )
-    if not probe.ok:
-        return None
-
-    lines = [line.strip() for line in probe.stdout.splitlines()]
-    if len(lines) < 3:
-        return None
-
-    root = Path(lines[0]).resolve(strict=False)
-    gitdir = Path(lines[1]).resolve(strict=False)
-    common_gitdir = Path(lines[2]).resolve(strict=False)
-    return WorktreeIdentity(root, gitdir, common_gitdir, head_label(path))
-
-
-def head_label(path: str | Path) -> str:
-    branch = git.run_git(path, ["symbolic-ref", "--quiet", "--short", "HEAD"])
-    if branch.ok:
-        name = branch.stdout.strip()
-        if name:
-            return name
-
-    commit = git.run_git(path, ["rev-parse", "--short", "HEAD"])
-    if commit.ok:
-        sha = commit.stdout.strip()
-        if sha:
-            return f"detached at {sha}"
-
-    return "unknown"
 
 
 def scan_worktree(entry: WorktreeEntry) -> None:

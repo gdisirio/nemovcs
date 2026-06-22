@@ -3,6 +3,8 @@ import unittest
 from unittest import mock
 
 from nemovcs import backends
+from nemovcs import git
+from nemovcs.backends.base import BackendWorktreeIdentity
 from nemovcs.backends.git import GitBackend
 
 
@@ -35,6 +37,23 @@ class BackendRegistryTest(unittest.TestCase):
         self.assertEqual(backend.id, "git")
         self.assertEqual(detected_root, root)
 
+    def test_detect_worktree_identity_returns_backend_and_identity(self):
+        root = Path("/tmp/repo")
+        identity = BackendWorktreeIdentity(
+            root=root,
+            vcs_dir=root / ".git",
+            common_dir=root / ".git",
+            head_label="main",
+        )
+
+        with mock.patch("nemovcs.backends.git.GitBackend.identity", return_value=identity):
+            detected = backends.detect_worktree_identity(root)
+
+        self.assertIsNotNone(detected)
+        backend, detected_identity = detected
+        self.assertEqual(backend.id, "git")
+        self.assertEqual(detected_identity, identity)
+
     def test_group_by_backend_groups_git_roots(self):
         root = Path("/tmp/repo")
 
@@ -54,6 +73,42 @@ class BackendRegistryTest(unittest.TestCase):
 
         self.assertIs(result, expected)
         status.assert_called_once_with([Path("/tmp/repo")])
+
+    def test_git_backend_builds_identity_from_rev_parse(self):
+        backend = GitBackend()
+        root = Path("/tmp/repo")
+
+        with mock.patch("nemovcs.git.run_git") as run_git:
+            run_git.side_effect = [
+                git.GitResult(
+                    ("git",),
+                    root,
+                    0,
+                    "/tmp/repo\n/tmp/repo/.git\n/tmp/repo/.git\n",
+                    "",
+                ),
+                git.GitResult(("git",), root, 0, "main\n", ""),
+            ]
+
+            identity = backend.identity(root / "src")
+
+        self.assertEqual(
+            identity,
+            BackendWorktreeIdentity(
+                root=root,
+                vcs_dir=root / ".git",
+                common_dir=root / ".git",
+                head_label="main",
+            ),
+        )
+
+    def test_git_backend_identity_returns_none_outside_worktree(self):
+        backend = GitBackend()
+
+        with mock.patch("nemovcs.git.run_git") as run_git:
+            run_git.return_value = git.GitResult(("git",), Path("/tmp"), 128, "", "fatal")
+
+            self.assertIsNone(backend.identity(Path("/tmp")))
 
 
 if __name__ == "__main__":
