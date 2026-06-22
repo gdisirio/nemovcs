@@ -839,6 +839,14 @@ Implementation:
 - Install the temporary ok/modified/conflict emblem SVGs into the user's hicolor
   icon theme so `NemoVCS.py` can call `item.add_emblem()` with normal emblem
   names.
+- Keep two source emblem sets using `-big` and `-small` suffixes, for example
+  `emblem-nemovcs-modified-big.svg` and
+  `emblem-nemovcs-modified-small.svg`.
+- Install the selected working emblem set without the size suffix, for example
+  copying `emblem-nemovcs-modified-big.svg` to
+  `emblem-nemovcs-modified.svg`. This keeps Nemo-facing icon names stable while
+  allowing the whole emblem set to be switched later through settings or install
+  policy.
 - Return aggregate status from daemon status records so folders can inherit
   modified/conflicted state from descendants.
 
