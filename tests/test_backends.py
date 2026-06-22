@@ -104,6 +104,18 @@ class BackendRegistryTest(unittest.TestCase):
         ):
             self.assertEqual(backends.commit_items([root]), {root: [item]})
 
+    def test_raw_status_collects_status_from_matching_backend(self):
+        root = Path("/tmp/repo")
+        expected = object()
+
+        with mock.patch("nemovcs.git.group_by_repo", return_value={root: ["."]}), mock.patch(
+            "nemovcs.git.status",
+            return_value=[expected],
+        ) as status:
+            self.assertEqual(backends.raw_status([root]), [expected])
+
+        status.assert_called_once_with([root])
+
     def test_current_branch_uses_detected_backend(self):
         root = Path("/tmp/repo")
 

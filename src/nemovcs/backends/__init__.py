@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Iterable, Sequence
+from typing import Any, Iterable, Sequence
 
 from .base import (
     Backend,
@@ -70,6 +70,14 @@ def commit_items(paths: Sequence[str | Path]) -> dict[Path, list[BackendChangeIt
     for backend in BACKENDS:
         items_by_root.update(backend.commit_items(selected_paths))
     return items_by_root
+
+
+def raw_status(paths: Sequence[str | Path]) -> list[Any]:
+    selected_paths = paths or [Path.cwd()]
+    results: list[Any] = []
+    for backend in group_by_backend(selected_paths):
+        results.extend(backend.status(selected_paths))
+    return results
 
 
 def current_branch(root: str | Path) -> str:

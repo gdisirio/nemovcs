@@ -1,5 +1,6 @@
 from pathlib import Path
 import unittest
+from unittest import mock
 
 from nemovcs import git
 from nemovcs.backends.base import BackendChangeItem
@@ -56,6 +57,44 @@ class StatusDialogTest(unittest.TestCase):
             ],
         )
         self.assertNotIn("--dir-diff", command)
+
+    def test_load_status_uses_backend_raw_status_for_output_tab(self):
+        class FakeStore:
+            def __init__(self):
+                self.cleared = False
+
+            def clear(self):
+                self.cleared = True
+
+        class FakeBuffer:
+            def __init__(self):
+                self.text = None
+
+            def set_text(self, text):
+                self.text = text
+
+        class FakeLabel:
+            def __init__(self):
+                self.text = None
+
+            def set_text(self, text):
+                self.text = text
+
+        dialog = StatusDialog.__new__(StatusDialog)
+        dialog.paths = ["/tmp/example"]
+        dialog.exit_code = 0
+        dialog.store = FakeStore()
+        dialog.output_buffer = FakeBuffer()
+        dialog.status_label = FakeLabel()
+        result = git.GitResult(("git",), Path("/tmp/example"), 0, " M src/app.py\n", "")
+
+        with mock.patch("nemovcs.ui.status_dialog.backends.commit_items", return_value={}), (
+            mock.patch("nemovcs.ui.status_dialog.backends.raw_status", return_value=[result])
+        ) as raw_status:
+            StatusDialog.load_status(dialog)
+
+        raw_status.assert_called_once_with(["/tmp/example"])
+        self.assertEqual(dialog.output_buffer.text, " M src/app.py\n")
 
 
 if __name__ == "__main__":

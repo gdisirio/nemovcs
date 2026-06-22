@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 import subprocess
 import sys
-from typing import Sequence
+from typing import Protocol, Sequence
 
 import gi
 
@@ -16,7 +16,6 @@ from gi.repository import GdkPixbuf  # noqa: E402
 from gi.repository import Pango  # noqa: E402
 
 from nemovcs import backends
-from nemovcs import git
 from nemovcs.backends.base import BackendChangeItem
 
 
@@ -39,6 +38,14 @@ STATUS_ICON_NAMES = {
 }
 
 
+class StatusOutputResult(Protocol):
+    cwd: Path
+    returncode: int
+    stdout: str
+    stderr: str
+    ok: bool
+
+
 def run(paths: Sequence[str]) -> int:
     window = StatusDialog(paths or ["."])
     window.connect("destroy", Gtk.main_quit)
@@ -47,7 +54,7 @@ def run(paths: Sequence[str]) -> int:
     return window.exit_code
 
 
-def format_status_output(results: list[git.GitResult]) -> str:
+def format_status_output(results: Sequence[StatusOutputResult]) -> str:
     chunks: list[str] = []
     for idx, result in enumerate(results):
         if idx:
@@ -178,7 +185,7 @@ class StatusDialog(Gtk.Window):
         self.output_buffer.set_text("")
 
         items_by_root = backends.commit_items(self.paths)
-        results = git.status(self.paths)
+        results = backends.raw_status(self.paths)
         self.output_buffer.set_text(format_status_output(results))
         self.exit_code = next((result.returncode for result in results if not result.ok), 0)
 
