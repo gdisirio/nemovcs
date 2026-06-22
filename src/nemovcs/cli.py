@@ -163,6 +163,15 @@ def cmd_commit_dialog(args: argparse.Namespace) -> int:
     return commit_dialog.run(args.paths or ["."])
 
 
+def cmd_stage_dialog(args: argparse.Namespace) -> int:
+    from .ui import stage_dialog
+
+    if not git.group_by_repo(args.paths or [Path.cwd()]):
+        print("not inside a Git working tree", file=sys.stderr)
+        return 1
+    return stage_dialog.run(args.paths or ["."])
+
+
 def cmd_settings(args: argparse.Namespace) -> int:
     print("NemoVCS settings are not implemented yet.")
     print("This placeholder is installed to validate the Nemo menu layout.")
@@ -365,6 +374,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     commit_dialog.add_argument("paths", nargs="*")
     commit_dialog.set_defaults(func=cmd_commit_dialog)
+
+    stage_dialog = subparsers.add_parser(
+        "stage-dialog",
+        help="open the GTK stage dialog",
+    )
+    stage_dialog.add_argument("paths", nargs="*")
+    stage_dialog.set_defaults(func=cmd_stage_dialog)
 
     settings = subparsers.add_parser("settings", help="show NemoVCS settings")
     settings.set_defaults(func=cmd_settings)

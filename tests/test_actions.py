@@ -50,6 +50,13 @@ class NemoActionFilesTest(unittest.TestCase):
         self.assertIn("Terminal=false", text)
         self.assertNotIn("run-terminal log", text)
 
+    def test_stage_action_uses_gtk_dialog(self):
+        text = (ACTION_DIR / "nemovcs-stage.nemo_action").read_text(encoding="utf-8")
+
+        self.assertIn("Exec=nemovcs stage-dialog %F", text)
+        self.assertIn("Terminal=false", text)
+        self.assertNotIn("run-terminal", text)
+
     def test_diff_action_launches_without_terminal(self):
         text = (ACTION_DIR / "nemovcs-diff.nemo_action").read_text(encoding="utf-8")
 

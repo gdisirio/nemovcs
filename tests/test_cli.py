@@ -1,8 +1,9 @@
+import io
 import unittest
 from pathlib import Path
 from unittest import mock
 
-from nemovcs.cli import absolute_paths, build_parser, log_phases
+from nemovcs.cli import absolute_paths, build_parser, cmd_stage_dialog, log_phases
 
 
 class CliParserTest(unittest.TestCase):
@@ -132,6 +133,38 @@ class CliParserTest(unittest.TestCase):
 
         self.assertEqual(args.command, "commit-dialog")
         self.assertEqual(args.paths, ["/tmp/example"])
+
+    def test_stage_dialog_accepts_paths(self):
+        parser = build_parser()
+
+        args = parser.parse_args(["stage-dialog", "/tmp/example"])
+
+        self.assertEqual(args.command, "stage-dialog")
+        self.assertEqual(args.paths, ["/tmp/example"])
+
+    def test_stage_dialog_runs_dialog_inside_worktree(self):
+        parser = build_parser()
+        args = parser.parse_args(["stage-dialog", "/tmp/example"])
+
+        with mock.patch("nemovcs.cli.git.group_by_repo") as group_by_repo, mock.patch(
+            "nemovcs.ui.stage_dialog.run",
+            return_value=0,
+        ) as run_dialog:
+            group_by_repo.return_value = {Path("/tmp/example"): ["."]}
+
+            self.assertEqual(cmd_stage_dialog(args), 0)
+
+        run_dialog.assert_called_once_with(["/tmp/example"])
+
+    def test_stage_dialog_rejects_paths_outside_worktree(self):
+        parser = build_parser()
+        args = parser.parse_args(["stage-dialog", "/tmp/example"])
+
+        with mock.patch("nemovcs.cli.git.group_by_repo", return_value={}), mock.patch(
+            "sys.stderr",
+            new=io.StringIO(),
+        ):
+            self.assertEqual(cmd_stage_dialog(args), 1)
 
 
 if __name__ == "__main__":

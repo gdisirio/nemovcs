@@ -18,12 +18,14 @@ NEMOVCS_ACTIONS = {
     "nemovcs-diff.nemo_action",
     "nemovcs-log.nemo_action",
     "nemovcs-settings.nemo_action",
+    "nemovcs-stage.nemo_action",
     "nemovcs-status.nemo_action",
     "nemovcs-update.nemo_action",
 }
 
 TOP_LEVEL_ACTIONS = [
     "nemovcs-commit.nemo_action",
+    "nemovcs-stage.nemo_action",
     "nemovcs-update.nemo_action",
     "nemovcs-background-update.nemo_action",
 ]

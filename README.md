@@ -1,66 +1,126 @@
 # NemoVCS
 
-NemoVCS is a small Git integration for the Nemo file manager.
+NemoVCS is a Git integration for the Nemo file manager.
 
-Status: alpha. NemoVCS now has contextual Nemo Actions, GTK commit/status/update
-flows, a DBus-activated status daemon, and a `nemo-python` emblem plugin for
-clean, modified, and conflicted Git status. It is usable for local testing, but
-still needs more hardening before unattended daily use.
+Status: alpha. It is usable for local testing, but still needs broader manual
+testing and hardening before unattended daily use.
 
-The first target is intentionally narrow:
+## Features
 
-- Git only
-- Nemo first
-- context menu operations through Nemo Actions
-- live emblems through a lightweight Nemo plugin
-- cached status through a DBus-activated daemon
-- no Python Git library; Git remains the status/action authority
+- Context menu actions inside Git working trees.
+- GTK dialogs for stage, commit, status, update, log, settings, and about.
+- Meld integration for diffs.
+- Live status emblems in Nemo:
+  - clean paths,
+  - modified paths and folders,
+  - conflicted paths and folders.
+- DBus-activated status daemon with cached status and filesystem monitoring.
+- Linked Git worktrees are treated as independent worktrees.
 
-RabbitVCS is useful reference material, but NemoVCS is a new project.
-The prototype keeps each operation explicit so early behavior is easy to test.
+## Dependencies
 
-## Current Functionality
+Required:
 
-The current alpha installs contextual Nemo menu items that appear only for paths
-inside Git working trees, plus a Nemo plugin for live status emblems.
+- Nemo
+- nemo-python
+- Python 3.10 or newer
+- python3-gi / PyGObject
+- python3-dbus
+- Git
+
+Optional:
+
+- Meld, for the `Diff...` action.
+
+NemoVCS shells out to the `git` executable. It does not use a Python Git
+library.
+
+## Install
+
+The current install flow is for per-user source-tree testing.
+
+From the repository root:
+
+```sh
+./scripts/install-actions.sh
+./scripts/install-nemo-extension.sh
+./scripts/install-statusd-service.sh
+nemo --quit
+```
+
+What this installs:
+
+- Nemo action files into `~/.local/share/nemo/actions`.
+- Temporary action icons under `~/.local/share/nemo/actions/nemovcs-icons`.
+- The generated nemo-python extension:
+  `~/.local/share/nemo-python/extensions/NemoVCS.py`.
+- Status emblem icons into `~/.local/share/icons/hicolor/scalable/emblems`.
+- The status daemon wrapper:
+  `~/.local/bin/nemovcs-statusd`.
+- The DBus activation file:
+  `~/.local/share/dbus-1/services/io.github.gdisirio.NemoVCS.Statusd.service`.
+
+After installing the DBus service, the status daemon starts on demand. You do
+not need to start it manually for normal use.
+
+## Uninstall
+
+To remove the per-user development install and stop the status daemon:
+
+```sh
+./scripts/uninstall.sh
+nemo --quit
+```
+
+The uninstall script removes only NemoVCS-owned files and prunes NemoVCS entries
+from Nemo's action layout. Unrelated Nemo actions are preserved.
+
+## Use
+
+Open Nemo inside a Git working tree.
 
 Top-level actions:
 
 - `Commit...`
+- `Stage...`
 - `Update...`
 
 `NemoVCS` submenu actions:
 
 - `Status...`
-- `Diff...` opens Meld
+- `Diff...`
 - `Log...`
 - `Settings...`
 - `About...`
 
-`Commit...` opens the first GTK commit dialog with a message editor, flat
-changed-file checklist, include checkboxes, and per-file context menu. The
-stage and commit steps run through a GTK logger with `Summary` and `Output`
-tabs.
+The status daemon is started automatically through session DBus activation when
+Nemo asks for status.
 
-`Update...` runs `git pull --ff-only` through the same GTK logger. `Status...`
-opens a GTK status window with a structured changed-file list in `Summary` and
-raw `git status --short --branch` text in `Output`. `Log...` runs through the
-GTK logger. `Settings...` is a GTK placeholder, and `About...` reports project
-information in a GTK about dialog.
+## Troubleshooting
 
-`Diff...` launches Meld through Git's difftool support without opening a
-terminal. If Meld is not installed, the diff action is hidden by Nemo's action
-dependency handling.
+Restart Nemo after installing, uninstalling, or changing the extension:
 
-Status emblems are provided by the Nemo plugin:
+```sh
+nemo --quit
+```
 
-- clean paths use the normal emblem,
-- modified paths and folders use the modified emblem,
-- conflicted paths and folders use the conflict emblem.
+Check whether the daemon can answer:
 
-The status daemon keeps a bounded cache of recently seen worktrees, supports
-linked worktrees as independent worktrees, watches cached worktrees with
-filesystem monitors, and is started on demand by session DBus activation.
+```sh
+PYTHONPATH=src python3 -m nemovcs status-cache --dbus .
+```
+
+Run the daemon manually while debugging:
+
+```sh
+PYTHONPATH=src python3 -m nemovcs statusd
+```
+
+Enable optional plugin diagnostics when launching Nemo manually:
+
+```sh
+NEMOVCS_PLUGIN_LOG=/tmp/nemovcs-plugin.log nemo
+```
 
 ## Development
 
@@ -70,87 +130,29 @@ Run the CLI directly from the source tree:
 PYTHONPATH=src python3 -m nemovcs --help
 ```
 
-Run tests from the source tree:
+Run tests:
 
 ```sh
 PYTHONPATH=src python3 -m unittest discover -s tests
 ```
 
-If `pip` is available, install the Python package in editable mode:
+Compile-check Python files:
+
+```sh
+python3 -m compileall -q src tests scripts
+```
+
+If `pip` is available, the Python package can also be installed in editable
+mode:
 
 ```sh
 python3 -m pip install -e .
 ```
 
-## Nemo Actions
+## Notes
 
-Action files live in `data/nemo/actions`.
+RabbitVCS is useful reference material, but NemoVCS is a new project.
 
-For per-user testing, install the actions and temporary icons with:
-
-```sh
-./scripts/install-actions.sh
-```
-
-Then restart Nemo:
-
-```sh
-nemo --quit
-```
-
-The actions use `Conditions=exec nemovcs action-visible inside-worktree ...`
-so they only appear for paths inside Git working trees.
-
-The installer also writes the current `NemoVCS` submenu layout into Nemo's user
-action layout file.
-
-## Nemo Plugin
-
-The status-emblem plugin is an early prototype. It installs a `nemo-python`
-`InfoProvider` that resolves local file paths, talks to the foreground status
-daemon, and applies one primary emblem for `ok`, `modified`, or `conflicted`
-status. It also listens for daemon status-change signals and invalidates
-bounded visible file items so Nemo can refresh emblems without navigating away.
-
-For per-user source-tree testing, install the extension with:
-
-```sh
-./scripts/install-nemo-extension.sh
-./scripts/install-statusd-service.sh
-```
-
-The status daemon is DBus-activated after installing the service. A DBus call
-to `io.github.gdisirio.NemoVCS.Statusd` starts it on demand. You can also run
-it manually while debugging:
-
-```sh
-PYTHONPATH=src python3 -m nemovcs statusd
-```
-
-Optional plugin diagnostics can be enabled when launching Nemo manually:
-
-```sh
-NEMOVCS_PLUGIN_LOG=/tmp/nemovcs-plugin.log nemo
-```
-
-Then restart Nemo:
-
-```sh
-nemo --quit
-```
-
-To remove the per-user development install and stop the status daemon:
-
-```sh
-./scripts/uninstall.sh
-nemo --quit
-```
-
-## Roadmap
-
-1. Harden live Nemo invalidation and linked-worktree behavior with broader
-   manual testing.
-2. Add optional diagnostics and configuration for cache sizes and plugin
-   behavior.
-3. Replace temporary RabbitVCS-derived icons with NemoVCS-native assets.
-4. Expand structured UI for log and other operations.
+Temporary icons are currently derived from RabbitVCS assets. They should be
+replaced with NemoVCS-native icons or clearly documented upstream assets before
+a broader release.

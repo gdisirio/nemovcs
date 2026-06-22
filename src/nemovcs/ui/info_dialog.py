@@ -48,3 +48,4 @@ def run_settings_placeholder() -> int:
     dialog.run()
     dialog.destroy()
     return 0
+

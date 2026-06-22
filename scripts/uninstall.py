@@ -20,6 +20,7 @@ ACTION_FILES = {
     "nemovcs-diff.nemo_action",
     "nemovcs-log.nemo_action",
     "nemovcs-settings.nemo_action",
+    "nemovcs-stage.nemo_action",
     "nemovcs-status.nemo_action",
     "nemovcs-update.nemo_action",
 }
