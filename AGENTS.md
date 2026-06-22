@@ -31,7 +31,7 @@ The machine may also have a `gh` account named `chibios-sheriff`. That account i
 The local repository is:
 
 ```text
-/home/giovanni/Projects/personal-github/nemovcs
+/home/giovanni/Projects/personal/nemovcs
 ```
 
 Current branch convention:
