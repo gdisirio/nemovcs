@@ -13,10 +13,12 @@ import subprocess
 ACTION_FILES = {
     "nemovcs-about.nemo_action",
     "nemovcs-background-about.nemo_action",
+    "nemovcs-background-clone.nemo_action",
     "nemovcs-background-push.nemo_action",
     "nemovcs-background-settings.nemo_action",
     "nemovcs-background-status.nemo_action",
     "nemovcs-background-update.nemo_action",
+    "nemovcs-clone.nemo_action",
     "nemovcs-commit.nemo_action",
     "nemovcs-diff.nemo_action",
     "nemovcs-log.nemo_action",

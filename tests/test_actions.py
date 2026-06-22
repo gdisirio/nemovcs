@@ -57,6 +57,23 @@ class NemoActionFilesTest(unittest.TestCase):
         self.assertIn("Terminal=false", text)
         self.assertNotIn("run-terminal", text)
 
+    def test_clone_action_uses_clone_target_visibility(self):
+        for name, placeholder, selection, extensions in (
+            ("nemovcs-clone.nemo_action", "%F", "s", "dir;"),
+            ("nemovcs-background-clone.nemo_action", "%P", "none", "any;"),
+        ):
+            with self.subTest(name=name):
+                text = (ACTION_DIR / name).read_text(encoding="utf-8")
+
+                self.assertIn(f"Exec=nemovcs clone-dialog {placeholder}", text)
+                self.assertIn(
+                    f"Conditions=exec nemovcs action-visible clone-target {placeholder}",
+                    text,
+                )
+                self.assertIn(f"Selection={selection}", text)
+                self.assertIn(f"Extensions={extensions}", text)
+                self.assertIn("Terminal=false", text)
+
     def test_push_actions_use_gtk_logger(self):
         for name, placeholder in (
             ("nemovcs-push.nemo_action", "%F"),

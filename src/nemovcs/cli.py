@@ -34,8 +34,21 @@ def cmd_action_visible(args: argparse.Namespace) -> int:
             return 1
         return 0 if all(git.is_inside_worktree(path) for path in args.paths) else 1
 
+    if args.predicate == "clone-target":
+        if not args.paths:
+            return 1
+        return 0 if all(clone_target_visible(path) for path in args.paths) else 1
+
     print(f"unknown visibility predicate: {args.predicate}", file=sys.stderr)
     return 2
+
+
+def clone_target_visible(path: str | Path) -> bool:
+    candidate = Path(path).expanduser()
+    if not candidate.is_absolute():
+        candidate = Path.cwd() / candidate
+    candidate = candidate.resolve(strict=False)
+    return candidate.is_dir() and not git.is_inside_worktree(candidate)
 
 
 def cmd_status(args: argparse.Namespace) -> int:
@@ -196,6 +209,16 @@ def cmd_stage_dialog(args: argparse.Namespace) -> int:
     return stage_dialog.run(args.paths or ["."])
 
 
+def cmd_clone_dialog(args: argparse.Namespace) -> int:
+    from .ui import clone_dialog
+
+    paths = args.paths or ["."]
+    if not all(clone_target_visible(path) for path in paths):
+        print("not a clone target", file=sys.stderr)
+        return 1
+    return clone_dialog.run(paths)
+
+
 def cmd_settings(args: argparse.Namespace) -> int:
     print("NemoVCS settings are not implemented yet.")
     print("This placeholder is installed to validate the Nemo menu layout.")
@@ -343,7 +366,7 @@ def build_parser() -> argparse.ArgumentParser:
         "action-visible",
         help="check whether a Nemo action should be visible",
     )
-    action_visible.add_argument("predicate", choices=["inside-worktree"])
+    action_visible.add_argument("predicate", choices=["inside-worktree", "clone-target"])
     action_visible.add_argument("paths", nargs="*")
     action_visible.set_defaults(func=cmd_action_visible)
 
@@ -416,6 +439,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     stage_dialog.add_argument("paths", nargs="*")
     stage_dialog.set_defaults(func=cmd_stage_dialog)
+
+    clone_dialog = subparsers.add_parser(
+        "clone-dialog",
+        help="open the GTK clone dialog",
+    )
+    clone_dialog.add_argument("paths", nargs="*")
+    clone_dialog.set_defaults(func=cmd_clone_dialog)
 
     settings = subparsers.add_parser("settings", help="show NemoVCS settings")
     settings.set_defaults(func=cmd_settings)

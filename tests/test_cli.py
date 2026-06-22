@@ -1,4 +1,5 @@
 import io
+import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -6,6 +7,8 @@ from unittest import mock
 from nemovcs.cli import (
     absolute_paths,
     build_parser,
+    clone_target_visible,
+    cmd_action_visible,
     cmd_stage_dialog,
     log_phases,
     push_phases,
@@ -20,6 +23,38 @@ class CliParserTest(unittest.TestCase):
 
         self.assertEqual(args.command, "run-terminal")
         self.assertEqual(args.args, ["log", "-n", "3", "path with space"])
+
+    def test_action_visible_accepts_clone_target_predicate(self):
+        parser = build_parser()
+
+        args = parser.parse_args(["action-visible", "clone-target", "/tmp/example"])
+
+        self.assertEqual(args.command, "action-visible")
+        self.assertEqual(args.predicate, "clone-target")
+        self.assertEqual(args.paths, ["/tmp/example"])
+
+    def test_clone_target_visible_accepts_non_worktree_directory(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with mock.patch("nemovcs.cli.git.is_inside_worktree", return_value=False):
+                self.assertTrue(clone_target_visible(tmp))
+
+    def test_clone_target_visible_rejects_worktree_directory(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with mock.patch("nemovcs.cli.git.is_inside_worktree", return_value=True):
+                self.assertFalse(clone_target_visible(tmp))
+
+    def test_clone_target_visible_rejects_files_without_git_check(self):
+        with tempfile.NamedTemporaryFile() as tmp:
+            with mock.patch("nemovcs.cli.git.is_inside_worktree") as is_inside_worktree:
+                self.assertFalse(clone_target_visible(tmp.name))
+
+        is_inside_worktree.assert_not_called()
+
+    def test_clone_target_predicate_rejects_missing_paths(self):
+        parser = build_parser()
+        args = parser.parse_args(["action-visible", "clone-target"])
+
+        self.assertEqual(cmd_action_visible(args), 1)
 
     def test_update_accepts_paths(self):
         parser = build_parser()
@@ -178,6 +213,36 @@ class CliParserTest(unittest.TestCase):
 
         self.assertEqual(args.command, "stage-dialog")
         self.assertEqual(args.paths, ["/tmp/example"])
+
+    def test_clone_dialog_accepts_paths(self):
+        parser = build_parser()
+
+        args = parser.parse_args(["clone-dialog", "/tmp/example"])
+
+        self.assertEqual(args.command, "clone-dialog")
+        self.assertEqual(args.paths, ["/tmp/example"])
+
+    def test_clone_dialog_runs_dialog_for_clone_target(self):
+        parser = build_parser()
+        args = parser.parse_args(["clone-dialog", "/tmp/example"])
+
+        with mock.patch("nemovcs.cli.clone_target_visible", return_value=True), mock.patch(
+            "nemovcs.ui.clone_dialog.run",
+            return_value=0,
+        ) as run_dialog:
+            self.assertEqual(args.func(args), 0)
+
+        run_dialog.assert_called_once_with(["/tmp/example"])
+
+    def test_clone_dialog_rejects_non_clone_target(self):
+        parser = build_parser()
+        args = parser.parse_args(["clone-dialog", "/tmp/example"])
+
+        with mock.patch("nemovcs.cli.clone_target_visible", return_value=False), mock.patch(
+            "sys.stderr",
+            new=io.StringIO(),
+        ):
+            self.assertEqual(args.func(args), 1)
 
     def test_stage_dialog_runs_dialog_inside_worktree(self):
         parser = build_parser()

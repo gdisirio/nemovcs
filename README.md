@@ -86,6 +86,7 @@ Top-level actions:
 
 `NemoVCS` submenu actions:
 
+- `Clone...`
 - `Stage...`
 - `Push...`
 - `Status...`
