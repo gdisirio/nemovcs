@@ -121,6 +121,25 @@ class BackendRegistryTest(unittest.TestCase):
 
         stage_phases.assert_called_once_with({root: ["src/app.py"]})
 
+    def test_commit_phases_uses_detected_backend(self):
+        root = Path("/tmp/repo")
+        phase = BackendCommandPhase(
+            title="Commit repo",
+            cwd=root,
+            command=("fake", "commit"),
+        )
+
+        with mock.patch("nemovcs.git.is_inside_worktree", return_value=True), mock.patch(
+            "nemovcs.backends.git.GitBackend.commit_phases",
+            return_value=[phase],
+        ) as commit_phases:
+            self.assertEqual(
+                backends.commit_phases(root, ["src/app.py"], "message"),
+                [phase],
+            )
+
+        commit_phases.assert_called_once_with(root, ["src/app.py"], "message")
+
     def test_git_backend_delegates_status_to_existing_git_helpers(self):
         backend = GitBackend()
         expected = object()
@@ -154,6 +173,34 @@ class BackendRegistryTest(unittest.TestCase):
                     ),
                 )
             ],
+        )
+
+    def test_git_backend_builds_commit_phases(self):
+        backend = GitBackend()
+        root = Path("/tmp/repo")
+
+        phases = backend.commit_phases(root, ["src/app.py"], "message")
+
+        self.assertEqual([phase.title for phase in phases], [
+            "Stage selected files",
+            "Create commit",
+        ])
+        self.assertEqual(
+            phases[0].command,
+            ("git", "-C", str(root), "add", "--", "src/app.py"),
+        )
+        self.assertEqual(
+            phases[1].command,
+            (
+                "git",
+                "-C",
+                str(root),
+                "commit",
+                "-m",
+                "message",
+                "--",
+                "src/app.py",
+            ),
         )
 
     def test_git_backend_translates_commit_items(self):

@@ -16,7 +16,7 @@ from gi.repository import GdkPixbuf  # noqa: E402
 from gi.repository import Pango  # noqa: E402
 
 from nemovcs import backends
-from nemovcs.backends.base import BackendChangeItem
+from nemovcs.backends.base import BackendChangeItem, BackendCommandPhase
 from nemovcs.ui import logger
 
 
@@ -337,21 +337,10 @@ class CommitDialog(Gtk.Window):
         self,
         relpaths: Sequence[str],
         message: str,
-    ) -> list[logger.CommandPhase]:
+    ) -> list[BackendCommandPhase]:
         if self.root is None:
             return []
-        return [
-            logger.CommandPhase.git(
-                "Stage selected files",
-                self.root,
-                ["add", "--", *relpaths],
-            ),
-            logger.CommandPhase.git(
-                "Create commit",
-                self.root,
-                ["commit", "-m", message, "--", *relpaths],
-            ),
-        ]
+        return backends.commit_phases(self.root, relpaths, message)
 
     def on_commit_logger_complete(self, ok: bool, _returncodes: list[int]) -> None:
         if ok:

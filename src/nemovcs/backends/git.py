@@ -111,6 +111,25 @@ class GitBackend:
             if relpaths
         ]
 
+    def commit_phases(
+        self,
+        root: str | Path,
+        relpaths: Sequence[str],
+        message: str,
+    ) -> list[BackendCommandPhase]:
+        return [
+            self._git_phase(
+                "Stage selected files",
+                root,
+                ["add", "--", *relpaths],
+            ),
+            self._git_phase(
+                "Create commit",
+                root,
+                ["commit", "-m", message, "--", *relpaths],
+            ),
+        ]
+
     def update(self, paths: Sequence[str | Path]) -> list[git.GitResult]:
         return git.update(paths)
 

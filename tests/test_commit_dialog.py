@@ -1,5 +1,6 @@
 from pathlib import Path
 import unittest
+from unittest import mock
 
 from nemovcs.backends.base import BackendChangeItem
 from nemovcs.ui.commit_dialog import CommitDialog
@@ -40,7 +41,8 @@ class CommitDialogCommandTest(unittest.TestCase):
         dialog = CommitDialog.__new__(CommitDialog)
         dialog.root = root
 
-        phases = dialog.commit_phases(["src/app.py"], "message")
+        with mock.patch("nemovcs.git.is_inside_worktree", return_value=True):
+            phases = dialog.commit_phases(["src/app.py"], "message")
 
         self.assertEqual([phase.title for phase in phases], [
             "Stage selected files",

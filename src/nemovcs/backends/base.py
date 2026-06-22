@@ -85,6 +85,13 @@ class Backend(Protocol):
         paths_by_root: dict[Path, Sequence[str]],
     ) -> list[BackendCommandPhase]: ...
 
+    def commit_phases(
+        self,
+        root: str | Path,
+        relpaths: Sequence[str],
+        message: str,
+    ) -> list[BackendCommandPhase]: ...
+
     def update(self, paths: Sequence[str | Path]) -> list[Any]: ...
 
     def push(self, paths: Sequence[str | Path]) -> list[Any]: ...

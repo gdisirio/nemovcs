@@ -91,3 +91,16 @@ def stage_phases(
             continue
         phases.extend(backend.stage_phases({root: relpaths}))
     return phases
+
+
+def commit_phases(
+    root: str | Path,
+    relpaths: Sequence[str],
+    message: str,
+) -> list[BackendCommandPhase]:
+    if not relpaths:
+        return []
+    backend = detect_backend(root)
+    if backend is None:
+        return []
+    return backend.commit_phases(root, relpaths, message)
