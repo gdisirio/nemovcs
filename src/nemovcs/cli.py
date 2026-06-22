@@ -249,6 +249,15 @@ def cmd_stage_dialog(args: argparse.Namespace) -> int:
     return stage_dialog.run(args.paths or ["."], operation=args.operation)
 
 
+def cmd_revert_dialog(args: argparse.Namespace) -> int:
+    from .ui import revert_dialog
+
+    if not backends.group_by_backend(args.paths or [Path.cwd()]):
+        print("not inside a versioned working tree", file=sys.stderr)
+        return 1
+    return revert_dialog.run(args.paths or ["."])
+
+
 def cmd_clone_dialog(args: argparse.Namespace) -> int:
     from .ui import clone_dialog
 
@@ -492,6 +501,13 @@ def build_parser() -> argparse.ArgumentParser:
     stage_dialog.add_argument("--operation", choices=["stage", "add"], default="stage")
     stage_dialog.add_argument("paths", nargs="*")
     stage_dialog.set_defaults(func=cmd_stage_dialog)
+
+    revert_dialog = subparsers.add_parser(
+        "revert-dialog",
+        help="open the GTK revert dialog",
+    )
+    revert_dialog.add_argument("paths", nargs="*")
+    revert_dialog.set_defaults(func=cmd_revert_dialog)
 
     clone_dialog = subparsers.add_parser(
         "clone-dialog",

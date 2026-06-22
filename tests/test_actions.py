@@ -67,6 +67,23 @@ class NemoActionFilesTest(unittest.TestCase):
         self.assertIn("Conditions=exec nemovcs action-visible inside-backend svn %F", text)
         self.assertIn("Terminal=false", text)
 
+    def test_revert_actions_use_gtk_dialog(self):
+        for name, backend, dependency in (
+            ("nemovcs-revert.nemo_action", "git", "git"),
+            ("nemovcs-svn-revert.nemo_action", "svn", "svn"),
+        ):
+            with self.subTest(name=name):
+                text = (ACTION_DIR / name).read_text(encoding="utf-8")
+
+                self.assertIn("Name=Revert...", text)
+                self.assertIn("Exec=nemovcs revert-dialog %F", text)
+                self.assertIn(f"Dependencies={dependency};nemovcs;", text)
+                self.assertIn(
+                    f"Conditions=exec nemovcs action-visible inside-backend {backend} %F",
+                    text,
+                )
+                self.assertIn("Terminal=false", text)
+
     def test_clone_action_uses_clone_target_visibility(self):
         for name, placeholder, selection, extensions, command, dependency in (
             ("nemovcs-clone.nemo_action", "%F", "s", "dir;", "git", "git"),

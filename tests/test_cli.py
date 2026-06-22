@@ -16,6 +16,7 @@ from nemovcs.cli import (
     cmd_diff_dialog,
     cmd_log,
     cmd_push,
+    cmd_revert_dialog,
     cmd_stage_dialog,
     cmd_status,
     cmd_status_dialog,
@@ -466,6 +467,14 @@ class CliParserTest(unittest.TestCase):
         self.assertEqual(args.operation, "add")
         self.assertEqual(args.paths, ["/tmp/example"])
 
+    def test_revert_dialog_accepts_paths(self):
+        parser = build_parser()
+
+        args = parser.parse_args(["revert-dialog", "/tmp/example"])
+
+        self.assertEqual(args.command, "revert-dialog")
+        self.assertEqual(args.paths, ["/tmp/example"])
+
     def test_clone_dialog_accepts_paths(self):
         parser = build_parser()
 
@@ -544,6 +553,30 @@ class CliParserTest(unittest.TestCase):
             new=io.StringIO(),
         ):
             self.assertEqual(cmd_stage_dialog(args), 1)
+
+    def test_revert_dialog_runs_dialog_inside_worktree(self):
+        parser = build_parser()
+        args = parser.parse_args(["revert-dialog", "/tmp/example"])
+
+        with mock.patch("nemovcs.cli.backends.group_by_backend") as group_by_backend, mock.patch(
+            "nemovcs.ui.revert_dialog.run",
+            return_value=0,
+        ) as run_dialog:
+            group_by_backend.return_value = {object(): {Path("/tmp/example"): ["."]}}
+
+            self.assertEqual(cmd_revert_dialog(args), 0)
+
+        run_dialog.assert_called_once_with(["/tmp/example"])
+
+    def test_revert_dialog_rejects_paths_outside_worktree(self):
+        parser = build_parser()
+        args = parser.parse_args(["revert-dialog", "/tmp/example"])
+
+        with mock.patch("nemovcs.cli.backends.group_by_backend", return_value={}), mock.patch(
+            "sys.stderr",
+            new=io.StringIO(),
+        ):
+            self.assertEqual(cmd_revert_dialog(args), 1)
 
 
 if __name__ == "__main__":

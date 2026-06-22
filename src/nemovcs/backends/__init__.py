@@ -176,6 +176,20 @@ def push_phases(paths: Sequence[str | Path]) -> list[BackendCommandPhase]:
     return phases
 
 
+def revert_phases(
+    paths_by_root: dict[Path, Sequence[str]],
+) -> list[BackendCommandPhase]:
+    phases: list[BackendCommandPhase] = []
+    for root, relpaths in paths_by_root.items():
+        if not relpaths:
+            continue
+        backend = detect_backend(root)
+        if backend is None:
+            continue
+        phases.extend(backend.revert_phases({root: relpaths}))
+    return phases
+
+
 def file_diff_command(item: BackendChangeItem) -> list[str]:
     backend = backend_by_id(item.backend_id)
     if backend is None:

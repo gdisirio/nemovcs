@@ -91,6 +91,7 @@ Top-level actions:
 - `SVN Checkout...`
 - `Stage...`
 - `Add...`
+- `Revert...`
 - `Push...`
 - `Status...`
 - `Log...`

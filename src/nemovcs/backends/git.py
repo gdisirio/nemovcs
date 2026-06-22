@@ -189,6 +189,20 @@ class GitBackend:
             for root in grouped_paths
         ]
 
+    def revert_phases(
+        self,
+        paths_by_root: dict[Path, Sequence[str]],
+    ) -> list[BackendCommandPhase]:
+        return [
+            self._git_phase(
+                f"Revert {root.name}",
+                root,
+                ["restore", "--staged", "--worktree", "--", *relpaths],
+            )
+            for root, relpaths in paths_by_root.items()
+            if relpaths
+        ]
+
     def file_diff_command(self, item: BackendChangeItem) -> list[str]:
         return [
             "git",

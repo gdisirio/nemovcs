@@ -371,6 +371,27 @@ class BackendRegistryTest(unittest.TestCase):
         self.assertEqual(update[0].command, ("git", "-C", str(root), "pull", "--ff-only"))
         self.assertEqual(push[0].command, ("git", "-C", str(root), "push"))
 
+    def test_git_backend_builds_revert_phases(self):
+        backend = GitBackend()
+        root = Path("/tmp/repo")
+
+        phases = backend.revert_phases({root: ["src/app.py", "README.md"]})
+
+        self.assertEqual(
+            phases[0].command,
+            (
+                "git",
+                "-C",
+                str(root),
+                "restore",
+                "--staged",
+                "--worktree",
+                "--",
+                "src/app.py",
+                "README.md",
+            ),
+        )
+
     def test_git_backend_builds_file_diff_command(self):
         backend = GitBackend()
         root = Path("/tmp/repo")
@@ -657,10 +678,12 @@ class BackendRegistryTest(unittest.TestCase):
         add = backend.stage_phases({root: ["new.txt"]})
         commit = backend.commit_phases(root, ["new.txt"], "message")
         update = backend.update_phases({root: ["."]})
+        revert = backend.revert_phases({root: ["modified.txt"]})
 
         self.assertEqual(add[0].command, ("svn", "add", "--parents", "new.txt"))
         self.assertEqual(commit[0].command, ("svn", "commit", "-m", "message", "new.txt"))
         self.assertEqual(update[0].command, ("svn", "update"))
+        self.assertEqual(revert[0].command, ("svn", "revert", "modified.txt"))
 
 
 if __name__ == "__main__":

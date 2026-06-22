@@ -1,0 +1,11 @@
+[Nemo Action]
+Name=Revert...
+Comment=Discard selected Subversion changes
+Exec=nemovcs revert-dialog %F
+Icon-Name=<nemovcs-icons/nemovcs/actions/nemovcs-update.svg>
+Selection=notnone
+Extensions=any;
+Dependencies=svn;nemovcs;
+UriScheme=file
+Conditions=exec nemovcs action-visible inside-backend svn %F
+Terminal=false
