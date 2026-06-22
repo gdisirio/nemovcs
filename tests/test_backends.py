@@ -128,6 +128,30 @@ class BackendRegistryTest(unittest.TestCase):
 
         log.assert_called_once_with([root], limit=7)
 
+    def test_raw_diff_collects_diff_from_matching_backend(self):
+        root = Path("/tmp/repo")
+        expected = object()
+
+        with mock.patch("nemovcs.git.group_by_repo", return_value={root: ["."]}), mock.patch(
+            "nemovcs.git.diff",
+            return_value=[expected],
+        ) as diff:
+            self.assertEqual(backends.raw_diff([root]), [expected])
+
+        diff.assert_called_once_with([root])
+
+    def test_diff_commands_collects_commands_from_matching_backend(self):
+        root = Path("/tmp/repo")
+        expected = object()
+
+        with mock.patch("nemovcs.git.group_by_repo", return_value={root: ["."]}), mock.patch(
+            "nemovcs.git.diff_commands",
+            return_value=[expected],
+        ) as diff_commands:
+            self.assertEqual(backends.diff_commands([root]), [expected])
+
+        diff_commands.assert_called_once_with([root])
+
     def test_current_branch_uses_detected_backend(self):
         root = Path("/tmp/repo")
 
@@ -193,6 +217,26 @@ class BackendRegistryTest(unittest.TestCase):
 
         self.assertIs(result, expected)
         log.assert_called_once_with([Path("/tmp/repo")], limit=7)
+
+    def test_git_backend_delegates_diff_to_existing_git_helpers(self):
+        backend = GitBackend()
+        expected = object()
+
+        with mock.patch("nemovcs.git.diff", return_value=expected) as diff:
+            result = backend.diff([Path("/tmp/repo")])
+
+        self.assertIs(result, expected)
+        diff.assert_called_once_with([Path("/tmp/repo")])
+
+    def test_git_backend_delegates_diff_commands_to_existing_git_helpers(self):
+        backend = GitBackend()
+        expected = object()
+
+        with mock.patch("nemovcs.git.diff_commands", return_value=expected) as diff_commands:
+            result = backend.diff_commands([Path("/tmp/repo")])
+
+        self.assertIs(result, expected)
+        diff_commands.assert_called_once_with([Path("/tmp/repo")])
 
     def test_git_backend_builds_stage_phases(self):
         backend = GitBackend()

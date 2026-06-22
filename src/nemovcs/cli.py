@@ -82,13 +82,13 @@ def cmd_status_dialog(args: argparse.Namespace) -> int:
 
 
 def cmd_diff(args: argparse.Namespace) -> int:
-    return _print_results(git.diff(args.paths))
+    return _print_results(backends.raw_diff(args.paths))
 
 
 def cmd_diff_dialog(args: argparse.Namespace) -> int:
     from .ui import info_dialog
 
-    commands = git.diff_commands(args.paths)
+    commands = backends.diff_commands(args.paths)
     if not commands:
         print("not inside a Git working tree", file=sys.stderr)
         return 1

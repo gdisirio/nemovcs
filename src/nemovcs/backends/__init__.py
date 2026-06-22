@@ -88,6 +88,22 @@ def raw_log(paths: Sequence[str | Path], limit: int) -> list[Any]:
     return results
 
 
+def raw_diff(paths: Sequence[str | Path]) -> list[Any]:
+    selected_paths = paths or [Path.cwd()]
+    results: list[Any] = []
+    for backend in group_by_backend(selected_paths):
+        results.extend(backend.diff(selected_paths))
+    return results
+
+
+def diff_commands(paths: Sequence[str | Path]) -> list[Any]:
+    selected_paths = paths or [Path.cwd()]
+    results: list[Any] = []
+    for backend in group_by_backend(selected_paths):
+        results.extend(backend.diff_commands(selected_paths))
+    return results
+
+
 def current_branch(root: str | Path) -> str:
     backend = detect_backend(root)
     if backend is None:

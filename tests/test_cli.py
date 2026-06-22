@@ -10,6 +10,8 @@ from nemovcs.cli import (
     build_parser,
     clone_target_visible,
     cmd_action_visible,
+    cmd_diff,
+    cmd_diff_dialog,
     cmd_log,
     cmd_push,
     cmd_stage_dialog,
@@ -35,6 +37,14 @@ class FakeBackend:
 
     def log(self, paths, limit):
         self.calls.append(("log", list(paths), limit))
+        return [self.result]
+
+    def diff(self, paths):
+        self.calls.append(("diff", list(paths)))
+        return [self.result]
+
+    def diff_commands(self, paths):
+        self.calls.append(("diff_commands", list(paths)))
         return [self.result]
 
     def update(self, paths):
@@ -167,6 +177,20 @@ class CliParserTest(unittest.TestCase):
         self.assertEqual(backend.calls, [("log", ["/tmp/example"], 7)])
         self.assertEqual(stdout.getvalue(), "ok\n")
 
+    def test_diff_uses_backend_registry(self):
+        parser = build_parser()
+        args = parser.parse_args(["diff", "/tmp/example"])
+        backend = FakeBackend()
+
+        with mock.patch(
+            "nemovcs.cli.backends.group_by_backend",
+            return_value={backend: {Path("/tmp/example"): ["."]}},
+        ), mock.patch("sys.stdout", new=io.StringIO()) as stdout:
+            self.assertEqual(cmd_diff(args), 0)
+
+        self.assertEqual(backend.calls, [("diff", ["/tmp/example"])])
+        self.assertEqual(stdout.getvalue(), "ok\n")
+
     def test_update_uses_backend_registry(self):
         parser = build_parser()
         args = parser.parse_args(["update", "/tmp/example"])
@@ -208,6 +232,26 @@ class CliParserTest(unittest.TestCase):
 
         self.assertEqual(args.command, "diff-dialog")
         self.assertEqual(args.paths, ["/tmp/example"])
+
+    def test_diff_dialog_uses_backend_diff_commands(self):
+        parser = build_parser()
+        args = parser.parse_args(["diff-dialog", "/tmp/example"])
+        command = git.GitResult(
+            ("meld", "/tmp/example"),
+            Path("/tmp/example"),
+            0,
+            "",
+            "",
+        )
+
+        with mock.patch(
+            "nemovcs.cli.backends.diff_commands",
+            return_value=[command],
+        ) as diff_commands, mock.patch("nemovcs.cli.subprocess.Popen") as popen:
+            self.assertEqual(cmd_diff_dialog(args), 0)
+
+        diff_commands.assert_called_once_with(["/tmp/example"])
+        popen.assert_called_once_with(command.args, cwd=str(command.cwd))
 
     def test_log_dialog_accepts_limit_and_paths(self):
         parser = build_parser()

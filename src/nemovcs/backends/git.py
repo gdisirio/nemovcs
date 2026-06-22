@@ -64,6 +64,12 @@ class GitBackend:
     def log(self, paths: Sequence[str | Path], limit: int) -> list[git.GitResult]:
         return git.log(paths, limit=limit)
 
+    def diff(self, paths: Sequence[str | Path]) -> list[git.GitResult]:
+        return git.diff(paths)
+
+    def diff_commands(self, paths: Sequence[str | Path]) -> list[git.GitResult]:
+        return git.diff_commands(paths)
+
     def scan_status(self, root: str | Path) -> BackendStatusScan:
         result = git.run_git(root, ["status", "--porcelain=v2", "-z"])
         if not result.ok:
