@@ -408,9 +408,10 @@ class CliParserTest(unittest.TestCase):
     def test_clone_dialog_accepts_paths(self):
         parser = build_parser()
 
-        args = parser.parse_args(["clone-dialog", "/tmp/example"])
+        args = parser.parse_args(["clone-dialog", "--vcs", "svn", "/tmp/example"])
 
         self.assertEqual(args.command, "clone-dialog")
+        self.assertEqual(args.vcs, "svn")
         self.assertEqual(args.paths, ["/tmp/example"])
 
     def test_clone_dialog_runs_dialog_for_clone_target(self):
@@ -423,7 +424,7 @@ class CliParserTest(unittest.TestCase):
         ) as run_dialog:
             self.assertEqual(args.func(args), 0)
 
-        run_dialog.assert_called_once_with(["/tmp/example"])
+        run_dialog.assert_called_once_with(["/tmp/example"], vcs="git")
 
     def test_clone_dialog_rejects_non_clone_target(self):
         parser = build_parser()

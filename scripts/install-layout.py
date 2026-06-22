@@ -15,6 +15,7 @@ NEMOVCS_ACTIONS = {
     "nemovcs-background-push.nemo_action",
     "nemovcs-background-settings.nemo_action",
     "nemovcs-background-status.nemo_action",
+    "nemovcs-background-svn-checkout.nemo_action",
     "nemovcs-background-update.nemo_action",
     "nemovcs-clone.nemo_action",
     "nemovcs-commit.nemo_action",
@@ -24,6 +25,7 @@ NEMOVCS_ACTIONS = {
     "nemovcs-settings.nemo_action",
     "nemovcs-stage.nemo_action",
     "nemovcs-status.nemo_action",
+    "nemovcs-svn-checkout.nemo_action",
     "nemovcs-update.nemo_action",
 }
 
@@ -36,6 +38,8 @@ TOP_LEVEL_ACTIONS = [
 SUBMENU_ACTIONS = [
     "nemovcs-clone.nemo_action",
     "nemovcs-background-clone.nemo_action",
+    "nemovcs-svn-checkout.nemo_action",
+    "nemovcs-background-svn-checkout.nemo_action",
     "nemovcs-stage.nemo_action",
     "nemovcs-push.nemo_action",
     "nemovcs-background-push.nemo_action",

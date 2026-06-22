@@ -1,11 +1,11 @@
 [Nemo Action]
-Name=Git Clone...
-Comment=Clone a Git repository here
-Exec=nemovcs clone-dialog --vcs git %P
+Name=SVN Checkout...
+Comment=Check out a Subversion repository here
+Exec=nemovcs clone-dialog --vcs svn %P
 Icon-Name=<nemovcs-icons/nemovcs/actions/nemovcs-commit.svg>
 Selection=none
 Extensions=any;
-Dependencies=git;nemovcs;
+Dependencies=svn;nemovcs;
 UriScheme=file
 Conditions=exec nemovcs action-visible clone-target %P
 Terminal=false

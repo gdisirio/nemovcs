@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 import re
 import sys
-from typing import Sequence
+from typing import Literal, Sequence
 
 import gi
 
@@ -15,8 +15,11 @@ from gi.repository import Gtk  # noqa: E402
 from nemovcs.ui import logger
 
 
-def run(paths: Sequence[str]) -> int:
-    window = CloneDialog(paths or ["."])
+VcsKind = Literal["git", "svn"]
+
+
+def run(paths: Sequence[str], *, vcs: VcsKind = "git") -> int:
+    window = CloneDialog(paths or ["."], vcs=vcs)
     window.connect("destroy", Gtk.main_quit)
     window.show_all()
     Gtk.main()
@@ -24,8 +27,9 @@ def run(paths: Sequence[str]) -> int:
 
 
 class CloneDialog(Gtk.Window):
-    def __init__(self, paths: Sequence[str]):
-        super().__init__(title="Clone")
+    def __init__(self, paths: Sequence[str], *, vcs: VcsKind = "git"):
+        super().__init__(title=dialog_title(vcs))
+        self.vcs = vcs
         self.base_dir = clone_base_dir(paths or ["."])
         self.exit_code = 0
         self.active_logger: logger.LoggerWindow | None = None
@@ -38,7 +42,10 @@ class CloneDialog(Gtk.Window):
         outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
         self.add(outer)
 
-        self.base_label = Gtk.Label(label=f"Clone into: {self.base_dir}", xalign=0)
+        self.base_label = Gtk.Label(
+            label=f"{operation_label(vcs)} into: {self.base_dir}",
+            xalign=0,
+        )
         self.base_label.set_selectable(True)
         outer.pack_start(self.base_label, False, False, 0)
 
@@ -60,6 +67,7 @@ class CloneDialog(Gtk.Window):
         grid.attach(self.target_entry, 1, 1, 1, 1)
 
         self.submodules_check = Gtk.CheckButton(label="Recurse submodules")
+        self.submodules_check.set_visible(vcs == "git")
         grid.attach(self.submodules_check, 1, 2, 1, 1)
 
         grid.set_column_homogeneous(False)
@@ -75,7 +83,7 @@ class CloneDialog(Gtk.Window):
         self.cancel_button.connect("clicked", self.on_cancel_clicked)
         buttons.add(self.cancel_button)
 
-        self.clone_button = Gtk.Button(label="Clone")
+        self.clone_button = Gtk.Button(label=operation_label(vcs))
         self.clone_button.get_style_context().add_class("suggested-action")
         self.clone_button.connect("clicked", self.on_clone_clicked)
         buttons.add(self.clone_button)
@@ -112,10 +120,11 @@ class CloneDialog(Gtk.Window):
             self.base_dir,
             self.repository_url(),
             self.target_name(),
+            vcs=self.vcs,
             recurse_submodules=self.submodules_check.get_active(),
         )
         window = logger.LoggerWindow(
-            "Clone",
+            dialog_title(self.vcs),
             phases,
             on_complete=self.on_clone_logger_complete,
         )
@@ -161,6 +170,14 @@ def clone_base_dir(paths: Sequence[str]) -> Path:
     return first.resolve(strict=False)
 
 
+def dialog_title(vcs: VcsKind) -> str:
+    return "Git Clone" if vcs == "git" else "SVN Checkout"
+
+
+def operation_label(vcs: VcsKind) -> str:
+    return "Clone" if vcs == "git" else "Checkout"
+
+
 def derive_target_name(url: str) -> str:
     value = url.strip()
     if not value:
@@ -199,13 +216,23 @@ def clone_phases(
     url: str,
     target_name: str,
     *,
+    vcs: VcsKind = "git",
     recurse_submodules: bool = False,
 ) -> list[logger.CommandPhase]:
+    if vcs == "svn":
+        return [
+            logger.CommandPhase(
+                "SVN checkout",
+                base_dir,
+                ("svn", "checkout", url, target_name),
+            )
+        ]
+
     args = ["clone"]
     if recurse_submodules:
         args.append("--recurse-submodules")
     args.extend([url, target_name])
-    return [logger.CommandPhase.git("Clone repository", base_dir, args)]
+    return [logger.CommandPhase.git("Git clone", base_dir, args)]
 
 
 if __name__ == "__main__":

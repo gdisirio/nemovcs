@@ -17,6 +17,7 @@ ACTION_FILES = {
     "nemovcs-background-push.nemo_action",
     "nemovcs-background-settings.nemo_action",
     "nemovcs-background-status.nemo_action",
+    "nemovcs-background-svn-checkout.nemo_action",
     "nemovcs-background-update.nemo_action",
     "nemovcs-clone.nemo_action",
     "nemovcs-commit.nemo_action",
@@ -26,6 +27,7 @@ ACTION_FILES = {
     "nemovcs-settings.nemo_action",
     "nemovcs-stage.nemo_action",
     "nemovcs-status.nemo_action",
+    "nemovcs-svn-checkout.nemo_action",
     "nemovcs-update.nemo_action",
 }
 BUS_NAME = "io.github.gdisirio.NemoVCS.Statusd"

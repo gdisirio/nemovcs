@@ -86,7 +86,8 @@ Top-level actions:
 
 `NemoVCS` submenu actions:
 
-- `Clone...`
+- `Git Clone...`
+- `SVN Checkout...`
 - `Stage...`
 - `Push...`
 - `Status...`

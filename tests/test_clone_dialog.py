@@ -55,7 +55,7 @@ class CloneDialogTest(unittest.TestCase):
         phases = clone_phases(base, "https://example.invalid/repo.git", "repo")
 
         self.assertEqual(len(phases), 1)
-        self.assertEqual(phases[0].title, "Clone repository")
+        self.assertEqual(phases[0].title, "Git clone")
         self.assertEqual(phases[0].cwd, base)
         self.assertEqual(
             phases[0].command,
@@ -82,6 +82,29 @@ class CloneDialogTest(unittest.TestCase):
                 "--recurse-submodules",
                 "https://example.invalid/repo.git",
                 "repo",
+            ),
+        )
+
+    def test_clone_phases_build_svn_checkout_command(self):
+        base = Path("/tmp")
+
+        phases = clone_phases(
+            base,
+            "https://example.invalid/svn/project",
+            "project",
+            vcs="svn",
+        )
+
+        self.assertEqual(len(phases), 1)
+        self.assertEqual(phases[0].title, "SVN checkout")
+        self.assertEqual(phases[0].cwd, base)
+        self.assertEqual(
+            phases[0].command,
+            (
+                "svn",
+                "checkout",
+                "https://example.invalid/svn/project",
+                "project",
             ),
         )
 

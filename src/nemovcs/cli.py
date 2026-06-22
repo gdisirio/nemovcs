@@ -193,7 +193,7 @@ def cmd_clone_dialog(args: argparse.Namespace) -> int:
     if not all(clone_target_visible(path) for path in paths):
         print("not a clone target", file=sys.stderr)
         return 1
-    return clone_dialog.run(paths)
+    return clone_dialog.run(paths, vcs=args.vcs)
 
 
 def cmd_settings(args: argparse.Namespace) -> int:
@@ -423,6 +423,7 @@ def build_parser() -> argparse.ArgumentParser:
         "clone-dialog",
         help="open the GTK clone dialog",
     )
+    clone_dialog.add_argument("--vcs", choices=["git", "svn"], default="git")
     clone_dialog.add_argument("paths", nargs="*")
     clone_dialog.set_defaults(func=cmd_clone_dialog)
 

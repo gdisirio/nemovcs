@@ -23,16 +23,18 @@ class InstallLayoutTest(unittest.TestCase):
 
         child_uuids = [child["uuid"] for child in layout[3]["children"]]
         self.assertEqual(
-            child_uuids[:5],
+            child_uuids[:7],
             [
                 "nemovcs-clone.nemo_action",
                 "nemovcs-background-clone.nemo_action",
+                "nemovcs-svn-checkout.nemo_action",
+                "nemovcs-background-svn-checkout.nemo_action",
                 "nemovcs-stage.nemo_action",
                 "nemovcs-push.nemo_action",
                 "nemovcs-background-push.nemo_action",
             ],
         )
-        self.assertEqual(child_uuids[5], "separator")
+        self.assertEqual(child_uuids[7], "separator")
         self.assertIn("nemovcs-status.nemo_action", child_uuids)
         self.assertIn("nemovcs-settings.nemo_action", child_uuids)
         self.assertIn("nemovcs-about.nemo_action", child_uuids)
