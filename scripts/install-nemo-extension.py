@@ -59,7 +59,7 @@ class NemoVCS(
         NemoVCSInfoProviderMixin.__init__(self)
 
     def get_name_and_desc(self):
-        return [("NemoVCS", "Version control integration for Nemo")]
+        return ["NemoVCS:::Version control integration for Nemo"]
 '''
 
 
