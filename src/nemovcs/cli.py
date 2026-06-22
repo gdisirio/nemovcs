@@ -132,6 +132,30 @@ def cmd_update_dialog(args: argparse.Namespace) -> int:
     return logger.run("Update", phases)
 
 
+def cmd_push(args: argparse.Namespace) -> int:
+    return _print_results(git.push(args.paths))
+
+
+def push_phases(paths: Sequence[str]):
+    from .ui import logger
+
+    grouped = git.group_by_repo(paths or [Path.cwd()])
+    return [
+        logger.CommandPhase.git(f"Push {root.name}", root, ["push"])
+        for root in grouped
+    ]
+
+
+def cmd_push_dialog(args: argparse.Namespace) -> int:
+    from .ui import logger
+
+    phases = push_phases(args.paths)
+    if not phases:
+        print("not inside a Git working tree", file=sys.stderr)
+        return 1
+    return logger.run("Push", phases)
+
+
 def cmd_commit(args: argparse.Namespace) -> int:
     paths = args.paths or ["."]
     grouped = git.group_by_repo(paths)
@@ -362,6 +386,17 @@ def build_parser() -> argparse.ArgumentParser:
     )
     update_dialog.add_argument("paths", nargs="*")
     update_dialog.set_defaults(func=cmd_update_dialog)
+
+    push = subparsers.add_parser("push", help="push the current Git repository")
+    push.add_argument("paths", nargs="*")
+    push.set_defaults(func=cmd_push)
+
+    push_dialog = subparsers.add_parser(
+        "push-dialog",
+        help="push the current Git repository in a GTK logger",
+    )
+    push_dialog.add_argument("paths", nargs="*")
+    push_dialog.set_defaults(func=cmd_push_dialog)
 
     commit = subparsers.add_parser("commit", help="stage selected paths and commit")
     commit.add_argument("-m", "--message")

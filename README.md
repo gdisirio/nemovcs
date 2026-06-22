@@ -8,7 +8,7 @@ testing and hardening before unattended daily use.
 ## Features
 
 - Context menu actions inside Git working trees.
-- GTK dialogs for stage, commit, status, update, log, settings, and about.
+- GTK dialogs for stage, commit, status, update, push, log, settings, and about.
 - Meld integration for diffs.
 - Live status emblems in Nemo:
   - clean paths,
@@ -84,6 +84,7 @@ Top-level actions:
 - `Commit...`
 - `Stage...`
 - `Update...`
+- `Push...`
 
 `NemoVCS` submenu actions:
 

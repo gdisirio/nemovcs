@@ -177,6 +177,16 @@ class GitHelpersTest(unittest.TestCase):
         )
         self.assertEqual(log.stdout.strip(), "update tracked")
 
+    def test_push_runs_once_per_repository(self):
+        fake_result = git.GitResult(("git",), self.root, 0, "", "")
+        with mock.patch("nemovcs.git.group_by_repo") as group_by_repo:
+            group_by_repo.return_value = {self.root: ["tracked.txt"]}
+            with mock.patch("nemovcs.git.run_git", return_value=fake_result) as run_git:
+                results = git.push([self.root / "tracked.txt"])
+
+        self.assertEqual(results, [fake_result])
+        run_git.assert_called_once_with(self.root, ["push"], timeout=300)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -55,6 +55,7 @@ class StageDialog(Gtk.Window):
         self.exit_code = 0
         self.items_by_root: dict[Path, list[git.CommitItem]] = {}
         self.active_logger: logger.LoggerWindow | None = None
+        self.stage_completed = False
         self.icon_theme = Gtk.IconTheme.get_default()
         self.icon_cache: dict[str, GdkPixbuf.Pixbuf | None] = {}
         self.status_icon_cache: dict[str, GdkPixbuf.Pixbuf | None] = {}
@@ -293,14 +294,20 @@ class StageDialog(Gtk.Window):
         self.set_deletable(False)
 
     def on_stage_logger_complete(self, ok: bool, _returncodes: list[int]) -> None:
+        if ok:
+            self.stage_completed = True
+            self.hide()
+            return
+
         self.set_deletable(True)
         self.close_button.set_sensitive(True)
         self.stage_button.set_sensitive(True)
-        if ok:
-            self.load_items()
+        self.load_items()
 
     def on_stage_logger_destroyed(self, _window: logger.LoggerWindow) -> None:
         self.active_logger = None
+        if self.stage_completed:
+            self.destroy()
 
     def on_row_activated(
         self,

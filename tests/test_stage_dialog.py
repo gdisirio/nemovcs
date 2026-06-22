@@ -81,6 +81,65 @@ class StageDialogCommandTest(unittest.TestCase):
             ],
         )
 
+    def test_successful_stage_hides_dialog_until_logger_closes(self):
+        class FakeDialog:
+            def __init__(self):
+                self.stage_completed = False
+                self.hidden = False
+                self.destroyed = False
+                self.active_logger = object()
+
+            def hide(self):
+                self.hidden = True
+
+            def destroy(self):
+                self.destroyed = True
+
+        dialog = FakeDialog()
+
+        StageDialog.on_stage_logger_complete(dialog, True, [])
+
+        self.assertTrue(dialog.stage_completed)
+        self.assertTrue(dialog.hidden)
+        self.assertFalse(dialog.destroyed)
+
+        StageDialog.on_stage_logger_destroyed(dialog, object())
+
+        self.assertIsNone(dialog.active_logger)
+        self.assertTrue(dialog.destroyed)
+
+    def test_failed_stage_keeps_dialog_open_and_refreshes(self):
+        class FakeButton:
+            def __init__(self):
+                self.sensitive = None
+
+            def set_sensitive(self, value):
+                self.sensitive = value
+
+        class FakeDialog:
+            def __init__(self):
+                self.stage_completed = False
+                self.close_button = FakeButton()
+                self.stage_button = FakeButton()
+                self.deletable = None
+                self.refreshed = False
+
+            def set_deletable(self, value):
+                self.deletable = value
+
+            def load_items(self):
+                self.refreshed = True
+
+        dialog = FakeDialog()
+
+        StageDialog.on_stage_logger_complete(dialog, False, [1])
+
+        self.assertFalse(dialog.stage_completed)
+        self.assertTrue(dialog.deletable)
+        self.assertTrue(dialog.close_button.sensitive)
+        self.assertTrue(dialog.stage_button.sensitive)
+        self.assertTrue(dialog.refreshed)
+
 
 if __name__ == "__main__":
     unittest.main()

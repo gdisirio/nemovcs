@@ -3,7 +3,13 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from nemovcs.cli import absolute_paths, build_parser, cmd_stage_dialog, log_phases
+from nemovcs.cli import (
+    absolute_paths,
+    build_parser,
+    cmd_stage_dialog,
+    log_phases,
+    push_phases,
+)
 
 
 class CliParserTest(unittest.TestCase):
@@ -29,6 +35,22 @@ class CliParserTest(unittest.TestCase):
         args = parser.parse_args(["update-dialog", "/tmp/example"])
 
         self.assertEqual(args.command, "update-dialog")
+        self.assertEqual(args.paths, ["/tmp/example"])
+
+    def test_push_accepts_paths(self):
+        parser = build_parser()
+
+        args = parser.parse_args(["push", "/tmp/example"])
+
+        self.assertEqual(args.command, "push")
+        self.assertEqual(args.paths, ["/tmp/example"])
+
+    def test_push_dialog_accepts_paths(self):
+        parser = build_parser()
+
+        args = parser.parse_args(["push-dialog", "/tmp/example"])
+
+        self.assertEqual(args.command, "push-dialog")
         self.assertEqual(args.paths, ["/tmp/example"])
 
     def test_status_dialog_accepts_paths(self):
@@ -79,6 +101,21 @@ class CliParserTest(unittest.TestCase):
                 "--",
                 "src/app.py",
             ),
+        )
+
+    def test_push_phases_push_each_grouped_repository(self):
+        root = Path("/tmp/example")
+
+        with mock.patch("nemovcs.cli.git.group_by_repo") as group_by_repo:
+            group_by_repo.return_value = {root: ["src/app.py"]}
+            phases = push_phases(["/tmp/example/src/app.py"])
+
+        self.assertEqual(len(phases), 1)
+        self.assertEqual(phases[0].title, "Push example")
+        self.assertEqual(phases[0].cwd, root)
+        self.assertEqual(
+            phases[0].command,
+            ("git", "-C", str(root), "push"),
         )
 
     def test_settings_and_about_parse(self):

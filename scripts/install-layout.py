@@ -11,12 +11,14 @@ from pathlib import Path
 NEMOVCS_ACTIONS = {
     "nemovcs-about.nemo_action",
     "nemovcs-background-about.nemo_action",
+    "nemovcs-background-push.nemo_action",
     "nemovcs-background-settings.nemo_action",
     "nemovcs-background-status.nemo_action",
     "nemovcs-background-update.nemo_action",
     "nemovcs-commit.nemo_action",
     "nemovcs-diff.nemo_action",
     "nemovcs-log.nemo_action",
+    "nemovcs-push.nemo_action",
     "nemovcs-settings.nemo_action",
     "nemovcs-stage.nemo_action",
     "nemovcs-status.nemo_action",
@@ -28,6 +30,8 @@ TOP_LEVEL_ACTIONS = [
     "nemovcs-stage.nemo_action",
     "nemovcs-update.nemo_action",
     "nemovcs-background-update.nemo_action",
+    "nemovcs-push.nemo_action",
+    "nemovcs-background-push.nemo_action",
 ]
 
 SUBMENU_ACTIONS = [
