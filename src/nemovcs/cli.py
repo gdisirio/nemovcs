@@ -10,7 +10,6 @@ from typing import Any, Callable, Protocol, Sequence
 
 from . import __version__
 from . import backends
-from . import git
 
 
 class CommandResult(Protocol):
@@ -65,7 +64,7 @@ def clone_target_visible(path: str | Path) -> bool:
     if not candidate.is_absolute():
         candidate = Path.cwd() / candidate
     candidate = candidate.resolve(strict=False)
-    return candidate.is_dir() and not git.is_inside_worktree(candidate)
+    return candidate.is_dir() and backends.detect_backend(candidate) is None
 
 
 def cmd_status(args: argparse.Namespace) -> int:
@@ -75,7 +74,7 @@ def cmd_status(args: argparse.Namespace) -> int:
 def cmd_status_dialog(args: argparse.Namespace) -> int:
     from .ui import status_dialog
 
-    if not git.group_by_repo(args.paths or [Path.cwd()]):
+    if not backends.group_by_backend(args.paths or [Path.cwd()]):
         print("not inside a Git working tree", file=sys.stderr)
         return 1
     return status_dialog.run(args.paths or ["."])
@@ -181,7 +180,7 @@ def cmd_commit_dialog(args: argparse.Namespace) -> int:
 def cmd_stage_dialog(args: argparse.Namespace) -> int:
     from .ui import stage_dialog
 
-    if not git.group_by_repo(args.paths or [Path.cwd()]):
+    if not backends.group_by_backend(args.paths or [Path.cwd()]):
         print("not inside a Git working tree", file=sys.stderr)
         return 1
     return stage_dialog.run(args.paths or ["."])

@@ -17,6 +17,7 @@ from nemovcs.cli import (
     cmd_push,
     cmd_stage_dialog,
     cmd_status,
+    cmd_status_dialog,
     cmd_update,
     log_phases,
     push_phases,
@@ -101,20 +102,20 @@ class CliParserTest(unittest.TestCase):
 
     def test_clone_target_visible_accepts_non_worktree_directory(self):
         with tempfile.TemporaryDirectory() as tmp:
-            with mock.patch("nemovcs.cli.git.is_inside_worktree", return_value=False):
+            with mock.patch("nemovcs.cli.backends.detect_backend", return_value=None):
                 self.assertTrue(clone_target_visible(tmp))
 
     def test_clone_target_visible_rejects_worktree_directory(self):
         with tempfile.TemporaryDirectory() as tmp:
-            with mock.patch("nemovcs.cli.git.is_inside_worktree", return_value=True):
+            with mock.patch("nemovcs.cli.backends.detect_backend", return_value=object()):
                 self.assertFalse(clone_target_visible(tmp))
 
-    def test_clone_target_visible_rejects_files_without_git_check(self):
+    def test_clone_target_visible_rejects_files_without_backend_check(self):
         with tempfile.NamedTemporaryFile() as tmp:
-            with mock.patch("nemovcs.cli.git.is_inside_worktree") as is_inside_worktree:
+            with mock.patch("nemovcs.cli.backends.detect_backend") as detect_backend:
                 self.assertFalse(clone_target_visible(tmp.name))
 
-        is_inside_worktree.assert_not_called()
+        detect_backend.assert_not_called()
 
     def test_clone_target_predicate_rejects_missing_paths(self):
         parser = build_parser()
@@ -294,8 +295,7 @@ class CliParserTest(unittest.TestCase):
     def test_log_phases_run_log_in_each_grouped_repository(self):
         root = Path("/tmp/example")
 
-        with mock.patch("nemovcs.cli.git.group_by_repo") as group_by_repo:
-            group_by_repo.return_value = {root: ["src/app.py"]}
+        with mock.patch("nemovcs.git.group_by_repo", return_value={root: ["src/app.py"]}):
             phases = log_phases(["/tmp/example/src/app.py"], 7)
 
         self.assertEqual(len(phases), 1)
@@ -319,8 +319,7 @@ class CliParserTest(unittest.TestCase):
     def test_push_phases_push_each_grouped_repository(self):
         root = Path("/tmp/example")
 
-        with mock.patch("nemovcs.cli.git.group_by_repo") as group_by_repo:
-            group_by_repo.return_value = {root: ["src/app.py"]}
+        with mock.patch("nemovcs.git.group_by_repo", return_value={root: ["src/app.py"]}):
             phases = push_phases(["/tmp/example/src/app.py"])
 
         self.assertEqual(len(phases), 1)
@@ -334,8 +333,7 @@ class CliParserTest(unittest.TestCase):
     def test_update_phases_pull_each_grouped_repository(self):
         root = Path("/tmp/example")
 
-        with mock.patch("nemovcs.cli.git.group_by_repo") as group_by_repo:
-            group_by_repo.return_value = {root: ["src/app.py"]}
+        with mock.patch("nemovcs.git.group_by_repo", return_value={root: ["src/app.py"]}):
             phases = update_phases(["/tmp/example/src/app.py"])
 
         self.assertEqual(len(phases), 1)
@@ -437,15 +435,39 @@ class CliParserTest(unittest.TestCase):
         ):
             self.assertEqual(args.func(args), 1)
 
+    def test_status_dialog_runs_dialog_inside_worktree(self):
+        parser = build_parser()
+        args = parser.parse_args(["status-dialog", "/tmp/example"])
+
+        with mock.patch("nemovcs.cli.backends.group_by_backend") as group_by_backend, mock.patch(
+            "nemovcs.ui.status_dialog.run",
+            return_value=0,
+        ) as run_dialog:
+            group_by_backend.return_value = {object(): {Path("/tmp/example"): ["."]}}
+
+            self.assertEqual(cmd_status_dialog(args), 0)
+
+        run_dialog.assert_called_once_with(["/tmp/example"])
+
+    def test_status_dialog_rejects_paths_outside_worktree(self):
+        parser = build_parser()
+        args = parser.parse_args(["status-dialog", "/tmp/example"])
+
+        with mock.patch("nemovcs.cli.backends.group_by_backend", return_value={}), mock.patch(
+            "sys.stderr",
+            new=io.StringIO(),
+        ):
+            self.assertEqual(cmd_status_dialog(args), 1)
+
     def test_stage_dialog_runs_dialog_inside_worktree(self):
         parser = build_parser()
         args = parser.parse_args(["stage-dialog", "/tmp/example"])
 
-        with mock.patch("nemovcs.cli.git.group_by_repo") as group_by_repo, mock.patch(
+        with mock.patch("nemovcs.cli.backends.group_by_backend") as group_by_backend, mock.patch(
             "nemovcs.ui.stage_dialog.run",
             return_value=0,
         ) as run_dialog:
-            group_by_repo.return_value = {Path("/tmp/example"): ["."]}
+            group_by_backend.return_value = {object(): {Path("/tmp/example"): ["."]}}
 
             self.assertEqual(cmd_stage_dialog(args), 0)
 
@@ -455,7 +477,7 @@ class CliParserTest(unittest.TestCase):
         parser = build_parser()
         args = parser.parse_args(["stage-dialog", "/tmp/example"])
 
-        with mock.patch("nemovcs.cli.git.group_by_repo", return_value={}), mock.patch(
+        with mock.patch("nemovcs.cli.backends.group_by_backend", return_value={}), mock.patch(
             "sys.stderr",
             new=io.StringIO(),
         ):
