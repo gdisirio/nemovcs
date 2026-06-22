@@ -80,6 +80,14 @@ def raw_status(paths: Sequence[str | Path]) -> list[Any]:
     return results
 
 
+def raw_log(paths: Sequence[str | Path], limit: int) -> list[Any]:
+    selected_paths = paths or [Path.cwd()]
+    results: list[Any] = []
+    for backend in group_by_backend(selected_paths):
+        results.extend(backend.log(selected_paths, limit))
+    return results
+
+
 def current_branch(root: str | Path) -> str:
     backend = detect_backend(root)
     if backend is None:

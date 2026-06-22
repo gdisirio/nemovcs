@@ -111,7 +111,7 @@ def cmd_diff_dialog(args: argparse.Namespace) -> int:
 
 
 def cmd_log(args: argparse.Namespace) -> int:
-    return _print_results(git.log(args.paths, limit=args.limit))
+    return _print_results(backends.raw_log(args.paths, args.limit))
 
 
 def log_phases(paths: Sequence[str], limit: int):

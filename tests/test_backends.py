@@ -116,6 +116,18 @@ class BackendRegistryTest(unittest.TestCase):
 
         status.assert_called_once_with([root])
 
+    def test_raw_log_collects_log_from_matching_backend(self):
+        root = Path("/tmp/repo")
+        expected = object()
+
+        with mock.patch("nemovcs.git.group_by_repo", return_value={root: ["."]}), mock.patch(
+            "nemovcs.git.log",
+            return_value=[expected],
+        ) as log:
+            self.assertEqual(backends.raw_log([root], 7), [expected])
+
+        log.assert_called_once_with([root], limit=7)
+
     def test_current_branch_uses_detected_backend(self):
         root = Path("/tmp/repo")
 
@@ -171,6 +183,16 @@ class BackendRegistryTest(unittest.TestCase):
 
         self.assertIs(result, expected)
         status.assert_called_once_with([Path("/tmp/repo")])
+
+    def test_git_backend_delegates_log_to_existing_git_helpers(self):
+        backend = GitBackend()
+        expected = object()
+
+        with mock.patch("nemovcs.git.log", return_value=expected) as log:
+            result = backend.log([Path("/tmp/repo")], 7)
+
+        self.assertIs(result, expected)
+        log.assert_called_once_with([Path("/tmp/repo")], limit=7)
 
     def test_git_backend_builds_stage_phases(self):
         backend = GitBackend()

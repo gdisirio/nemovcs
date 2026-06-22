@@ -61,6 +61,9 @@ class GitBackend:
     def status(self, paths: Sequence[str | Path]) -> list[git.GitResult]:
         return git.status(paths)
 
+    def log(self, paths: Sequence[str | Path], limit: int) -> list[git.GitResult]:
+        return git.log(paths, limit=limit)
+
     def scan_status(self, root: str | Path) -> BackendStatusScan:
         result = git.run_git(root, ["status", "--porcelain=v2", "-z"])
         if not result.ok:

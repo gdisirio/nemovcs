@@ -10,6 +10,7 @@ from nemovcs.cli import (
     build_parser,
     clone_target_visible,
     cmd_action_visible,
+    cmd_log,
     cmd_push,
     cmd_stage_dialog,
     cmd_status,
@@ -30,6 +31,10 @@ class FakeBackend:
 
     def status(self, paths):
         self.calls.append(("status", list(paths)))
+        return [self.result]
+
+    def log(self, paths, limit):
+        self.calls.append(("log", list(paths), limit))
         return [self.result]
 
     def update(self, paths):
@@ -146,6 +151,20 @@ class CliParserTest(unittest.TestCase):
             self.assertEqual(cmd_status(args), 0)
 
         self.assertEqual(backend.calls, [("status", ["/tmp/example"])])
+        self.assertEqual(stdout.getvalue(), "ok\n")
+
+    def test_log_uses_backend_registry(self):
+        parser = build_parser()
+        args = parser.parse_args(["log", "-n", "7", "/tmp/example"])
+        backend = FakeBackend()
+
+        with mock.patch(
+            "nemovcs.cli.backends.group_by_backend",
+            return_value={backend: {Path("/tmp/example"): ["."]}},
+        ), mock.patch("sys.stdout", new=io.StringIO()) as stdout:
+            self.assertEqual(cmd_log(args), 0)
+
+        self.assertEqual(backend.calls, [("log", ["/tmp/example"], 7)])
         self.assertEqual(stdout.getvalue(), "ok\n")
 
     def test_update_uses_backend_registry(self):
