@@ -162,6 +162,19 @@ class GitBackend:
             for root in grouped_paths
         ]
 
+    def file_diff_command(self, item: BackendChangeItem) -> list[str]:
+        return [
+            "git",
+            "-C",
+            str(item.root),
+            "difftool",
+            "--tool=meld",
+            "--no-prompt",
+            "HEAD",
+            "--",
+            item.path,
+        ]
+
     def update(self, paths: Sequence[str | Path]) -> list[git.GitResult]:
         return git.update(paths)
 

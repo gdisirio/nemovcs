@@ -128,3 +128,10 @@ def push_phases(paths: Sequence[str | Path]) -> list[BackendCommandPhase]:
     for backend, grouped_paths in group_by_backend(selected_paths).items():
         phases.extend(backend.push_phases(grouped_paths))
     return phases
+
+
+def file_diff_command(item: BackendChangeItem) -> list[str]:
+    backend = backend_by_id(item.backend_id)
+    if backend is None:
+        return []
+    return backend.file_diff_command(item)

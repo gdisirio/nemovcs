@@ -30,6 +30,16 @@ class BackendRegistryTest(unittest.TestCase):
     def test_backend_by_id_returns_none_for_unknown_backend(self):
         self.assertIsNone(backends.backend_by_id("svn"))
 
+    def test_file_diff_command_returns_empty_for_unknown_backend(self):
+        item = BackendChangeItem(
+            backend_id="svn",
+            root=Path("/tmp/repo"),
+            path="src/app.py",
+            status="modified",
+        )
+
+        self.assertEqual(backends.file_diff_command(item), [])
+
     def test_detect_backend_returns_git_for_git_worktree(self):
         with mock.patch("nemovcs.git.is_inside_worktree", return_value=True):
             backend = backends.detect_backend(Path("/tmp/repo"))
@@ -235,6 +245,31 @@ class BackendRegistryTest(unittest.TestCase):
 
         self.assertEqual(update[0].command, ("git", "-C", str(root), "pull", "--ff-only"))
         self.assertEqual(push[0].command, ("git", "-C", str(root), "push"))
+
+    def test_git_backend_builds_file_diff_command(self):
+        backend = GitBackend()
+        root = Path("/tmp/repo")
+        item = BackendChangeItem(
+            backend_id="git",
+            root=root,
+            path="src/app.py",
+            status="modified",
+        )
+
+        self.assertEqual(
+            backend.file_diff_command(item),
+            [
+                "git",
+                "-C",
+                str(root),
+                "difftool",
+                "--tool=meld",
+                "--no-prompt",
+                "HEAD",
+                "--",
+                "src/app.py",
+            ],
+        )
 
     def test_git_backend_translates_commit_items(self):
         backend = GitBackend()

@@ -466,26 +466,14 @@ class CommitDialog(Gtk.Window):
 
     def open_diff(self, item: BackendChangeItem) -> None:
         if item.status == "untracked":
-            self.show_error("Untracked files do not have a Git diff yet.")
+            self.show_error("Untracked files do not have a diff yet.")
             return
         if self.root is None:
             return
         self.spawn(self.file_diff_command(item))
 
     def file_diff_command(self, item: BackendChangeItem) -> list[str]:
-        if self.root is None:
-            return []
-        return [
-            "git",
-            "-C",
-            str(self.root),
-            "difftool",
-            "--tool=meld",
-            "--no-prompt",
-            "HEAD",
-            "--",
-            item.path,
-        ]
+        return backends.file_diff_command(item)
 
     def absolute_path(self, item: BackendChangeItem) -> Path:
         return item.root / item.path
