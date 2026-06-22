@@ -93,7 +93,7 @@ class NemoVCSInfoProviderCoreTest(unittest.TestCase):
 
         self.assertEqual(item.emblems, ["rabbitvcs-conflicted"])
 
-    def test_ok_status_does_not_add_emblem(self):
+    def test_ok_status_adds_normal_emblem(self):
         core = nemo_plugin.NemoVCSInfoProviderCore(
             seen=lambda paths: ["/tmp/repo"],
             get_status=lambda paths: [
@@ -108,7 +108,7 @@ class NemoVCSInfoProviderCoreTest(unittest.TestCase):
 
         core.update_item(item)
 
-        self.assertEqual(item.emblems, [])
+        self.assertEqual(item.emblems, ["rabbitvcs-normal"])
 
     def test_primary_emblem_maps_only_visible_statuses(self):
         self.assertEqual(nemo_plugin.primary_emblem("modified"), "rabbitvcs-modified")
@@ -116,7 +116,7 @@ class NemoVCSInfoProviderCoreTest(unittest.TestCase):
             nemo_plugin.primary_emblem("conflicted"),
             "rabbitvcs-conflicted",
         )
-        self.assertIsNone(nemo_plugin.primary_emblem("ok"))
+        self.assertEqual(nemo_plugin.primary_emblem("ok"), "rabbitvcs-normal")
         self.assertIsNone(nemo_plugin.primary_emblem("loading"))
         self.assertIsNone(nemo_plugin.primary_emblem("stale"))
         self.assertIsNone(nemo_plugin.primary_emblem("error"))

@@ -813,14 +813,13 @@ Tests:
 
 Remaining Milestone 7 work:
 
-- Decide whether `ok` should render a clean emblem or no emblem. The first
-  primary-emblem pass intentionally renders no emblem for `ok` to avoid visual
-  noise and because the current temporary icon set has no clean icon in-tree.
+- Decide whether the clean/ok emblem is too visually noisy once broader manual
+  testing covers several repositories.
 - Manual-test the extension inside Nemo.
 
-#### Milestone 7.2: Primary Modified/Conflict Emblems
+#### Milestone 7.2: Primary Status Emblems
 
-Status: implemented for `modified` and `conflicted`.
+Status: implemented for `ok`, `modified`, and `conflicted`.
 
 Goal: show one primary emblem in Nemo from cached daemon state.
 
@@ -829,8 +828,9 @@ Implementation:
 - Map cached `modified` status to the temporary `rabbitvcs-modified` emblem.
 - Map cached `conflicted` status to the temporary `rabbitvcs-conflicted`
   emblem.
-- Render no emblem for `ok`, `loading`, `stale`, or `error` in this first pass.
-- Install the temporary modified/conflict emblem SVGs into the user's hicolor
+- Map cached `ok` status to the temporary `rabbitvcs-normal` emblem.
+- Render no emblem for `loading`, `stale`, or `error` in this first pass.
+- Install the temporary ok/modified/conflict emblem SVGs into the user's hicolor
   icon theme so `NemoVCS.py` can call `item.add_emblem()` with normal emblem
   names.
 - Return aggregate status from daemon status records so folders can inherit
@@ -840,7 +840,8 @@ Tests:
 
 - Modified status adds the modified emblem.
 - Conflicted status adds the conflict emblem.
-- Clean/loading/stale/error statuses do not add emblems.
+- Clean status adds the normal emblem.
+- Loading/stale/error statuses do not add emblems.
 - Folder status records use aggregate descendant status.
 - Installer writes the user extension and the two required emblem SVGs.
 

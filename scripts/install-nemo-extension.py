@@ -12,6 +12,7 @@ EXTENSION_NAME = "NemoVCS.py"
 EMBLEM_ICON_NAMES = [
     "emblem-rabbitvcs-conflicted.svg",
     "emblem-rabbitvcs-modified.svg",
+    "emblem-rabbitvcs-normal.svg",
 ]
 
 

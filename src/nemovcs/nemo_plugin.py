@@ -14,6 +14,7 @@ from . import status_client
 PRIMARY_EMBLEMS = {
     "conflicted": "rabbitvcs-conflicted",
     "modified": "rabbitvcs-modified",
+    "ok": "rabbitvcs-normal",
 }
 
 

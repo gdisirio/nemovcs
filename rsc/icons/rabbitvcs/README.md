@@ -9,6 +9,12 @@ Source tree:
 /home/giovanni/Projects/personal-github/rabbitvcs-ng/data/icons/hicolor/scalable
 ```
 
+The local working reference tree for this session is:
+
+```text
+/home/giovanni/Projects/personal/rabbitvcs-ng/data/icons/hicolor/scalable
+```
+
 Upstream project:
 
 ```text
@@ -30,4 +36,3 @@ Replacement direction:
 - create NemoVCS-native icons,
 - use system theme icons where possible,
 - or keep only clearly licensed upstream assets with explicit attribution.
-

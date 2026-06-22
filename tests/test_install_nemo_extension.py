@@ -55,6 +55,16 @@ class InstallNemoExtensionTest(unittest.TestCase):
                     / "emblem-rabbitvcs-conflicted.svg"
                 ).exists()
             )
+            self.assertTrue(
+                (
+                    Path(tmp)
+                    / "icons"
+                    / "hicolor"
+                    / "scalable"
+                    / "emblems"
+                    / "emblem-rabbitvcs-normal.svg"
+                ).exists()
+            )
 
 
 if __name__ == "__main__":
