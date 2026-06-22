@@ -82,12 +82,12 @@ Open Nemo inside a Git working tree.
 Top-level actions:
 
 - `Commit...`
-- `Stage...`
 - `Update...`
-- `Push...`
 
 `NemoVCS` submenu actions:
 
+- `Stage...`
+- `Push...`
 - `Status...`
 - `Diff...`
 - `Log...`

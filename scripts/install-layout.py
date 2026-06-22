@@ -27,14 +27,15 @@ NEMOVCS_ACTIONS = {
 
 TOP_LEVEL_ACTIONS = [
     "nemovcs-commit.nemo_action",
-    "nemovcs-stage.nemo_action",
     "nemovcs-update.nemo_action",
     "nemovcs-background-update.nemo_action",
-    "nemovcs-push.nemo_action",
-    "nemovcs-background-push.nemo_action",
 ]
 
 SUBMENU_ACTIONS = [
+    "nemovcs-stage.nemo_action",
+    "nemovcs-push.nemo_action",
+    "nemovcs-background-push.nemo_action",
+    "separator",
     "nemovcs-status.nemo_action",
     "nemovcs-background-status.nemo_action",
     "nemovcs-diff.nemo_action",
@@ -102,6 +103,21 @@ def prune_nemovcs(nodes: list[object]) -> list[dict[str, object]]:
     return kept
 
 
+def normalize_separators(nodes: list[dict[str, object]]) -> list[dict[str, object]]:
+    normalized: list[dict[str, object]] = []
+    previous_was_separator = True
+    for node in nodes:
+        is_separator = node.get("type") == "separator"
+        if is_separator and previous_was_separator:
+            continue
+        normalized.append(node)
+        previous_was_separator = is_separator
+
+    while normalized and normalized[-1].get("type") == "separator":
+        normalized.pop()
+    return normalized
+
+
 def discover_non_nemovcs_actions() -> list[dict[str, object]]:
     data_dirs = os.environ.get("XDG_DATA_DIRS", "/usr/local/share:/usr/share").split(":")
     data_home = os.environ.get("XDG_DATA_HOME", str(Path.home() / ".local/share"))
@@ -137,8 +153,13 @@ def load_layout(path: Path) -> dict[str, object]:
 def build_nemovcs_layout() -> list[dict[str, object]]:
     return [
         *(action_node(name) for name in TOP_LEVEL_ACTIONS),
-        submenu_node("NemoVCS", [action_node(name) for name in SUBMENU_ACTIONS]),
-        separator_node(),
+        submenu_node(
+            "NemoVCS",
+            [
+                separator_node() if name == "separator" else action_node(name)
+                for name in SUBMENU_ACTIONS
+            ],
+        ),
     ]
 
 
@@ -149,10 +170,12 @@ def main() -> int:
     backup_path = layout_path.with_suffix(".json.bak")
 
     data = load_layout(layout_path)
-    data["toplevel"] = [
-        *build_nemovcs_layout(),
-        *prune_nemovcs(data.get("toplevel", [])),
-    ]
+    data["toplevel"] = normalize_separators(
+        [
+            *build_nemovcs_layout(),
+            *prune_nemovcs(data.get("toplevel", [])),
+        ]
+    )
 
     if layout_path.exists() and not backup_path.exists():
         backup_path.write_bytes(layout_path.read_bytes())

@@ -15,19 +15,46 @@ class InstallLayoutTest(unittest.TestCase):
         layout = install_layout.build_nemovcs_layout()
 
         self.assertEqual(layout[0]["uuid"], "nemovcs-commit.nemo_action")
-        self.assertEqual(layout[1]["uuid"], "nemovcs-stage.nemo_action")
-        self.assertEqual(layout[2]["uuid"], "nemovcs-update.nemo_action")
-        self.assertEqual(layout[3]["uuid"], "nemovcs-background-update.nemo_action")
-        self.assertEqual(layout[4]["uuid"], "nemovcs-push.nemo_action")
-        self.assertEqual(layout[5]["uuid"], "nemovcs-background-push.nemo_action")
-        self.assertEqual(layout[6]["uuid"], "NemoVCS")
-        self.assertEqual(layout[6]["type"], "submenu")
-        self.assertEqual(layout[6]["user-label"], "NemoVCS")
+        self.assertEqual(layout[1]["uuid"], "nemovcs-update.nemo_action")
+        self.assertEqual(layout[2]["uuid"], "nemovcs-background-update.nemo_action")
+        self.assertEqual(layout[3]["uuid"], "NemoVCS")
+        self.assertEqual(layout[3]["type"], "submenu")
+        self.assertEqual(layout[3]["user-label"], "NemoVCS")
 
-        child_uuids = [child["uuid"] for child in layout[6]["children"]]
+        child_uuids = [child["uuid"] for child in layout[3]["children"]]
+        self.assertEqual(
+            child_uuids[:4],
+            [
+                "nemovcs-stage.nemo_action",
+                "nemovcs-push.nemo_action",
+                "nemovcs-background-push.nemo_action",
+                "separator",
+            ],
+        )
         self.assertIn("nemovcs-status.nemo_action", child_uuids)
         self.assertIn("nemovcs-settings.nemo_action", child_uuids)
         self.assertIn("nemovcs-about.nemo_action", child_uuids)
+
+    def test_normalize_separators_removes_duplicates_and_edges(self):
+        nodes = [
+            {"uuid": "separator", "type": "separator"},
+            {"uuid": "nemovcs-commit.nemo_action", "type": "action"},
+            {"uuid": "separator", "type": "separator"},
+            {"uuid": "separator", "type": "separator"},
+            {"uuid": "other.nemo_action", "type": "action"},
+            {"uuid": "separator", "type": "separator"},
+        ]
+
+        normalized = install_layout.normalize_separators(nodes)
+
+        self.assertEqual(
+            [node["uuid"] for node in normalized],
+            [
+                "nemovcs-commit.nemo_action",
+                "separator",
+                "other.nemo_action",
+            ],
+        )
 
     def test_prune_removes_nested_nemovcs_nodes(self):
         nodes = [
