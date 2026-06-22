@@ -28,13 +28,13 @@ COL_ITEM = 5
 ICON_SIZE = 20
 RESOURCE_ROOT = Path(__file__).resolve().parents[3] / "rsc" / "icons" / "nemovcs"
 STATUS_ICON_NAMES = {
-    "added": "emblem-nemovcs-added.svg",
-    "changed": "emblem-nemovcs-modified.svg",
-    "conflicted": "emblem-nemovcs-conflicted.svg",
-    "deleted": "emblem-nemovcs-deleted.svg",
-    "modified": "emblem-nemovcs-modified.svg",
-    "renamed": "emblem-nemovcs-modified.svg",
-    "untracked": "emblem-nemovcs-unversioned.svg",
+    "added": "emblem-nemovcs-added-small.svg",
+    "changed": "emblem-nemovcs-modified-small.svg",
+    "conflicted": "emblem-nemovcs-conflicted-small.svg",
+    "deleted": "emblem-nemovcs-deleted-small.svg",
+    "modified": "emblem-nemovcs-modified-small.svg",
+    "renamed": "emblem-nemovcs-modified-small.svg",
+    "untracked": "emblem-nemovcs-unversioned-small.svg",
 }
 
 
@@ -376,7 +376,7 @@ class StatusDialog(Gtk.Window):
 
     def status_icon(self, status: str) -> GdkPixbuf.Pixbuf | None:
         if status not in self.status_icon_cache:
-            icon_name = STATUS_ICON_NAMES.get(status, "emblem-nemovcs-modified.svg")
+            icon_name = STATUS_ICON_NAMES.get(status, "emblem-nemovcs-modified-small.svg")
             icon_path = RESOURCE_ROOT / "emblems" / icon_name
             try:
                 self.status_icon_cache[status] = GdkPixbuf.Pixbuf.new_from_file_at_size(

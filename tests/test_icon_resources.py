@@ -14,7 +14,14 @@ class IconResourcesTest(unittest.TestCase):
                 self.assertIn('viewBox="0 95 162 162"', path.read_text(encoding="utf-8"))
 
     def test_small_emblem_variants_keep_original_canvas(self):
-        for status in ("normal", "modified", "conflicted"):
+        for status in (
+            "normal",
+            "modified",
+            "conflicted",
+            "added",
+            "deleted",
+            "unversioned",
+        ):
             with self.subTest(status=status):
                 path = EMBLEM_DIR / f"emblem-nemovcs-{status}-small.svg"
                 text = path.read_text(encoding="utf-8")
