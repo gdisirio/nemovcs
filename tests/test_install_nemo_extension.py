@@ -20,6 +20,7 @@ class InstallNemoExtensionTest(unittest.TestCase):
         self.assertIn("gi.require_version(\"Nemo\", \"3.0\")", source)
         self.assertIn("NemoVCSInfoProviderMixin", source)
         self.assertIn("Nemo.MenuProvider", source)
+        self.assertIn("Nemo.NameAndDescProvider", source)
         self.assertIn("sys.path.insert(0, '/tmp/nemovcs/src')", source)
 
     def test_install_writes_user_extension_file(self):

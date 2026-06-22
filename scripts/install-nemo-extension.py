@@ -23,8 +23,19 @@ def extension_source(repo_root: Path) -> str:
 from __future__ import annotations
 
 import sys
+import os
+from pathlib import Path
 
 sys.path.insert(0, {str(src_path)!r})
+
+if os.environ.get("NEMOVCS_PLUGIN_LOG"):
+    try:
+        Path(os.environ["NEMOVCS_PLUGIN_LOG"]).write_text(
+            '{{"event":"extension-import"}}\\n',
+            encoding="utf-8",
+        )
+    except OSError:
+        pass
 
 import gi
 
@@ -36,13 +47,19 @@ from nemovcs.nemo_plugin import NemoVCSInfoProviderMixin
 
 class NemoVCS(
     NemoVCSInfoProviderMixin,
+    GObject.GObject,
     Nemo.InfoProvider,
     Nemo.MenuProvider,
-    GObject.GObject,
+    Nemo.NameAndDescProvider,
 ):
     """Nemo provider for NemoVCS status emblems and context menus."""
 
-    pass
+    def __init__(self):
+        GObject.GObject.__init__(self)
+        NemoVCSInfoProviderMixin.__init__(self)
+
+    def get_name_and_desc(self):
+        return [("NemoVCS", "Version control integration for Nemo")]
 '''
 
 

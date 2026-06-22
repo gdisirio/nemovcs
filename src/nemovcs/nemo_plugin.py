@@ -250,6 +250,7 @@ class NemoVCSInfoProviderMixin:
         self.nemovcs_core = NemoVCSInfoProviderCore()
         self.nemovcs_signal_subscription = None
         self.subscribe_status_changed()
+        self.nemovcs_core.log("provider-init")
 
     def update_file_info(self, item):
         from gi.repository import Nemo
