@@ -48,10 +48,11 @@ class WorktreeIdentity:
     gitdir: Path
     common_gitdir: Path
     head_label: str
+    backend_id: str = "git"
 
     @property
     def cache_key(self) -> str:
-        return str(self.root)
+        return f"{self.backend_id}:{self.root}"
 
 
 @dataclass
@@ -244,6 +245,7 @@ class StatusDaemonCore:
         if identity is None:
             return {
                 "path": str(path),
+                "backend": "",
                 "worktree_id": "",
                 "root": "",
                 "gitdir": "",
@@ -257,6 +259,7 @@ class StatusDaemonCore:
         if entry is None:
             return {
                 "path": str(path),
+                "backend": identity.backend_id,
                 "worktree_id": identity.cache_key,
                 "root": str(identity.root),
                 "gitdir": str(identity.gitdir),
@@ -268,6 +271,7 @@ class StatusDaemonCore:
 
         return {
             "path": str(path),
+            "backend": identity.backend_id,
             "worktree_id": identity.cache_key,
             "root": str(identity.root),
             "gitdir": str(identity.gitdir),
@@ -442,6 +446,7 @@ def format_cache_probe(paths: list[str | Path]) -> tuple[int, str, str]:
     for idx, entry in enumerate(cache.entries(), start=1):
         identity = entry.identity
         lines.append(f"{idx}. {identity.root}")
+        lines.append(f"   backend: {identity.backend_id}")
         lines.append(f"   gitdir: {identity.gitdir}")
         lines.append(f"   common-gitdir: {identity.common_gitdir}")
         lines.append(f"   head: {identity.head_label}")

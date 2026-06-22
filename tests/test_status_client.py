@@ -20,7 +20,8 @@ class StatusClientCacheTest(unittest.TestCase):
             return [
                 {
                     "path": str(root / "tracked.txt"),
-                    "worktree_id": str(root),
+                    "backend": "git",
+                    "worktree_id": f"git:{root}",
                     "status": "modified",
                 }
             ]
@@ -40,22 +41,52 @@ class StatusClientCacheTest(unittest.TestCase):
             [
                 {
                     "path": str(root / "tracked.txt"),
-                    "worktree_id": str(root),
+                    "backend": "git",
+                    "worktree_id": f"git:{root}",
                     "status": "modified",
                 },
                 {
                     "path": str(other / "tracked.txt"),
-                    "worktree_id": str(other),
+                    "backend": "git",
+                    "worktree_id": f"git:{other}",
                     "status": "modified",
                 },
             ]
         )
 
-        removed = cache.invalidate(str(root), [root / "tracked.txt"])
+        removed = cache.invalidate(f"git:{root}", [root / "tracked.txt"])
 
         self.assertEqual(removed, [str(root / "tracked.txt")])
         self.assertIsNone(cache.get(root / "tracked.txt"))
         self.assertIsNotNone(cache.get(other / "tracked.txt"))
+
+    def test_invalidate_keeps_same_root_from_other_backend(self):
+        cache = status_client.StatusClientCache()
+        root = Path("/tmp/repo")
+        git_path = root / "git.txt"
+        svn_path = root / "svn.txt"
+        cache.update(
+            [
+                {
+                    "path": str(git_path),
+                    "backend": "git",
+                    "worktree_id": f"git:{root}",
+                    "status": "modified",
+                },
+                {
+                    "path": str(svn_path),
+                    "backend": "svn",
+                    "worktree_id": f"svn:{root}",
+                    "status": "modified",
+                },
+            ]
+        )
+
+        removed = cache.invalidate(f"git:{root}", [])
+
+        self.assertEqual(removed, [str(git_path)])
+        self.assertIsNone(cache.get(git_path))
+        self.assertIsNotNone(cache.get(svn_path))
 
     def test_invalidate_child_path_also_removes_parent_folder_aggregate(self):
         cache = status_client.StatusClientCache()
@@ -64,23 +95,26 @@ class StatusClientCacheTest(unittest.TestCase):
             [
                 {
                     "path": str(root / "dir"),
-                    "worktree_id": str(root),
+                    "backend": "git",
+                    "worktree_id": f"git:{root}",
                     "status": "ok",
                 },
                 {
                     "path": str(root / "dir" / "nested.txt"),
-                    "worktree_id": str(root),
+                    "backend": "git",
+                    "worktree_id": f"git:{root}",
                     "status": "ok",
                 },
                 {
                     "path": str(root / "unrelated.txt"),
-                    "worktree_id": str(root),
+                    "backend": "git",
+                    "worktree_id": f"git:{root}",
                     "status": "ok",
                 },
             ]
         )
 
-        removed = cache.invalidate(str(root), [root / "dir" / "nested.txt"])
+        removed = cache.invalidate(f"git:{root}", [root / "dir" / "nested.txt"])
 
         self.assertEqual(
             removed,
@@ -93,12 +127,22 @@ class StatusClientCacheTest(unittest.TestCase):
         root = Path("/tmp/repo")
         cache.update(
             [
-                {"path": str(root / "a.txt"), "worktree_id": str(root), "status": "ok"},
-                {"path": str(root / "b.txt"), "worktree_id": str(root), "status": "ok"},
+                {
+                    "path": str(root / "a.txt"),
+                    "backend": "git",
+                    "worktree_id": f"git:{root}",
+                    "status": "ok",
+                },
+                {
+                    "path": str(root / "b.txt"),
+                    "backend": "git",
+                    "worktree_id": f"git:{root}",
+                    "status": "ok",
+                },
             ]
         )
 
-        removed = cache.invalidate(str(root), [])
+        removed = cache.invalidate(f"git:{root}", [])
 
         self.assertEqual(removed, [str(root / "a.txt"), str(root / "b.txt")])
 

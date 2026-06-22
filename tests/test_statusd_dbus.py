@@ -24,6 +24,7 @@ class StatusDaemonCoreTest(unittest.TestCase):
         records = core.get_status(["/definitely/not/a/nemovcs/worktree"])
 
         self.assertEqual(len(records), 1)
+        self.assertEqual(records[0]["backend"], "")
         self.assertEqual(records[0]["status"], statusd.EmblemStatus.ERROR)
         self.assertEqual(records[0]["error"], "not inside a Git working tree")
 

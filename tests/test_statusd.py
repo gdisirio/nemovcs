@@ -80,6 +80,8 @@ class WorktreeIdentityTest(unittest.TestCase):
         self.assertEqual(identity.gitdir, self.root / ".git")
         self.assertEqual(identity.common_gitdir, self.root / ".git")
         self.assertEqual(identity.head_label, "main")
+        self.assertEqual(identity.backend_id, "git")
+        self.assertEqual(identity.cache_key, f"git:{self.root}")
 
     def test_child_path_resolves_to_same_identity(self):
         child = self.root / "src"
@@ -296,6 +298,8 @@ class StatusDaemonSchedulerTest(unittest.TestCase):
         with mock.patch("nemovcs.statusd.identify_worktree", return_value=first):
             record = core.status_record(first.root / "dir")
 
+        self.assertEqual(record["backend"], "git")
+        self.assertEqual(record["worktree_id"], first.cache_key)
         self.assertEqual(record["status"], statusd.EmblemStatus.MODIFIED)
 
 
@@ -577,6 +581,7 @@ class WorktreeScanTest(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         self.assertEqual(stderr, "")
         self.assertIn("Cache:\n1. ", stdout)
+        self.assertIn("   backend: git", stdout)
         self.assertIn(f"   gitdir: {self.root / '.git'}", stdout)
         self.assertIn("   head: main", stdout)
         self.assertIn("Paths:", stdout)

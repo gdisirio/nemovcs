@@ -33,6 +33,26 @@ class CliParserTest(unittest.TestCase):
         self.assertEqual(args.predicate, "clone-target")
         self.assertEqual(args.paths, ["/tmp/example"])
 
+    def test_inside_worktree_predicate_uses_backend_registry(self):
+        parser = build_parser()
+        args = parser.parse_args(["action-visible", "inside-worktree", "/tmp/example"])
+
+        with mock.patch("nemovcs.cli.backends.detect_backend", return_value=object()):
+            self.assertEqual(cmd_action_visible(args), 0)
+
+    def test_inside_worktree_predicate_rejects_unknown_backend(self):
+        parser = build_parser()
+        args = parser.parse_args(["action-visible", "inside-worktree", "/tmp/example"])
+
+        with mock.patch("nemovcs.cli.backends.detect_backend", return_value=None):
+            self.assertEqual(cmd_action_visible(args), 1)
+
+    def test_inside_worktree_predicate_rejects_missing_paths(self):
+        parser = build_parser()
+        args = parser.parse_args(["action-visible", "inside-worktree"])
+
+        self.assertEqual(cmd_action_visible(args), 1)
+
     def test_clone_target_visible_accepts_non_worktree_directory(self):
         with tempfile.TemporaryDirectory() as tmp:
             with mock.patch("nemovcs.cli.git.is_inside_worktree", return_value=False):

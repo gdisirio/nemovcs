@@ -9,6 +9,7 @@ import sys
 from typing import Callable, Sequence
 
 from . import __version__
+from . import backends
 from . import git
 
 
@@ -32,7 +33,7 @@ def cmd_action_visible(args: argparse.Namespace) -> int:
     if args.predicate == "inside-worktree":
         if not args.paths:
             return 1
-        return 0 if all(git.is_inside_worktree(path) for path in args.paths) else 1
+        return 0 if all(backends.detect_backend(path) for path in args.paths) else 1
 
     if args.predicate == "clone-target":
         if not args.paths:
@@ -261,6 +262,7 @@ def cmd_status_cache(args: argparse.Namespace) -> int:
         for record in records:
             print(
                 f"{record['path']}: {record['status']} "
+                f"backend={record.get('backend', '')} "
                 f"worktree={record['worktree_id']}"
             )
             if record.get("error"):
@@ -282,6 +284,7 @@ def absolute_paths(paths: Sequence[str | Path]) -> list[str]:
 def print_status_record(record: dict[str, str]) -> None:
     print(
         f"{record['path']}: {record['status']} "
+        f"backend={record.get('backend', '')} "
         f"worktree={record['worktree_id']}"
     )
     if record.get("error"):
