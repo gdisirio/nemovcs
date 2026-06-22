@@ -88,6 +88,29 @@ class CliParserTest(unittest.TestCase):
         self.assertEqual(parser.parse_args(["settings-dialog"]).command, "settings-dialog")
         self.assertEqual(parser.parse_args(["about-dialog"]).command, "about-dialog")
 
+    def test_status_cache_accepts_paths(self):
+        parser = build_parser()
+
+        args = parser.parse_args(["status-cache", "/tmp/example"])
+
+        self.assertEqual(args.command, "status-cache")
+        self.assertFalse(args.dbus)
+        self.assertEqual(args.paths, ["/tmp/example"])
+
+    def test_status_cache_accepts_dbus_probe(self):
+        parser = build_parser()
+
+        args = parser.parse_args(["status-cache", "--dbus", "/tmp/example"])
+
+        self.assertEqual(args.command, "status-cache")
+        self.assertTrue(args.dbus)
+        self.assertEqual(args.paths, ["/tmp/example"])
+
+    def test_statusd_parses(self):
+        parser = build_parser()
+
+        self.assertEqual(parser.parse_args(["statusd"]).command, "statusd")
+
     def test_commit_dialog_accepts_paths(self):
         parser = build_parser()
 

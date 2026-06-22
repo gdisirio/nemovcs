@@ -555,6 +555,7 @@ Expected direction:
 - Discover repositories from Nemo on-visit events.
 - Run one initial status scan per repository root.
 - Cache status by repository root and relative path.
+- Keep a bounded cache of recently seen worktrees.
 - Return cached, stale, loading, or error states quickly.
 - Watch worktree and `.git` changes.
 - Debounce refreshes.
@@ -563,6 +564,219 @@ Expected direction:
 
 The daemon should avoid continuous polling and should not scan arbitrary home
 directories.
+
+Initial cache policy:
+
+- Treat each Git worktree as a separate cache entry, including linked worktrees.
+- Treat linked worktrees as full worktrees, not as secondary views of the main
+  checkout.
+- Use an LRU-style "seen worktrees" cache.
+- Default maximum cached worktrees: `12`.
+- Make the maximum configurable later.
+- When Nemo visits a path inside a worktree, move that worktree to the front of
+  the cache.
+- If the cache exceeds the maximum, evict the least recently seen worktree.
+- Active filesystem monitoring is enabled only for worktrees currently in the
+  cache.
+- Evicting a worktree must stop its active monitors and release cached per-path
+  status for that worktree.
+- Emblems for linked worktrees must use the same status rules as normal
+  worktrees.
+- Actions invoked inside a linked worktree must operate on that worktree's own
+  checkout, branch, index, and gitdir. They must not accidentally affect the
+  main worktree or another linked worktree.
+
+Initial emblem priority:
+
+1. `conflicted`
+2. `modified`
+3. `ok`
+
+Folder emblems should summarize the highest-priority state of visible or cached
+descendants. Exact propagation rules can evolve, but conflicts must dominate
+modified state, and modified state must dominate clean state.
+
+### Status Daemon Prototype Milestones
+
+The first prototype can be a normal foreground process started manually from the
+source tree. Service installation, autostart, and packaging can wait until the
+behavior is proven.
+
+#### Milestone 1: Worktree Identity Model
+
+Status: implemented in the initial pure model.
+
+Goal: identify normal and linked Git worktrees correctly.
+
+Implementation:
+
+- Add a small status daemon module with pure worktree-discovery helpers.
+- Use Git probes such as `rev-parse --show-toplevel`, `rev-parse --git-dir`,
+  and `rev-parse --git-common-dir`.
+- Represent a worktree with:
+  - worktree root,
+  - gitdir,
+  - common gitdir,
+  - current branch or detached HEAD label.
+
+Tests:
+
+- Normal repository path resolves to one worktree identity.
+- Child paths resolve to the same worktree identity.
+- Linked worktree paths resolve to distinct worktree identities with distinct
+  worktree roots and gitdirs.
+- Non-repository paths return no identity.
+
+#### Milestone 2: In-Memory Worktree LRU Cache
+
+Status: implemented in the initial pure model.
+
+Goal: implement the bounded "seen worktrees" policy without filesystem
+monitoring.
+
+Implementation:
+
+- Add a configurable maximum cache size, defaulting to `12`.
+- Add `seen(paths)` behavior that discovers worktrees and moves them to the
+  front of the cache.
+- Evict the least recently seen worktree when over the limit.
+- Store per-worktree status records by relative path.
+
+Tests:
+
+- Seeing a worktree inserts it.
+- Seeing it again moves it to the front.
+- Adding the thirteenth worktree evicts the oldest with the default limit.
+- Linked worktrees occupy separate cache entries.
+
+#### Milestone 3: One-Shot Status Scan
+
+Status: implemented in the initial pure model.
+
+Goal: fill cache entries from Git without any Nemo integration.
+
+Implementation:
+
+- Run `git status --porcelain=v2 -z` per cached worktree.
+- Map file states to the initial emblem states:
+  - `conflicted`,
+  - `modified`,
+  - `ok`.
+- Mark unknown or in-progress status as `loading` or `stale` internally, even
+  if the first UI only renders primary emblems.
+
+Tests:
+
+- Modified, added, deleted, renamed, untracked, and conflicted paths map to
+  expected internal states.
+- Clean tracked paths queried from a scanned worktree return `ok` when known.
+- Folder aggregate state follows priority: `conflicted > modified > ok`.
+
+#### Milestone 4: Manual Daemon Process and Local CLI Probe
+
+Status: implemented as a foreground prototype command and in-process cache
+probe.
+
+Goal: run the daemon manually and inspect status from a terminal.
+
+Implementation:
+
+- Add `nemovcs-statusd` or `nemovcs statusd` as a foreground process.
+- Add a debug CLI command such as `nemovcs status-cache PATH...` that talks to
+  the running daemon or, initially, to the same in-process cache model.
+- Print worktree identity, cache order, and status records for requested paths.
+
+Tests:
+
+- Unit tests cover cache behavior.
+- Manual test: start daemon, call debug command on paths in one repository.
+- Manual test: visit more than the configured cache size and confirm eviction.
+
+#### Milestone 5: DBus API Skeleton
+
+Status: implemented as a manually started session-bus service.
+
+Goal: establish the daemon/plugin boundary without Nemo yet.
+
+Initial DBus shape:
+
+- Method: `Seen(paths: as)`.
+- Method: `GetStatus(paths: as) -> status records`.
+- Signal: `StatusChanged(worktree_id, paths)`.
+
+Behavior:
+
+- `Seen` updates the worktree LRU and schedules scans.
+- `GetStatus` returns quickly from cache with `ok`, `modified`, `conflicted`,
+  `loading`, `stale`, or `error`.
+- `StatusChanged` is an invalidation signal, not a full UI-state push.
+
+Tests:
+
+- A client can call `Seen` and observe cache order changes.
+- A client can call `GetStatus` and receive fast cached responses.
+- A scan completion emits `StatusChanged`.
+- Daemon remains alive if a client disconnects.
+
+#### Milestone 6: Filesystem Monitoring and Debounce
+
+Status: implemented for the foreground prototype with a pure debounce scheduler
+and Gio-backed filesystem monitor manager.
+
+Goal: refresh cached worktrees without continuous polling.
+
+Implementation:
+
+- Start monitors only for cached worktrees.
+- Stop monitors on worktree eviction.
+- Watch the worktree and Git metadata paths needed to detect file, index, HEAD,
+  and ref changes.
+- Coalesce event bursts into one refresh.
+
+Tests:
+
+- File content changes eventually update status.
+- `git add`, commit, checkout, and merge-conflict changes invalidate status.
+- Evicting a worktree stops its monitors.
+- Repeated event bursts trigger bounded refreshes.
+
+#### Milestone 7: Minimal Nemo Plugin
+
+Goal: render one primary emblem in Nemo from cached daemon state.
+
+Implementation:
+
+- Add a `nemo-python` plugin implementing `Nemo.InfoProvider.update_file_info()`.
+- In `update_file_info()`, send seen paths and fetch cached status quickly.
+- Apply one primary emblem using priority `conflicted > modified > ok`.
+- If daemon status is `loading`, return without blocking and rely on later
+  invalidation.
+
+Tests:
+
+- Manual test in Nemo: modified file shows modified emblem.
+- Manual test in Nemo: conflicted file/folder shows conflict emblem.
+- Manual test linked worktree: emblems follow that worktree's own status.
+- Manual memory check: browsing many repositories does not grow plugin memory
+  without bound.
+
+#### Milestone 8: Nemo Invalidation
+
+Goal: make emblems update when daemon status changes.
+
+Implementation:
+
+- Plugin listens for daemon `StatusChanged` signals.
+- Plugin asks Nemo to invalidate or refresh visible file info where the API
+  supports it.
+- If Nemo invalidation is limited, document the fallback behavior.
+
+Tests:
+
+- Modify a visible file and confirm the emblem updates without navigating away,
+  if the API supports it.
+- Commit or revert a visible file and confirm the emblem returns to `ok`.
+- Confirm daemon signals do not make the plugin retain stale file objects.
 
 ## Ideas Under Evaluation
 

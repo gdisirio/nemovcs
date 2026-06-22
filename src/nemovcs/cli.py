@@ -188,6 +188,44 @@ def cmd_about_dialog(args: argparse.Namespace) -> int:
     return info_dialog.run_about()
 
 
+def cmd_status_cache(args: argparse.Namespace) -> int:
+    from . import statusd
+
+    if args.dbus:
+        from . import statusd_dbus
+
+        try:
+            statusd_dbus.call_seen([str(path) for path in args.paths or [Path.cwd()]])
+            records = statusd_dbus.call_get_status(
+                [str(path) for path in args.paths or [Path.cwd()]]
+            )
+        except Exception as exc:
+            print(f"status daemon DBus call failed: {exc}", file=sys.stderr)
+            return 1
+
+        for record in records:
+            print(
+                f"{record['path']}: {record['status']} "
+                f"worktree={record['worktree_id']}"
+            )
+            if record.get("error"):
+                print(f"  error: {record['error']}")
+        return 0
+
+    exit_code, stdout, stderr = statusd.format_cache_probe(args.paths or [Path.cwd()])
+    if stdout:
+        print(stdout, end="")
+    if stderr:
+        print(stderr, end="", file=sys.stderr)
+    return exit_code
+
+
+def cmd_statusd(args: argparse.Namespace) -> int:
+    from . import statusd_dbus
+
+    return statusd_dbus.run_foreground()
+
+
 def cmd_run_terminal(args: argparse.Namespace) -> int:
     nested_args = list(args.args)
     if not nested_args:
@@ -287,6 +325,24 @@ def build_parser() -> argparse.ArgumentParser:
         help="show NemoVCS information in a GTK dialog",
     )
     about_dialog.set_defaults(func=cmd_about_dialog)
+
+    status_cache = subparsers.add_parser(
+        "status-cache",
+        help="inspect the status daemon cache model",
+    )
+    status_cache.add_argument(
+        "--dbus",
+        action="store_true",
+        help="query a running status daemon over DBus",
+    )
+    status_cache.add_argument("paths", nargs="*")
+    status_cache.set_defaults(func=cmd_status_cache)
+
+    statusd_parser = subparsers.add_parser(
+        "statusd",
+        help="run the foreground status daemon prototype",
+    )
+    statusd_parser.set_defaults(func=cmd_statusd)
 
     run_terminal = subparsers.add_parser(
         "run-terminal",
