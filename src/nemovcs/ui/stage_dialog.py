@@ -15,7 +15,8 @@ from gi.repository import Gdk, Gio, GLib, Gtk  # noqa: E402
 from gi.repository import GdkPixbuf  # noqa: E402
 from gi.repository import Pango  # noqa: E402
 
-from nemovcs import git
+from nemovcs import backends
+from nemovcs.backends.base import BackendChangeItem
 from nemovcs.ui import logger
 
 
@@ -53,7 +54,7 @@ class StageDialog(Gtk.Window):
         super().__init__(title="Stage")
         self.paths = list(paths)
         self.exit_code = 0
-        self.items_by_root: dict[Path, list[git.CommitItem]] = {}
+        self.items_by_root: dict[Path, list[BackendChangeItem]] = {}
         self.active_logger: logger.LoggerWindow | None = None
         self.stage_completed = False
         self.icon_theme = Gtk.IconTheme.get_default()
@@ -182,7 +183,7 @@ class StageDialog(Gtk.Window):
 
     def load_items(self) -> None:
         self.store.clear()
-        self.items_by_root = git.commit_items(self.paths)
+        self.items_by_root = backends.commit_items(self.paths)
 
         total = 0
         changed = 0
@@ -226,7 +227,7 @@ class StageDialog(Gtk.Window):
         model, paths = selection.get_selected_rows()
         return [model.get_iter(path) for path in paths]
 
-    def selected_items(self) -> list[git.CommitItem]:
+    def selected_items(self) -> list[BackendChangeItem]:
         return [self.store[iter_][COL_ITEM] for iter_ in self.selected_iters()]
 
     def checked_stage_paths_by_root(self) -> dict[Path, list[str]]:
@@ -234,7 +235,7 @@ class StageDialog(Gtk.Window):
         for row in self.store:
             if not row[COL_INCLUDED]:
                 continue
-            item: git.CommitItem = row[COL_ITEM]
+            item: BackendChangeItem = row[COL_ITEM]
             relpaths = paths_by_root.setdefault(item.root, [])
             for relpath in item.stage_paths:
                 if relpath not in relpaths:
@@ -248,7 +249,7 @@ class StageDialog(Gtk.Window):
         return stage_phases(paths_by_root)
 
     @staticmethod
-    def default_selected(item: git.CommitItem) -> bool:
+    def default_selected(item: BackendChangeItem) -> bool:
         return not item.conflicted
 
     def on_refresh_clicked(self, _button: Gtk.Button) -> None:
@@ -259,7 +260,7 @@ class StageDialog(Gtk.Window):
 
     def on_select_all_clicked(self, _button: Gtk.Button) -> None:
         for row in self.store:
-            item: git.CommitItem = row[COL_ITEM]
+            item: BackendChangeItem = row[COL_ITEM]
             row[COL_INCLUDED] = self.default_selected(item)
 
     def on_select_none_clicked(self, _button: Gtk.Button) -> None:
@@ -268,7 +269,7 @@ class StageDialog(Gtk.Window):
 
     def on_include_toggled(self, _renderer: Gtk.CellRendererToggle, path: str) -> None:
         row = self.store[path]
-        item: git.CommitItem = row[COL_ITEM]
+        item: BackendChangeItem = row[COL_ITEM]
         if item.conflicted:
             return
         row[COL_INCLUDED] = not row[COL_INCLUDED]
@@ -395,7 +396,7 @@ class StageDialog(Gtk.Window):
 
     def on_context_toggle(self, _item: Gtk.MenuItem) -> None:
         for iter_ in self.selected_iters():
-            item: git.CommitItem = self.store[iter_][COL_ITEM]
+            item: BackendChangeItem = self.store[iter_][COL_ITEM]
             if not item.conflicted:
                 self.store[iter_][COL_INCLUDED] = not self.store[iter_][COL_INCLUDED]
 
@@ -416,13 +417,13 @@ class StageDialog(Gtk.Window):
         paths = "\n".join(item.path for item in self.selected_items())
         Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD).set_text(paths, -1)
 
-    def open_diff(self, item: git.CommitItem) -> None:
+    def open_diff(self, item: BackendChangeItem) -> None:
         if item.status == "untracked":
             self.show_error("Untracked files do not have a Git diff yet.")
             return
         self.spawn(self.file_diff_command(item))
 
-    def file_diff_command(self, item: git.CommitItem) -> list[str]:
+    def file_diff_command(self, item: BackendChangeItem) -> list[str]:
         return [
             "git",
             "-C",
@@ -435,10 +436,10 @@ class StageDialog(Gtk.Window):
             item.path,
         ]
 
-    def absolute_path(self, item: git.CommitItem) -> Path:
+    def absolute_path(self, item: BackendChangeItem) -> Path:
         return item.root / item.path
 
-    def file_icon(self, item: git.CommitItem) -> GdkPixbuf.Pixbuf | None:
+    def file_icon(self, item: BackendChangeItem) -> GdkPixbuf.Pixbuf | None:
         path = self.absolute_path(item)
         try:
             info = Gio.File.new_for_path(str(path)).query_info(

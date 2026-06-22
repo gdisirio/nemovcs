@@ -12,6 +12,7 @@ from typing import Iterable, Sequence
 
 from nemovcs import git
 from nemovcs.backends.base import (
+    BackendChangeItem,
     BackendStatusItem,
     BackendStatusScan,
     BackendWorktreeIdentity,
@@ -86,8 +87,11 @@ class GitBackend:
     def commit_items(
         self,
         paths: Sequence[str | Path],
-    ) -> dict[Path, list[git.CommitItem]]:
-        return git.commit_items(paths)
+    ) -> dict[Path, list[BackendChangeItem]]:
+        return {
+            root: [self._change_item(item) for item in items]
+            for root, items in git.commit_items(paths).items()
+        }
 
     def current_branch(self, root: str | Path) -> str:
         return git.current_branch(root)
@@ -112,3 +116,14 @@ class GitBackend:
                 return f"detached at {sha}"
 
         return "unknown"
+
+    def _change_item(self, item: git.CommitItem) -> BackendChangeItem:
+        return BackendChangeItem(
+            backend_id=self.id,
+            root=item.root,
+            path=item.path,
+            status=item.status,
+            old_path=item.old_path,
+            tracked=item.tracked,
+            conflicted=item.conflicted,
+        )

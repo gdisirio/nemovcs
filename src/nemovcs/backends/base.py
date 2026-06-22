@@ -29,6 +29,27 @@ class BackendStatusScan:
     error: str = ""
 
 
+@dataclass(frozen=True)
+class BackendChangeItem:
+    backend_id: str
+    root: Path
+    path: str
+    status: str
+    old_path: str | None = None
+    tracked: bool = True
+    conflicted: bool = False
+
+    @property
+    def default_selected(self) -> bool:
+        return self.tracked and not self.conflicted
+
+    @property
+    def stage_paths(self) -> tuple[str, ...]:
+        if self.old_path:
+            return (self.old_path, self.path)
+        return (self.path,)
+
+
 class Backend(Protocol):
     id: str
     label: str
@@ -45,7 +66,10 @@ class Backend(Protocol):
 
     def scan_status(self, root: str | Path) -> BackendStatusScan: ...
 
-    def commit_items(self, paths: Sequence[str | Path]) -> dict[Path, list[Any]]: ...
+    def commit_items(
+        self,
+        paths: Sequence[str | Path],
+    ) -> dict[Path, list[BackendChangeItem]]: ...
 
     def current_branch(self, root: str | Path) -> str: ...
 

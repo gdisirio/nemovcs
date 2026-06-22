@@ -15,7 +15,9 @@ from gi.repository import Gdk, Gio, GLib, Gtk  # noqa: E402
 from gi.repository import GdkPixbuf  # noqa: E402
 from gi.repository import Pango  # noqa: E402
 
+from nemovcs import backends
 from nemovcs import git
+from nemovcs.backends.base import BackendChangeItem
 
 
 COL_STATUS_ICON = 0
@@ -175,7 +177,7 @@ class StatusDialog(Gtk.Window):
         self.store.clear()
         self.output_buffer.set_text("")
 
-        items_by_root = git.commit_items(self.paths)
+        items_by_root = backends.commit_items(self.paths)
         results = git.status(self.paths)
         self.output_buffer.set_text(format_status_output(results))
         self.exit_code = next((result.returncode for result in results if not result.ok), 0)
@@ -218,7 +220,7 @@ class StatusDialog(Gtk.Window):
         model, paths = selection.get_selected_rows()
         return [model.get_iter(path) for path in paths]
 
-    def selected_items(self) -> list[git.CommitItem]:
+    def selected_items(self) -> list[BackendChangeItem]:
         return [self.store[iter_][COL_ITEM] for iter_ in self.selected_iters()]
 
     def on_refresh_clicked(self, _button: Gtk.Button) -> None:
@@ -322,13 +324,13 @@ class StatusDialog(Gtk.Window):
         paths = "\n".join(item.path for item in self.selected_items())
         Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD).set_text(paths, -1)
 
-    def open_diff(self, item: git.CommitItem) -> None:
+    def open_diff(self, item: BackendChangeItem) -> None:
         if item.status == "untracked":
             self.show_error("Untracked files do not have a Git diff yet.")
             return
         self.spawn(self.file_diff_command(item))
 
-    def file_diff_command(self, item: git.CommitItem) -> list[str]:
+    def file_diff_command(self, item: BackendChangeItem) -> list[str]:
         return [
             "git",
             "-C",
@@ -341,10 +343,10 @@ class StatusDialog(Gtk.Window):
             item.path,
         ]
 
-    def absolute_path(self, item: git.CommitItem) -> Path:
+    def absolute_path(self, item: BackendChangeItem) -> Path:
         return item.root / item.path
 
-    def file_icon(self, item: git.CommitItem) -> GdkPixbuf.Pixbuf | None:
+    def file_icon(self, item: BackendChangeItem) -> GdkPixbuf.Pixbuf | None:
         path = self.absolute_path(item)
         try:
             info = Gio.File.new_for_path(str(path)).query_info(

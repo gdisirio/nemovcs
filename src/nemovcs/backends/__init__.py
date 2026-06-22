@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, Sequence
 
-from .base import Backend, BackendWorktreeIdentity
+from .base import Backend, BackendChangeItem, BackendWorktreeIdentity
 from .git import GitBackend
 
 
@@ -57,3 +57,18 @@ def group_by_backend(
         if roots:
             grouped[backend] = roots
     return grouped
+
+
+def commit_items(paths: Sequence[str | Path]) -> dict[Path, list[BackendChangeItem]]:
+    selected_paths = paths or [Path.cwd()]
+    items_by_root: dict[Path, list[BackendChangeItem]] = {}
+    for backend in BACKENDS:
+        items_by_root.update(backend.commit_items(selected_paths))
+    return items_by_root
+
+
+def current_branch(root: str | Path) -> str:
+    backend = detect_backend(root)
+    if backend is None:
+        return "unknown"
+    return backend.current_branch(root)

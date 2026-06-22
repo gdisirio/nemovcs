@@ -1,7 +1,7 @@
 from pathlib import Path
 import unittest
 
-from nemovcs import git
+from nemovcs.backends.base import BackendChangeItem
 from nemovcs.ui.stage_dialog import StageDialog, stage_phases
 
 
@@ -34,20 +34,18 @@ class StageDialogCommandTest(unittest.TestCase):
 
     def test_default_selection_includes_untracked_but_excludes_conflicted(self):
         root = Path("/tmp/example")
-        untracked = git.CommitItem(
+        untracked = BackendChangeItem(
+            backend_id="git",
             root=root,
             path="new.txt",
             status="untracked",
-            index_status="?",
-            worktree_status="?",
             tracked=False,
         )
-        conflicted = git.CommitItem(
+        conflicted = BackendChangeItem(
+            backend_id="git",
             root=root,
             path="conflict.txt",
             status="conflicted",
-            index_status="U",
-            worktree_status="U",
             conflicted=True,
         )
 
@@ -56,12 +54,11 @@ class StageDialogCommandTest(unittest.TestCase):
 
     def test_file_diff_command_uses_item_repository(self):
         root = Path("/tmp/example")
-        item = git.CommitItem(
+        item = BackendChangeItem(
+            backend_id="git",
             root=root,
             path="src/app.py",
             status="modified",
-            index_status=".",
-            worktree_status="M",
         )
 
         command = StageDialog.file_diff_command(StageDialog.__new__(StageDialog), item)

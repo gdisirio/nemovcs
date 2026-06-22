@@ -2,6 +2,7 @@ from pathlib import Path
 import unittest
 
 from nemovcs import git
+from nemovcs.backends.base import BackendChangeItem
 from nemovcs.ui.status_dialog import StatusDialog, format_status_output
 
 
@@ -30,12 +31,11 @@ class StatusDialogTest(unittest.TestCase):
 
     def test_file_diff_command_compares_path_against_head_without_dir_diff(self):
         root = Path("/tmp/example")
-        item = git.CommitItem(
+        item = BackendChangeItem(
+            backend_id="git",
             root=root,
             path="src/app.py",
             status="modified",
-            index_status=".",
-            worktree_status="M",
         )
         dialog = StatusDialog.__new__(StatusDialog)
 

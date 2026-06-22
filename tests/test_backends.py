@@ -4,7 +4,11 @@ from unittest import mock
 
 from nemovcs import backends
 from nemovcs import git
-from nemovcs.backends.base import BackendStatusItem, BackendWorktreeIdentity
+from nemovcs.backends.base import (
+    BackendChangeItem,
+    BackendStatusItem,
+    BackendWorktreeIdentity,
+)
 from nemovcs.backends.git import GitBackend
 
 
@@ -74,6 +78,32 @@ class BackendRegistryTest(unittest.TestCase):
         self.assertEqual(backend.id, "git")
         self.assertEqual(grouped[backend], {root: ["src/app.py"]})
 
+    def test_commit_items_collects_items_from_registered_backend(self):
+        root = Path("/tmp/repo")
+        item = BackendChangeItem(
+            backend_id="git",
+            root=root,
+            path="src/app.py",
+            status="modified",
+        )
+
+        with mock.patch(
+            "nemovcs.backends.git.GitBackend.commit_items",
+            return_value={root: [item]},
+        ):
+            self.assertEqual(backends.commit_items([root]), {root: [item]})
+
+    def test_current_branch_uses_detected_backend(self):
+        root = Path("/tmp/repo")
+
+        with mock.patch("nemovcs.git.is_inside_worktree", return_value=True), mock.patch(
+            "nemovcs.git.current_branch",
+            return_value="main",
+        ) as current_branch:
+            self.assertEqual(backends.current_branch(root), "main")
+
+        current_branch.assert_called_once_with(root)
+
     def test_git_backend_delegates_status_to_existing_git_helpers(self):
         backend = GitBackend()
         expected = object()
@@ -83,6 +113,54 @@ class BackendRegistryTest(unittest.TestCase):
 
         self.assertIs(result, expected)
         status.assert_called_once_with([Path("/tmp/repo")])
+
+    def test_git_backend_translates_commit_items(self):
+        backend = GitBackend()
+        root = Path("/tmp/repo")
+
+        with mock.patch("nemovcs.git.commit_items") as commit_items:
+            commit_items.return_value = {
+                root: [
+                    git.CommitItem(
+                        root=root,
+                        path="src/app.py",
+                        status="modified",
+                        index_status=".",
+                        worktree_status="M",
+                    ),
+                    git.CommitItem(
+                        root=root,
+                        path="new.txt",
+                        status="untracked",
+                        index_status="?",
+                        worktree_status="?",
+                        tracked=False,
+                    ),
+                ]
+            }
+
+            result = backend.commit_items([root])
+
+        self.assertEqual(
+            result,
+            {
+                root: [
+                    BackendChangeItem(
+                        backend_id="git",
+                        root=root,
+                        path="src/app.py",
+                        status="modified",
+                    ),
+                    BackendChangeItem(
+                        backend_id="git",
+                        root=root,
+                        path="new.txt",
+                        status="untracked",
+                        tracked=False,
+                    ),
+                ]
+            },
+        )
 
     def test_git_backend_scan_status_translates_porcelain_items(self):
         backend = GitBackend()
