@@ -140,11 +140,13 @@ class StatusDaemonCore:
         debounce_seconds: float = DEFAULT_DEBOUNCE_SECONDS,
         timer: Callable[[float, Callable[[], None]], object] | None = None,
         scan_func: Callable[[WorktreeEntry], None] | None = None,
+        status_changed_callback: Callable[[str, list[str]], None] | None = None,
     ):
         self.cache = cache if cache is not None else WorktreeCache()
         self.debounce_seconds = debounce_seconds
         self.timer = timer if timer is not None else immediate_timer
         self.scan_func = scan_func if scan_func is not None else scan_worktree
+        self.status_changed_callback = status_changed_callback
         self.changed_worktrees: list[str] = []
         self.monitor_manager = None
         self.cache.evict_callback = self.on_cache_evict
@@ -164,7 +166,7 @@ class StatusDaemonCore:
             if identity.cache_key in scanned_keys:
                 continue
             entry = self.cache.touch(identity)
-            self.scan_entry(entry)
+            self.scan_entry(entry, notify=False)
             if self.monitor_manager is not None:
                 self.monitor_manager.ensure(entry)
             scanned_keys.add(identity.cache_key)
@@ -210,7 +212,8 @@ class StatusDaemonCore:
         entry.scan_scheduled = False
         self.scan_entry(entry)
 
-    def scan_entry(self, entry: WorktreeEntry) -> None:
+    def scan_entry(self, entry: WorktreeEntry, *, notify: bool = True) -> None:
+        changed_paths = status_changed_paths(entry)
         entry.scan_in_flight = True
         try:
             self.scan_func(entry)
@@ -219,10 +222,16 @@ class StatusDaemonCore:
         entry.stale = False
         entry.stale_paths.clear()
         self.changed_worktrees.append(entry.identity.cache_key)
+        if notify:
+            self.notify_status_changed(entry.identity.cache_key, changed_paths)
 
         if entry.rescan_needed:
             entry.rescan_needed = False
             self.mark_stale(entry.identity.cache_key)
+
+    def notify_status_changed(self, worktree_id: str, paths: list[str]) -> None:
+        if self.status_changed_callback is not None:
+            self.status_changed_callback(worktree_id, paths)
 
     def get_status(self, paths: list[str | Path]) -> list[dict[str, str]]:
         records: list[dict[str, str]] = []
@@ -402,6 +411,17 @@ def relative_path_in_worktree(
         return None
 
     return "." if str(relpath) == "." else relpath.as_posix()
+
+
+def status_changed_paths(entry: WorktreeEntry) -> list[str]:
+    if not entry.stale_paths:
+        return [str(entry.identity.root)]
+
+    return [
+        str(entry.identity.root / relpath)
+        for relpath in sorted(entry.stale_paths)
+        if relpath != "."
+    ] or [str(entry.identity.root)]
 
 
 def format_cache_probe(paths: list[str | Path]) -> tuple[int, str, str]:

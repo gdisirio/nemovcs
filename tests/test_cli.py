@@ -111,6 +111,14 @@ class CliParserTest(unittest.TestCase):
 
         self.assertEqual(parser.parse_args(["statusd"]).command, "statusd")
 
+    def test_status_watch_accepts_paths(self):
+        parser = build_parser()
+
+        args = parser.parse_args(["status-watch", "/tmp/example"])
+
+        self.assertEqual(args.command, "status-watch")
+        self.assertEqual(args.paths, ["/tmp/example"])
+
     def test_commit_dialog_accepts_paths(self):
         parser = build_parser()
 

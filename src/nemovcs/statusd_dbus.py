@@ -84,6 +84,19 @@ def call_get_status(paths: Sequence[str]) -> list[dict[str, str]]:
     ]
 
 
+def subscribe_status_changed(callback):
+    import dbus
+
+    bus = dbus.SessionBus()
+    return bus.add_signal_receiver(
+        callback,
+        signal_name="StatusChanged",
+        dbus_interface=statusd.DBUS_INTERFACE,
+        bus_name=statusd.DBUS_BUS_NAME,
+        path=statusd.DBUS_OBJECT_PATH,
+    )
+
+
 def _statusd_proxy():
     import dbus
 
@@ -103,6 +116,7 @@ def make_service_class():
         ):
             super().__init__(bus, statusd.DBUS_OBJECT_PATH)
             self.core = core
+            self.core.status_changed_callback = self.StatusChanged
 
         @dbus.service.method(
             statusd.DBUS_INTERFACE,
@@ -111,8 +125,6 @@ def make_service_class():
         )
         def Seen(self, paths):
             worktree_ids = self.core.seen([str(path) for path in paths])
-            for worktree_id in worktree_ids:
-                self.StatusChanged(worktree_id, [str(path) for path in paths])
             return worktree_ids
 
         @dbus.service.method(

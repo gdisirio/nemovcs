@@ -220,6 +220,61 @@ def cmd_status_cache(args: argparse.Namespace) -> int:
     return exit_code
 
 
+def print_status_record(record: dict[str, str]) -> None:
+    print(
+        f"{record['path']}: {record['status']} "
+        f"worktree={record['worktree_id']}"
+    )
+    if record.get("error"):
+        print(f"  error: {record['error']}")
+
+
+def cmd_status_watch(args: argparse.Namespace) -> int:
+    import dbus.mainloop.glib
+    from gi.repository import GLib
+
+    from . import status_client
+    from . import statusd_dbus
+
+    dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
+    watched_paths = [str(path) for path in args.paths or [Path.cwd()]]
+    cache = status_client.StatusClientCache()
+
+    def refresh() -> None:
+        records = cache.refresh(
+            watched_paths,
+            statusd_dbus.call_seen,
+            statusd_dbus.call_get_status,
+        )
+        for record in records:
+            print_status_record(record)
+        sys.stdout.flush()
+
+    def on_changed(worktree_id, paths) -> None:
+        changed_paths = [str(path) for path in paths]
+        removed = cache.invalidate(str(worktree_id), changed_paths)
+        print(
+            f"StatusChanged worktree={worktree_id} "
+            f"paths={','.join(changed_paths) or '*'} "
+            f"invalidated={len(removed)}"
+        )
+        refresh()
+
+    try:
+        statusd_dbus.subscribe_status_changed(on_changed)
+        refresh()
+    except Exception as exc:
+        print(f"status daemon DBus watch failed: {exc}", file=sys.stderr)
+        return 1
+
+    loop = GLib.MainLoop()
+    try:
+        loop.run()
+    except KeyboardInterrupt:
+        print("status watch stopped.")
+    return 0
+
+
 def cmd_statusd(args: argparse.Namespace) -> int:
     from . import statusd_dbus
 
@@ -337,6 +392,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     status_cache.add_argument("paths", nargs="*")
     status_cache.set_defaults(func=cmd_status_cache)
+
+    status_watch = subparsers.add_parser(
+        "status-watch",
+        help="watch status daemon invalidation signals",
+    )
+    status_watch.add_argument("paths", nargs="*")
+    status_watch.set_defaults(func=cmd_status_watch)
 
     statusd_parser = subparsers.add_parser(
         "statusd",

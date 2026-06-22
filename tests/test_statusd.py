@@ -172,6 +172,7 @@ class StatusDaemonSchedulerTest(unittest.TestCase):
     def test_mark_stale_schedules_one_debounced_scan(self):
         timer = FakeTimer()
         scans: list[statusd.WorktreeIdentity] = []
+        changed: list[tuple[str, list[str]]] = []
 
         def scan(entry: statusd.WorktreeEntry) -> None:
             scans.append(entry.identity)
@@ -181,7 +182,14 @@ class StatusDaemonSchedulerTest(unittest.TestCase):
         cache = statusd.WorktreeCache()
         entry = cache.touch(first)
         entry.scanned = True
-        core = statusd.StatusDaemonCore(cache, timer=timer, scan_func=scan)
+        core = statusd.StatusDaemonCore(
+            cache,
+            timer=timer,
+            scan_func=scan,
+            status_changed_callback=lambda worktree_id, paths: changed.append(
+                (worktree_id, paths)
+            ),
+        )
 
         self.assertTrue(core.mark_stale(first.cache_key, [first.root / "a.txt"]))
         self.assertTrue(core.mark_stale(first.cache_key, [first.root / "b.txt"]))
@@ -200,6 +208,36 @@ class StatusDaemonSchedulerTest(unittest.TestCase):
         self.assertFalse(entry.stale)
         self.assertEqual(entry.stale_paths, set())
         self.assertEqual(core.changed_worktrees, [first.cache_key])
+        self.assertEqual(
+            changed,
+            [
+                (
+                    first.cache_key,
+                    [str(first.root / "a.txt"), str(first.root / "b.txt")],
+                )
+            ],
+        )
+
+    def test_seen_scans_without_status_changed_signal(self):
+        changed: list[tuple[str, list[str]]] = []
+        first = identity("one")
+        cache = statusd.WorktreeCache()
+
+        def scan(_entry: statusd.WorktreeEntry) -> None:
+            _entry.scanned = True
+
+        core = statusd.StatusDaemonCore(
+            cache,
+            scan_func=scan,
+            status_changed_callback=lambda worktree_id, paths: changed.append(
+                (worktree_id, paths)
+            ),
+        )
+
+        with mock.patch("nemovcs.statusd.identify_worktree", return_value=first):
+            self.assertEqual(core.seen([first.root]), [first.cache_key])
+
+        self.assertEqual(changed, [])
 
     def test_mark_stale_for_unknown_worktree_returns_false(self):
         core = statusd.StatusDaemonCore(timer=FakeTimer())
@@ -225,6 +263,27 @@ class StatusDaemonSchedulerTest(unittest.TestCase):
         self.assertFalse(entry.rescan_needed)
         self.assertTrue(entry.scan_scheduled)
         self.assertEqual(len(timer.scheduled), 1)
+
+    def test_scan_entry_reports_worktree_root_when_no_specific_path_changed(self):
+        changed: list[tuple[str, list[str]]] = []
+        first = identity("one")
+        cache = statusd.WorktreeCache()
+        entry = cache.touch(first)
+
+        def scan(_entry: statusd.WorktreeEntry) -> None:
+            _entry.scanned = True
+
+        core = statusd.StatusDaemonCore(
+            cache,
+            scan_func=scan,
+            status_changed_callback=lambda worktree_id, paths: changed.append(
+                (worktree_id, paths)
+            ),
+        )
+
+        core.scan_entry(entry)
+
+        self.assertEqual(changed, [(first.cache_key, [str(first.root)])])
 
 
 @unittest.skipUnless(have_git(), "git executable is required")

@@ -720,8 +720,8 @@ Tests:
 
 #### Milestone 6: Filesystem Monitoring and Debounce
 
-Status: implemented for the foreground prototype with a pure debounce scheduler
-and Gio-backed filesystem monitor manager.
+Status: implemented for the foreground prototype with a pure debounce scheduler,
+Gio-backed filesystem monitor manager, and client-side invalidation helpers.
 
 Goal: refresh cached worktrees without continuous polling.
 
@@ -739,6 +739,35 @@ Tests:
 - `git add`, commit, checkout, and merge-conflict changes invalidate status.
 - Evicting a worktree stops its monitors.
 - Repeated event bursts trigger bounded refreshes.
+
+#### Milestone 6.3: Client Invalidation Probe
+
+Status: implemented for the foreground prototype.
+
+Goal: prove the daemon/plugin invalidation contract before writing the Nemo
+`InfoProvider`.
+
+Implementation:
+
+- Emit `StatusChanged(worktree_id, paths)` from background/scheduled scans.
+- Do not emit `StatusChanged` from client-initiated `Seen` calls, because the
+  caller receives fresh status from `GetStatus` and should not create an
+  invalidation loop.
+- Add a small client-side status cache that can invalidate records by worktree
+  and changed path.
+- Invalidate parent folder aggregate records when a changed child path is
+  reported.
+- Add a manual `nemovcs status-watch PATH...` probe that subscribes to daemon
+  signals, invalidates the local client cache, and refreshes watched paths.
+
+Tests:
+
+- Scheduled scans emit changed absolute paths.
+- `Seen` scans do not emit invalidation signals.
+- Client cache invalidates only records in the affected worktree.
+- Client cache invalidates parent folder aggregate records for changed children.
+- Manual test: start `nemovcs statusd`, run `nemovcs status-watch PATH`, modify
+  a file, and observe a `StatusChanged` line followed by refreshed status.
 
 #### Milestone 7: Minimal Nemo Plugin
 
