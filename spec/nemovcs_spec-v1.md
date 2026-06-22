@@ -509,7 +509,9 @@ Before then, it should run only cheap Git commands and avoid blocking Nemo's UI.
 
 ## Future Repository Browser
 
-A repository browser is required after the core action workflow is usable.
+A repository browser is required after the core action workflow is usable. The
+planned browser is SVN-only. A Git repository browser or graphical branch view
+is not planned unless a concrete workflow later justifies it.
 
 There are two plausible designs:
 
@@ -518,7 +520,8 @@ There are two plausible designs:
 
 The standalone browser is the preferred first implementation. RabbitVCS has a
 standalone GTK SVN browser that can be used as reference material, but it should
-not be copied wholesale: it is SVN-focused and tied to RabbitVCS internals.
+not be copied wholesale: it is tightly coupled to RabbitVCS internals, its
+custom GTK helper classes, and `pysvn`.
 
 Using Nemo itself as the browser is an open research item. A normal Nemo
 extension can add menus, emblems, columns, and property pages, but it does not
@@ -530,15 +533,19 @@ is not already present in the working tree, NemoVCS would likely need one of:
 - a temporary materialized checkout/tree view,
 - or a simpler action that opens local working-tree paths in Nemo.
 
-For Git, the standalone browser should initially support:
+The first SVN-only browser should support:
 
-- browse tracked files at a revision,
-- choose branch/tag/commit,
-- open or export a file,
-- compare selected revision/path with working tree when applicable.
+- open from a working copy path by resolving its repository URL,
+- manually enter or paste an SVN repository URL,
+- choose HEAD or a numeric revision,
+- list directory contents using `svn list --xml`,
+- navigate into directories,
+- open or export selected files/directories through temporary materialization,
+- copy selected URLs,
+- start checkout/export/log actions from selected URLs.
 
-For SVN, a future backend could provide remote repository browsing similar to
-RabbitVCS' browser.
+Remote mutating operations such as repository mkdir, rename, delete, copy, and
+move should be deferred until the read-only browsing flow is solid.
 
 ## Future Status Daemon
 
