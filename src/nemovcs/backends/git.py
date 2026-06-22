@@ -70,6 +70,24 @@ class GitBackend:
     def diff_commands(self, paths: Sequence[str | Path]) -> list[git.GitResult]:
         return git.diff_commands(paths)
 
+    def commit(
+        self,
+        paths: Sequence[str | Path],
+        message: str | None,
+    ) -> list[git.GitResult]:
+        results: list[git.GitResult] = []
+        for root, relpaths in git.group_by_repo(paths or [Path.cwd()]).items():
+            add_result = git.run_git(root, ["add", "--", *relpaths])
+            results.append(add_result)
+            if not add_result.ok:
+                continue
+
+            commit_args = ["commit"]
+            if message:
+                commit_args.extend(["-m", message])
+            results.append(git.run_git(root, commit_args, timeout=3600))
+        return results
+
     def scan_status(self, root: str | Path) -> BackendStatusScan:
         result = git.run_git(root, ["status", "--porcelain=v2", "-z"])
         if not result.ok:

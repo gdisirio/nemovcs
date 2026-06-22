@@ -104,6 +104,14 @@ def diff_commands(paths: Sequence[str | Path]) -> list[Any]:
     return results
 
 
+def commit(paths: Sequence[str | Path], message: str | None) -> list[Any]:
+    selected_paths = paths or [Path.cwd()]
+    results: list[Any] = []
+    for backend in group_by_backend(selected_paths):
+        results.extend(backend.commit(selected_paths, message))
+    return results
+
+
 def current_branch(root: str | Path) -> str:
     backend = detect_backend(root)
     if backend is None:

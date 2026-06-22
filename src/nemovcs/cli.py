@@ -165,28 +165,11 @@ def cmd_push_dialog(args: argparse.Namespace) -> int:
 
 
 def cmd_commit(args: argparse.Namespace) -> int:
-    paths = args.paths or ["."]
-    grouped = git.group_by_repo(paths)
-    if not grouped:
+    results = backends.commit(args.paths, args.message)
+    if not results:
         print("not inside a Git working tree", file=sys.stderr)
         return 1
-
-    exit_code = 0
-    for root, relpaths in grouped.items():
-        add_result = git.run_git(root, ["add", "--", *relpaths])
-        if not add_result.ok:
-            _print_results([add_result])
-            exit_code = add_result.returncode or 1
-            continue
-
-        commit_args = ["commit"]
-        if args.message:
-            commit_args.extend(["-m", args.message])
-        result = git.run_git(root, commit_args, timeout=3600)
-        rc = _print_results([result])
-        if rc:
-            exit_code = rc
-    return exit_code
+    return _print_results(results)
 
 
 def cmd_commit_dialog(args: argparse.Namespace) -> int:

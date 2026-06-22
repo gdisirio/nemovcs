@@ -152,6 +152,18 @@ class BackendRegistryTest(unittest.TestCase):
 
         diff_commands.assert_called_once_with([root])
 
+    def test_commit_collects_results_from_matching_backend(self):
+        root = Path("/tmp/repo")
+        expected = object()
+
+        with mock.patch("nemovcs.git.group_by_repo", return_value={root: ["."]}), mock.patch(
+            "nemovcs.backends.git.GitBackend.commit",
+            return_value=[expected],
+        ) as commit:
+            self.assertEqual(backends.commit([root], "message"), [expected])
+
+        commit.assert_called_once_with([root], "message")
+
     def test_current_branch_uses_detected_backend(self):
         root = Path("/tmp/repo")
 
@@ -237,6 +249,39 @@ class BackendRegistryTest(unittest.TestCase):
 
         self.assertIs(result, expected)
         diff_commands.assert_called_once_with([Path("/tmp/repo")])
+
+    def test_git_backend_commit_stages_then_commits(self):
+        backend = GitBackend()
+        root = Path("/tmp/repo")
+        add_result = git.GitResult(("git",), root, 0, "", "")
+        commit_result = git.GitResult(("git",), root, 0, "", "")
+
+        with mock.patch("nemovcs.git.group_by_repo", return_value={root: ["src/app.py"]}), (
+            mock.patch("nemovcs.git.run_git", side_effect=[add_result, commit_result])
+        ) as run_git:
+            result = backend.commit([root / "src/app.py"], "message")
+
+        self.assertEqual(result, [add_result, commit_result])
+        self.assertEqual(
+            run_git.mock_calls,
+            [
+                mock.call(root, ["add", "--", "src/app.py"]),
+                mock.call(root, ["commit", "-m", "message"], timeout=3600),
+            ],
+        )
+
+    def test_git_backend_commit_stops_repository_after_failed_stage(self):
+        backend = GitBackend()
+        root = Path("/tmp/repo")
+        add_result = git.GitResult(("git",), root, 1, "", "failed")
+
+        with mock.patch("nemovcs.git.group_by_repo", return_value={root: ["src/app.py"]}), (
+            mock.patch("nemovcs.git.run_git", return_value=add_result)
+        ) as run_git:
+            result = backend.commit([root / "src/app.py"], "message")
+
+        self.assertEqual(result, [add_result])
+        run_git.assert_called_once_with(root, ["add", "--", "src/app.py"])
 
     def test_git_backend_builds_stage_phases(self):
         backend = GitBackend()

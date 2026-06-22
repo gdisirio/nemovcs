@@ -77,6 +77,12 @@ class Backend(Protocol):
 
     def diff_commands(self, paths: Sequence[str | Path]) -> list[Any]: ...
 
+    def commit(
+        self,
+        paths: Sequence[str | Path],
+        message: str | None,
+    ) -> list[Any]: ...
+
     def scan_status(self, root: str | Path) -> BackendStatusScan: ...
 
     def commit_items(

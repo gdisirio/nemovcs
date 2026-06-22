@@ -10,6 +10,7 @@ from nemovcs.cli import (
     build_parser,
     clone_target_visible,
     cmd_action_visible,
+    cmd_commit,
     cmd_diff,
     cmd_diff_dialog,
     cmd_log,
@@ -45,6 +46,10 @@ class FakeBackend:
 
     def diff_commands(self, paths):
         self.calls.append(("diff_commands", list(paths)))
+        return [self.result]
+
+    def commit(self, paths, message):
+        self.calls.append(("commit", list(paths), message))
         return [self.result]
 
     def update(self, paths):
@@ -190,6 +195,30 @@ class CliParserTest(unittest.TestCase):
 
         self.assertEqual(backend.calls, [("diff", ["/tmp/example"])])
         self.assertEqual(stdout.getvalue(), "ok\n")
+
+    def test_commit_uses_backend_registry(self):
+        parser = build_parser()
+        args = parser.parse_args(["commit", "-m", "message", "/tmp/example"])
+        backend = FakeBackend()
+
+        with mock.patch(
+            "nemovcs.cli.backends.group_by_backend",
+            return_value={backend: {Path("/tmp/example"): ["."]}},
+        ), mock.patch("sys.stdout", new=io.StringIO()) as stdout:
+            self.assertEqual(cmd_commit(args), 0)
+
+        self.assertEqual(backend.calls, [("commit", ["/tmp/example"], "message")])
+        self.assertEqual(stdout.getvalue(), "ok\n")
+
+    def test_commit_rejects_paths_outside_worktree(self):
+        parser = build_parser()
+        args = parser.parse_args(["commit", "-m", "message", "/tmp/example"])
+
+        with mock.patch("nemovcs.cli.backends.group_by_backend", return_value={}), mock.patch(
+            "sys.stderr",
+            new=io.StringIO(),
+        ):
+            self.assertEqual(cmd_commit(args), 1)
 
     def test_update_uses_backend_registry(self):
         parser = build_parser()
