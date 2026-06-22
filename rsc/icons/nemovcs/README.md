@@ -2,6 +2,10 @@
 
 These icons are temporary development assets derived from RabbitVCS icon assets.
 
+The default `normal`, `modified`, and `conflicted` emblems use a cropped
+`viewBox` so Nemo renders the overlay artwork larger. The `*-small.svg`
+variants keep the original full canvas for a future size/style setting.
+
 Observed source license:
 
 ```text
