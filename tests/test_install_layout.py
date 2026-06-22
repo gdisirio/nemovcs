@@ -22,31 +22,8 @@ class InstallLayoutTest(unittest.TestCase):
         self.assertEqual(layout[5]["uuid"], "nemovcs-svn-update.nemo_action")
         self.assertEqual(layout[6]["uuid"], "nemovcs-background-svn-update.nemo_action")
         self.assertEqual(layout[7]["uuid"], "nemovcs-svn-diff.nemo_action")
-        self.assertEqual(layout[8]["uuid"], "NemoVCS")
-        self.assertEqual(layout[8]["type"], "submenu")
-        self.assertEqual(layout[8]["user-label"], "NemoVCS")
-
-        child_uuids = [child["uuid"] for child in layout[8]["children"]]
-        self.assertEqual(
-            child_uuids[:9],
-            [
-                "nemovcs-clone.nemo_action",
-                "nemovcs-background-clone.nemo_action",
-                "nemovcs-svn-checkout.nemo_action",
-                "nemovcs-background-svn-checkout.nemo_action",
-                "nemovcs-stage.nemo_action",
-                "nemovcs-svn-add.nemo_action",
-                "nemovcs-revert.nemo_action",
-                "nemovcs-svn-revert.nemo_action",
-                "nemovcs-push.nemo_action",
-            ],
-        )
-        self.assertEqual(child_uuids[10], "separator")
-        self.assertNotIn("nemovcs-diff.nemo_action", child_uuids)
-        self.assertNotIn("nemovcs-svn-diff.nemo_action", child_uuids)
-        self.assertIn("nemovcs-status.nemo_action", child_uuids)
-        self.assertIn("nemovcs-settings.nemo_action", child_uuids)
-        self.assertIn("nemovcs-about.nemo_action", child_uuids)
+        self.assertEqual(len(layout), 8)
+        self.assertNotIn("NemoVCS", [node["uuid"] for node in layout])
 
     def test_normalize_separators_removes_duplicates_and_edges(self):
         nodes = [

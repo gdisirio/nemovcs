@@ -34,8 +34,13 @@ from gi.repository import GObject, Nemo
 from nemovcs.nemo_plugin import NemoVCSInfoProviderMixin
 
 
-class NemoVCS(NemoVCSInfoProviderMixin, Nemo.InfoProvider, GObject.GObject):
-    """InfoProvider for daemon-backed NemoVCS status emblems."""
+class NemoVCS(
+    NemoVCSInfoProviderMixin,
+    Nemo.InfoProvider,
+    Nemo.MenuProvider,
+    GObject.GObject,
+):
+    """Nemo provider for NemoVCS status emblems and context menus."""
 
     pass
 '''

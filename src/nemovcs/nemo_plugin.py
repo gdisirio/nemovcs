@@ -7,10 +7,13 @@ installs can point Nemo at this source tree without requiring pip install -e.
 from __future__ import annotations
 
 from collections import OrderedDict
+from dataclasses import dataclass
 import json
 import os
 from pathlib import Path
+import subprocess
 import time
+from typing import Sequence
 
 from . import status_client
 
@@ -22,6 +25,17 @@ PRIMARY_EMBLEMS = {
     "modified": "nemovcs-modified",
     "ok": "nemovcs-normal",
 }
+MENU_ICON = "nemovcs"
+
+
+@dataclass(frozen=True)
+class MenuActionSpec:
+    name: str
+    label: str
+    command: tuple[str, ...] = ()
+    tip: str = ""
+    icon: str = MENU_ICON
+    separator: bool = False
 
 
 class NemoVCSInfoProviderCore:
@@ -188,6 +202,29 @@ class NemoVCSInfoProviderCore:
         if self.diagnostics is not None:
             self.diagnostics.log(event, **fields)
 
+    def menu_paths(self, items) -> list[str]:
+        paths: list[str] = []
+        for item in items:
+            path = self.item_path(item)
+            if path is not None:
+                paths.append(path)
+        return paths
+
+    def submenu_specs(self, paths: Sequence[str | Path]) -> list[MenuActionSpec]:
+        normalized = [str(Path(path).resolve(strict=False)) for path in paths]
+        if not normalized:
+            return []
+
+        if all(is_clone_target(path) for path in normalized):
+            return clone_menu_specs(normalized)
+
+        backend_id = selected_backend_id(normalized)
+        if backend_id == "git":
+            return git_menu_specs(normalized)
+        if backend_id == "svn":
+            return svn_menu_specs(normalized)
+        return []
+
 
 class PluginDiagnostics:
     def __init__(self, path: str | Path):
@@ -219,6 +256,56 @@ class NemoVCSInfoProviderMixin:
 
         self.nemovcs_core.update_item(item)
         return Nemo.OperationResult.COMPLETE
+
+    def get_file_items(self, _window, items):
+        paths = self.nemovcs_core.menu_paths(items)
+        return self.nemovcs_menu_items(paths)
+
+    def get_background_items(self, _window, item):
+        path = self.nemovcs_core.item_path(item)
+        return self.nemovcs_menu_items([path] if path else [])
+
+    def nemovcs_menu_items(self, paths: Sequence[str]) -> list[object]:
+        specs = self.nemovcs_core.submenu_specs(paths)
+        if not specs:
+            return []
+
+        from gi.repository import Nemo
+
+        submenu_item = Nemo.MenuItem(
+            name="NemoVCS::Menu",
+            label="NemoVCS",
+            tip="NemoVCS actions",
+            icon=MENU_ICON,
+        )
+        submenu = Nemo.Menu()
+        submenu_item.set_submenu(submenu)
+
+        for spec in specs:
+            if spec.separator:
+                submenu.append_item(Nemo.MenuItem.new_separator(spec.name))
+                continue
+            item = Nemo.MenuItem(
+                name=spec.name,
+                label=spec.label,
+                tip=spec.tip,
+                icon=spec.icon,
+            )
+            item.connect("activate", self.on_menu_item_activate, spec.command)
+            submenu.append_item(item)
+
+        return [submenu_item]
+
+    def on_menu_item_activate(self, _item, command: Sequence[str]) -> None:
+        try:
+            subprocess.Popen(list(command))
+        except OSError as exc:
+            self.nemovcs_core.last_error = str(exc)
+            self.nemovcs_core.log(
+                "menu-spawn-error",
+                command=" ".join(command),
+                error=str(exc),
+            )
 
     def subscribe_status_changed(self) -> bool:
         try:
@@ -254,3 +341,72 @@ def subscribe_daemon_status_changed(callback):
 
 def primary_emblem(status: str) -> str | None:
     return PRIMARY_EMBLEMS.get(status)
+
+
+def selected_backend_id(paths: Sequence[str | Path]) -> str | None:
+    from . import backends
+
+    for backend in backends.registered_backends():
+        if all(backend.is_worktree(path) for path in paths):
+            return backend.id
+    return None
+
+
+def is_clone_target(path: str | Path) -> bool:
+    from . import backends
+
+    candidate = Path(path).expanduser()
+    if not candidate.is_absolute():
+        candidate = Path.cwd() / candidate
+    candidate = candidate.resolve(strict=False)
+    return candidate.is_dir() and backends.detect_backend(candidate) is None
+
+
+def git_menu_specs(paths: Sequence[str]) -> list[MenuActionSpec]:
+    return [
+        action("GitStage", "Stage...", ["stage-dialog", "--operation", "stage", *paths]),
+        action("GitRevert", "Revert...", ["revert-dialog", *paths]),
+        action("GitPush", "Push...", ["push-dialog", *paths]),
+        separator("GitSep1"),
+        action("GitStatus", "Status...", ["status-dialog", *paths]),
+        action("GitLog", "Log...", ["log-dialog", *paths]),
+        separator("GitSep2"),
+        action("GitSettings", "Settings...", ["settings-dialog"]),
+        action("GitAbout", "About...", ["about-dialog"]),
+    ]
+
+
+def svn_menu_specs(paths: Sequence[str]) -> list[MenuActionSpec]:
+    return [
+        action("SvnAdd", "Add...", ["stage-dialog", "--operation", "add", *paths]),
+        action("SvnRevert", "Revert...", ["revert-dialog", *paths]),
+        separator("SvnSep1"),
+        action("SvnStatus", "Status...", ["status-dialog", *paths]),
+        action("SvnLog", "Log...", ["log-dialog", *paths]),
+        separator("SvnSep2"),
+        action("SvnSettings", "Settings...", ["settings-dialog"]),
+        action("SvnAbout", "About...", ["about-dialog"]),
+    ]
+
+
+def clone_menu_specs(paths: Sequence[str]) -> list[MenuActionSpec]:
+    return [
+        action("GitClone", "Git Clone...", ["clone-dialog", "--vcs", "git", *paths]),
+        action("SvnCheckout", "SVN Checkout...", ["clone-dialog", "--vcs", "svn", *paths]),
+        separator("CloneSep1"),
+        action("CloneSettings", "Settings...", ["settings-dialog"]),
+        action("CloneAbout", "About...", ["about-dialog"]),
+    ]
+
+
+def action(name: str, label: str, args: Sequence[str]) -> MenuActionSpec:
+    return MenuActionSpec(
+        name=f"NemoVCS::{name}",
+        label=label,
+        command=("nemovcs", *args),
+        tip=label.removesuffix("..."),
+    )
+
+
+def separator(name: str) -> MenuActionSpec:
+    return MenuActionSpec(name=f"NemoVCS::{name}", label="", separator=True)

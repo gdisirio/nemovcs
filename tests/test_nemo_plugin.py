@@ -330,6 +330,86 @@ class NemoVCSInfoProviderCoreTest(unittest.TestCase):
         with mock.patch("pathlib.Path.open", side_effect=OSError("denied")):
             diagnostics.log("event")
 
+    def test_git_submenu_specs_use_existing_dialog_commands(self):
+        core = nemo_plugin.NemoVCSInfoProviderCore()
+
+        with mock.patch("nemovcs.nemo_plugin.is_clone_target", return_value=False), (
+            mock.patch("nemovcs.nemo_plugin.selected_backend_id", return_value="git")
+        ):
+            specs = core.submenu_specs(["/tmp/repo/src/app.py"])
+
+        commands = [spec.command for spec in specs if not spec.separator]
+        self.assertIn(
+            (
+                "nemovcs",
+                "stage-dialog",
+                "--operation",
+                "stage",
+                "/tmp/repo/src/app.py",
+            ),
+            commands,
+        )
+        self.assertIn(
+            ("nemovcs", "revert-dialog", "/tmp/repo/src/app.py"),
+            commands,
+        )
+        self.assertIn(
+            ("nemovcs", "push-dialog", "/tmp/repo/src/app.py"),
+            commands,
+        )
+
+    def test_svn_submenu_specs_use_existing_dialog_commands(self):
+        core = nemo_plugin.NemoVCSInfoProviderCore()
+
+        with mock.patch("nemovcs.nemo_plugin.is_clone_target", return_value=False), (
+            mock.patch("nemovcs.nemo_plugin.selected_backend_id", return_value="svn")
+        ):
+            specs = core.submenu_specs(["/tmp/wc/tracked.c"])
+
+        commands = [spec.command for spec in specs if not spec.separator]
+        self.assertIn(
+            (
+                "nemovcs",
+                "stage-dialog",
+                "--operation",
+                "add",
+                "/tmp/wc/tracked.c",
+            ),
+            commands,
+        )
+        self.assertIn(
+            ("nemovcs", "revert-dialog", "/tmp/wc/tracked.c"),
+            commands,
+        )
+        self.assertNotIn(
+            ("nemovcs", "push-dialog", "/tmp/wc/tracked.c"),
+            commands,
+        )
+
+    def test_clone_submenu_specs_offer_git_clone_and_svn_checkout(self):
+        core = nemo_plugin.NemoVCSInfoProviderCore()
+
+        with mock.patch("nemovcs.nemo_plugin.is_clone_target", return_value=True):
+            specs = core.submenu_specs(["/tmp/target"])
+
+        commands = [spec.command for spec in specs if not spec.separator]
+        self.assertIn(
+            ("nemovcs", "clone-dialog", "--vcs", "git", "/tmp/target"),
+            commands,
+        )
+        self.assertIn(
+            ("nemovcs", "clone-dialog", "--vcs", "svn", "/tmp/target"),
+            commands,
+        )
+
+    def test_mixed_or_unknown_backend_has_no_submenu_specs(self):
+        core = nemo_plugin.NemoVCSInfoProviderCore()
+
+        with mock.patch("nemovcs.nemo_plugin.is_clone_target", return_value=False), (
+            mock.patch("nemovcs.nemo_plugin.selected_backend_id", return_value=None)
+        ):
+            self.assertEqual(core.submenu_specs(["/tmp/path"]), [])
+
 
 if __name__ == "__main__":
     unittest.main()

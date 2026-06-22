@@ -189,13 +189,6 @@ def load_layout(path: Path) -> dict[str, object]:
 def build_nemovcs_layout() -> list[dict[str, object]]:
     return [
         *(action_node(name) for name in TOP_LEVEL_ACTIONS),
-        submenu_node(
-            "NemoVCS",
-            [
-                separator_node() if name == "separator" else action_node(name)
-                for name in SUBMENU_ACTIONS
-            ],
-        ),
     ]
 
 
