@@ -104,3 +104,27 @@ def commit_phases(
     if backend is None:
         return []
     return backend.commit_phases(root, relpaths, message)
+
+
+def log_phases(paths: Sequence[str | Path], limit: int) -> list[BackendCommandPhase]:
+    selected_paths = paths or [Path.cwd()]
+    phases: list[BackendCommandPhase] = []
+    for backend, grouped_paths in group_by_backend(selected_paths).items():
+        phases.extend(backend.log_phases(grouped_paths, limit))
+    return phases
+
+
+def update_phases(paths: Sequence[str | Path]) -> list[BackendCommandPhase]:
+    selected_paths = paths or [Path.cwd()]
+    phases: list[BackendCommandPhase] = []
+    for backend, grouped_paths in group_by_backend(selected_paths).items():
+        phases.extend(backend.update_phases(grouped_paths))
+    return phases
+
+
+def push_phases(paths: Sequence[str | Path]) -> list[BackendCommandPhase]:
+    selected_paths = paths or [Path.cwd()]
+    phases: list[BackendCommandPhase] = []
+    for backend, grouped_paths in group_by_backend(selected_paths).items():
+        phases.extend(backend.push_phases(grouped_paths))
+    return phases

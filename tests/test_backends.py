@@ -203,6 +203,39 @@ class BackendRegistryTest(unittest.TestCase):
             ),
         )
 
+    def test_git_backend_builds_log_phases(self):
+        backend = GitBackend()
+        root = Path("/tmp/repo")
+
+        phases = backend.log_phases({root: ["src/app.py"]}, 7)
+
+        self.assertEqual(len(phases), 1)
+        self.assertEqual(phases[0].title, "Log repo")
+        self.assertEqual(
+            phases[0].command,
+            (
+                "git",
+                "-C",
+                str(root),
+                "log",
+                "--oneline",
+                "--decorate",
+                "-n7",
+                "--",
+                "src/app.py",
+            ),
+        )
+
+    def test_git_backend_builds_update_and_push_phases(self):
+        backend = GitBackend()
+        root = Path("/tmp/repo")
+
+        update = backend.update_phases({root: ["src/app.py"]})
+        push = backend.push_phases({root: ["src/app.py"]})
+
+        self.assertEqual(update[0].command, ("git", "-C", str(root), "pull", "--ff-only"))
+        self.assertEqual(push[0].command, ("git", "-C", str(root), "push"))
+
     def test_git_backend_translates_commit_items(self):
         backend = GitBackend()
         root = Path("/tmp/repo")

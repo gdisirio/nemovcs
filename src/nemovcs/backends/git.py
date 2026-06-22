@@ -130,6 +130,38 @@ class GitBackend:
             ),
         ]
 
+    def log_phases(
+        self,
+        grouped_paths: dict[Path, list[str]],
+        limit: int,
+    ) -> list[BackendCommandPhase]:
+        return [
+            self._git_phase(
+                f"Log {root.name}",
+                root,
+                ["log", "--oneline", "--decorate", f"-n{limit}", "--", *relpaths],
+            )
+            for root, relpaths in grouped_paths.items()
+        ]
+
+    def update_phases(
+        self,
+        grouped_paths: dict[Path, list[str]],
+    ) -> list[BackendCommandPhase]:
+        return [
+            self._git_phase(f"Update {root.name}", root, ["pull", "--ff-only"])
+            for root in grouped_paths
+        ]
+
+    def push_phases(
+        self,
+        grouped_paths: dict[Path, list[str]],
+    ) -> list[BackendCommandPhase]:
+        return [
+            self._git_phase(f"Push {root.name}", root, ["push"])
+            for root in grouped_paths
+        ]
+
     def update(self, paths: Sequence[str | Path]) -> list[git.GitResult]:
         return git.update(paths)
 

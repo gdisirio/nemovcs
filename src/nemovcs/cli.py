@@ -115,17 +115,7 @@ def cmd_log(args: argparse.Namespace) -> int:
 
 
 def log_phases(paths: Sequence[str], limit: int):
-    from .ui import logger
-
-    grouped = git.group_by_repo(paths or [Path.cwd()])
-    return [
-        logger.CommandPhase.git(
-            f"Log {root.name}",
-            root,
-            ["log", "--oneline", "--decorate", f"-n{limit}", "--", *relpaths],
-        )
-        for root, relpaths in grouped.items()
-    ]
+    return backends.log_phases(paths, limit)
 
 
 def cmd_log_dialog(args: argparse.Namespace) -> int:
@@ -143,13 +133,7 @@ def cmd_update(args: argparse.Namespace) -> int:
 
 
 def update_phases(paths: Sequence[str]):
-    from .ui import logger
-
-    grouped = git.group_by_repo(paths or [Path.cwd()])
-    return [
-        logger.CommandPhase.git(f"Update {root.name}", root, ["pull", "--ff-only"])
-        for root in grouped
-    ]
+    return backends.update_phases(paths)
 
 
 def cmd_update_dialog(args: argparse.Namespace) -> int:
@@ -167,13 +151,7 @@ def cmd_push(args: argparse.Namespace) -> int:
 
 
 def push_phases(paths: Sequence[str]):
-    from .ui import logger
-
-    grouped = git.group_by_repo(paths or [Path.cwd()])
-    return [
-        logger.CommandPhase.git(f"Push {root.name}", root, ["push"])
-        for root in grouped
-    ]
+    return backends.push_phases(paths)
 
 
 def cmd_push_dialog(args: argparse.Namespace) -> int:

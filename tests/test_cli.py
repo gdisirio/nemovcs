@@ -16,6 +16,7 @@ from nemovcs.cli import (
     cmd_update,
     log_phases,
     push_phases,
+    update_phases,
 )
 
 
@@ -236,6 +237,21 @@ class CliParserTest(unittest.TestCase):
         self.assertEqual(
             phases[0].command,
             ("git", "-C", str(root), "push"),
+        )
+
+    def test_update_phases_pull_each_grouped_repository(self):
+        root = Path("/tmp/example")
+
+        with mock.patch("nemovcs.cli.git.group_by_repo") as group_by_repo:
+            group_by_repo.return_value = {root: ["src/app.py"]}
+            phases = update_phases(["/tmp/example/src/app.py"])
+
+        self.assertEqual(len(phases), 1)
+        self.assertEqual(phases[0].title, "Update example")
+        self.assertEqual(phases[0].cwd, root)
+        self.assertEqual(
+            phases[0].command,
+            ("git", "-C", str(root), "pull", "--ff-only"),
         )
 
     def test_settings_and_about_parse(self):

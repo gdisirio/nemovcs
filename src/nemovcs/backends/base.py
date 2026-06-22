@@ -92,6 +92,22 @@ class Backend(Protocol):
         message: str,
     ) -> list[BackendCommandPhase]: ...
 
+    def log_phases(
+        self,
+        grouped_paths: dict[Path, list[str]],
+        limit: int,
+    ) -> list[BackendCommandPhase]: ...
+
+    def update_phases(
+        self,
+        grouped_paths: dict[Path, list[str]],
+    ) -> list[BackendCommandPhase]: ...
+
+    def push_phases(
+        self,
+        grouped_paths: dict[Path, list[str]],
+    ) -> list[BackendCommandPhase]: ...
+
     def update(self, paths: Sequence[str | Path]) -> list[Any]: ...
 
     def push(self, paths: Sequence[str | Path]) -> list[Any]: ...
