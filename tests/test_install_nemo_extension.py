@@ -42,7 +42,7 @@ class InstallNemoExtensionTest(unittest.TestCase):
                     / "hicolor"
                     / "scalable"
                     / "emblems"
-                    / "emblem-rabbitvcs-modified.svg"
+                    / "emblem-nemovcs-modified.svg"
                 ).exists()
             )
             self.assertTrue(
@@ -52,7 +52,7 @@ class InstallNemoExtensionTest(unittest.TestCase):
                     / "hicolor"
                     / "scalable"
                     / "emblems"
-                    / "emblem-rabbitvcs-conflicted.svg"
+                    / "emblem-nemovcs-conflicted.svg"
                 ).exists()
             )
             self.assertTrue(
@@ -62,7 +62,7 @@ class InstallNemoExtensionTest(unittest.TestCase):
                     / "hicolor"
                     / "scalable"
                     / "emblems"
-                    / "emblem-rabbitvcs-normal.svg"
+                    / "emblem-nemovcs-normal.svg"
                 ).exists()
             )
 

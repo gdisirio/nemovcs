@@ -28,9 +28,9 @@ ACTION_FILES = {
 }
 BUS_NAME = "io.github.gdisirio.NemoVCS.Statusd"
 EMBLEM_ICONS = {
-    "emblem-rabbitvcs-conflicted.svg",
-    "emblem-rabbitvcs-modified.svg",
-    "emblem-rabbitvcs-normal.svg",
+    "emblem-nemovcs-conflicted.svg",
+    "emblem-nemovcs-modified.svg",
+    "emblem-nemovcs-normal.svg",
 }
 
 

@@ -2,7 +2,7 @@
 Name=Update...
 Comment=Update this Git repository
 Exec=nemovcs update-dialog %P
-Icon-Name=<nemovcs-icons/rabbitvcs/actions/rabbitvcs-update.svg>
+Icon-Name=<nemovcs-icons/nemovcs/actions/nemovcs-update.svg>
 Selection=none
 Extensions=any;
 Dependencies=git;nemovcs;

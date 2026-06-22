@@ -2,7 +2,7 @@
 Name=Settings...
 Comment=Show NemoVCS settings
 Exec=nemovcs settings-dialog
-Icon-Name=<nemovcs-icons/rabbitvcs/actions/rabbitvcs-settings.svg>
+Icon-Name=<nemovcs-icons/nemovcs/actions/nemovcs-settings.svg>
 Selection=none
 Extensions=any;
 Dependencies=git;nemovcs;

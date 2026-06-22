@@ -25,15 +25,15 @@ COL_PATH = 3
 COL_OLD_PATH = 4
 COL_ITEM = 5
 ICON_SIZE = 20
-RESOURCE_ROOT = Path(__file__).resolve().parents[3] / "rsc" / "icons" / "rabbitvcs"
+RESOURCE_ROOT = Path(__file__).resolve().parents[3] / "rsc" / "icons" / "nemovcs"
 STATUS_ICON_NAMES = {
-    "added": "emblem-rabbitvcs-added.svg",
-    "changed": "emblem-rabbitvcs-modified.svg",
-    "conflicted": "emblem-rabbitvcs-conflicted.svg",
-    "deleted": "emblem-rabbitvcs-deleted.svg",
-    "modified": "emblem-rabbitvcs-modified.svg",
-    "renamed": "emblem-rabbitvcs-modified.svg",
-    "untracked": "emblem-rabbitvcs-unversioned.svg",
+    "added": "emblem-nemovcs-added.svg",
+    "changed": "emblem-nemovcs-modified.svg",
+    "conflicted": "emblem-nemovcs-conflicted.svg",
+    "deleted": "emblem-nemovcs-deleted.svg",
+    "modified": "emblem-nemovcs-modified.svg",
+    "renamed": "emblem-nemovcs-modified.svg",
+    "untracked": "emblem-nemovcs-unversioned.svg",
 }
 
 
@@ -259,7 +259,7 @@ class StatusDialog(Gtk.Window):
                 "Diff with Meld",
                 self.on_context_diff,
                 None,
-                RESOURCE_ROOT / "actions" / "rabbitvcs-diff.svg",
+                RESOURCE_ROOT / "actions" / "nemovcs-diff.svg",
             ),
             ("Open File", self.on_context_open, "document-open-symbolic", None),
             (
@@ -377,7 +377,7 @@ class StatusDialog(Gtk.Window):
 
     def status_icon(self, status: str) -> GdkPixbuf.Pixbuf | None:
         if status not in self.status_icon_cache:
-            icon_name = STATUS_ICON_NAMES.get(status, "emblem-rabbitvcs-modified.svg")
+            icon_name = STATUS_ICON_NAMES.get(status, "emblem-nemovcs-modified.svg")
             icon_path = RESOURCE_ROOT / "emblems" / icon_name
             try:
                 self.status_icon_cache[status] = GdkPixbuf.Pixbuf.new_from_file_at_size(

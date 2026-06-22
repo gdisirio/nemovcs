@@ -2,7 +2,7 @@
 Name=Stage...
 Comment=Open the NemoVCS stage dialog
 Exec=nemovcs stage-dialog %F
-Icon-Name=<nemovcs-icons/rabbitvcs/actions/rabbitvcs-commit.svg>
+Icon-Name=<nemovcs-icons/nemovcs/actions/nemovcs-commit.svg>
 Selection=notnone
 Extensions=any;
 Dependencies=git;nemovcs;

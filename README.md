@@ -152,8 +152,6 @@ python3 -m pip install -e .
 
 ## Notes
 
-RabbitVCS is useful reference material, but NemoVCS is a new project.
-
-Temporary icons are currently derived from RabbitVCS assets. They should be
-replaced with NemoVCS-native icons or clearly documented upstream assets before
-a broader release.
+Temporary icons are currently derived from RabbitVCS assets under GPL-2.0. They
+should be replaced with NemoVCS-native icons or kept with complete attribution
+before a broader release.

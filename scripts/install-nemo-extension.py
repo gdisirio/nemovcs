@@ -10,9 +10,9 @@ from pathlib import Path
 
 EXTENSION_NAME = "NemoVCS.py"
 EMBLEM_ICON_NAMES = [
-    "emblem-rabbitvcs-conflicted.svg",
-    "emblem-rabbitvcs-modified.svg",
-    "emblem-rabbitvcs-normal.svg",
+    "emblem-nemovcs-conflicted.svg",
+    "emblem-nemovcs-modified.svg",
+    "emblem-nemovcs-normal.svg",
 ]
 
 
@@ -54,7 +54,7 @@ def icon_target_dir(data_home: Path | None = None) -> Path:
 
 
 def install_icons(repo_root: Path, data_home: Path | None = None) -> list[Path]:
-    source_dir = repo_root / "rsc" / "icons" / "rabbitvcs" / "emblems"
+    source_dir = repo_root / "rsc" / "icons" / "nemovcs" / "emblems"
     target = icon_target_dir(data_home)
     target.mkdir(parents=True, exist_ok=True)
 

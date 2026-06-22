@@ -1,25 +1,6 @@
-# Temporary RabbitVCS Icons
+# Temporary Icon Assets
 
-These icons were copied from the local `rabbitvcs-ng` fork as temporary
-development assets.
-
-Source tree:
-
-```text
-/home/giovanni/Projects/personal-github/rabbitvcs-ng/data/icons/hicolor/scalable
-```
-
-The local working reference tree for this session is:
-
-```text
-/home/giovanni/Projects/personal/rabbitvcs-ng/data/icons/hicolor/scalable
-```
-
-Upstream project:
-
-```text
-RabbitVCS
-```
+These icons are temporary development assets derived from RabbitVCS icon assets.
 
 Observed source license:
 

@@ -2,7 +2,7 @@
 Name=Status...
 Comment=Show Git status for this folder
 Exec=nemovcs status-dialog %P
-Icon-Name=<nemovcs-icons/rabbitvcs/apps/rabbitvcs.svg>
+Icon-Name=<nemovcs-icons/nemovcs/apps/nemovcs.svg>
 Selection=none
 Extensions=any;
 Dependencies=git;nemovcs;

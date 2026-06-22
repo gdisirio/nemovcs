@@ -2,7 +2,7 @@
 Name=About...
 Comment=Show NemoVCS information
 Exec=nemovcs about-dialog
-Icon-Name=<nemovcs-icons/rabbitvcs/actions/rabbitvcs-about.svg>
+Icon-Name=<nemovcs-icons/nemovcs/actions/nemovcs-about.svg>
 Selection=notnone
 Extensions=any;
 Dependencies=git;nemovcs;

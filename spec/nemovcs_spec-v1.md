@@ -380,8 +380,8 @@ v1 actions can use `Terminal=true`. Actions that have moved to the GTK logger
 should use `Terminal=false`.
 
 Menu items that open a terminal or future dialog should use an ellipsis in their
-label. The early prototype uses temporary RabbitVCS icons stored under
-`rsc/icons/rabbitvcs`; these assets must be replaced or license-cleared before a
+label. The early prototype uses temporary third-party icons stored under
+`rsc/icons/nemovcs`; these assets must be replaced or license-cleared before a
 proper release.
 
 ## Error Handling
@@ -824,10 +824,10 @@ Goal: show one primary emblem in Nemo from cached daemon state.
 
 Implementation:
 
-- Map cached `modified` status to the temporary `rabbitvcs-modified` emblem.
-- Map cached `conflicted` status to the temporary `rabbitvcs-conflicted`
+- Map cached `modified` status to the temporary `nemovcs-modified` emblem.
+- Map cached `conflicted` status to the temporary `nemovcs-conflicted`
   emblem.
-- Map cached `ok` status to the temporary `rabbitvcs-normal` emblem.
+- Map cached `ok` status to the temporary `nemovcs-normal` emblem.
 - Render no emblem for `loading`, `stale`, or `error` in this first pass.
 - Install the temporary ok/modified/conflict emblem SVGs into the user's hicolor
   icon theme so `NemoVCS.py` can call `item.add_emblem()` with normal emblem

@@ -27,8 +27,8 @@ class UninstallTest(unittest.TestCase):
             for name in uninstall.ACTION_FILES:
                 (actions / name).write_text("[Nemo Action]\n", encoding="utf-8")
             (actions / "other.nemo_action").write_text("[Nemo Action]\n", encoding="utf-8")
-            (actions / "nemovcs-icons" / "rabbitvcs").mkdir(parents=True)
-            (actions / "nemovcs-icons" / "rabbitvcs" / "icon.svg").write_text(
+            (actions / "nemovcs-icons" / "nemovcs").mkdir(parents=True)
+            (actions / "nemovcs-icons" / "nemovcs" / "icon.svg").write_text(
                 "icon",
                 encoding="utf-8",
             )

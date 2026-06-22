@@ -2,7 +2,7 @@
 Name=Commit...
 Comment=Open the NemoVCS commit dialog
 Exec=nemovcs commit-dialog %F
-Icon-Name=<nemovcs-icons/rabbitvcs/actions/rabbitvcs-commit.svg>
+Icon-Name=<nemovcs-icons/nemovcs/actions/nemovcs-commit.svg>
 Selection=notnone
 Extensions=any;
 Dependencies=git;nemovcs;

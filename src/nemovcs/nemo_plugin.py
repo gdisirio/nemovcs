@@ -18,9 +18,9 @@ from . import status_client
 DEFAULT_MAX_VISIBLE_ITEMS = 2048
 
 PRIMARY_EMBLEMS = {
-    "conflicted": "rabbitvcs-conflicted",
-    "modified": "rabbitvcs-modified",
-    "ok": "rabbitvcs-normal",
+    "conflicted": "nemovcs-conflicted",
+    "modified": "nemovcs-modified",
+    "ok": "nemovcs-normal",
 }
 
 
