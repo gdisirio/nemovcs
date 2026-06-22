@@ -1,11 +1,11 @@
 [Nemo Action]
 Name=About...
 Comment=Show NemoVCS information
-Exec=nemovcs run-terminal about
+Exec=nemovcs about-dialog
 Icon-Name=<nemovcs-icons/rabbitvcs/actions/rabbitvcs-about.svg>
 Selection=notnone
 Extensions=any;
 Dependencies=git;nemovcs;
 UriScheme=file
 Conditions=exec nemovcs action-visible inside-worktree %F
-Terminal=true
+Terminal=false

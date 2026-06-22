@@ -350,6 +350,30 @@ def diff(paths: Sequence[str | Path]) -> list[GitResult]:
     return results
 
 
+def diff_commands(paths: Sequence[str | Path]) -> list[GitResult]:
+    """Return Git difftool commands for selected paths without running them."""
+
+    grouped = group_by_repo(paths or [Path.cwd()])
+    results: list[GitResult] = []
+    for root, relpaths in grouped.items():
+        args = [
+            "difftool",
+            "--tool=meld",
+            "--dir-diff",
+            "--no-prompt",
+            "--",
+            *relpaths,
+        ]
+        command = ("git", "-C", str(root), *args)
+        if shutil.which("meld") is None:
+            results.append(
+                GitResult(command, root, 127, "", f"{MELD_MISSING_MESSAGE}\n")
+            )
+            continue
+        results.append(GitResult(command, root, 0, "", ""))
+    return results
+
+
 def update(paths: Sequence[str | Path]) -> list[GitResult]:
     grouped = group_by_repo(paths or [Path.cwd()])
     results: list[GitResult] = []

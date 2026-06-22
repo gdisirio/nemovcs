@@ -42,12 +42,70 @@ def cmd_status(args: argparse.Namespace) -> int:
     return _print_results(git.status(args.paths))
 
 
+def cmd_status_dialog(args: argparse.Namespace) -> int:
+    from .ui import status_dialog
+
+    if not git.group_by_repo(args.paths or [Path.cwd()]):
+        print("not inside a Git working tree", file=sys.stderr)
+        return 1
+    return status_dialog.run(args.paths or ["."])
+
+
 def cmd_diff(args: argparse.Namespace) -> int:
     return _print_results(git.diff(args.paths))
 
 
+def cmd_diff_dialog(args: argparse.Namespace) -> int:
+    from .ui import info_dialog
+
+    commands = git.diff_commands(args.paths)
+    if not commands:
+        print("not inside a Git working tree", file=sys.stderr)
+        return 1
+
+    exit_code = 0
+    for command in commands:
+        if not command.ok:
+            info_dialog.show_error(
+                "Unable to open diff",
+                command.stderr.strip() or "Git difftool command could not be built.",
+            )
+            exit_code = command.returncode or 1
+            continue
+        try:
+            subprocess.Popen(command.args, cwd=str(command.cwd))
+        except OSError as exc:
+            info_dialog.show_error("Unable to open diff", str(exc))
+            exit_code = 127
+    return exit_code
+
+
 def cmd_log(args: argparse.Namespace) -> int:
     return _print_results(git.log(args.paths, limit=args.limit))
+
+
+def log_phases(paths: Sequence[str], limit: int):
+    from .ui import logger
+
+    grouped = git.group_by_repo(paths or [Path.cwd()])
+    return [
+        logger.CommandPhase.git(
+            f"Log {root.name}",
+            root,
+            ["log", "--oneline", "--decorate", f"-n{limit}", "--", *relpaths],
+        )
+        for root, relpaths in grouped.items()
+    ]
+
+
+def cmd_log_dialog(args: argparse.Namespace) -> int:
+    from .ui import logger
+
+    phases = log_phases(args.paths, args.limit)
+    if not phases:
+        print("not inside a Git working tree", file=sys.stderr)
+        return 1
+    return logger.run("Log", phases)
 
 
 def cmd_update(args: argparse.Namespace) -> int:
@@ -111,11 +169,23 @@ def cmd_settings(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_settings_dialog(args: argparse.Namespace) -> int:
+    from .ui import info_dialog
+
+    return info_dialog.run_settings_placeholder()
+
+
 def cmd_about(args: argparse.Namespace) -> int:
     print(f"NemoVCS {__version__}")
     print("Git integration for the Nemo file manager.")
     print("Project: https://github.com/gdisirio/nemovcs")
     return 0
+
+
+def cmd_about_dialog(args: argparse.Namespace) -> int:
+    from .ui import info_dialog
+
+    return info_dialog.run_about()
 
 
 def cmd_run_terminal(args: argparse.Namespace) -> int:
@@ -152,14 +222,30 @@ def build_parser() -> argparse.ArgumentParser:
     status.add_argument("paths", nargs="*")
     status.set_defaults(func=cmd_status)
 
+    status_dialog = subparsers.add_parser(
+        "status-dialog",
+        help="show Git status in a GTK dialog",
+    )
+    status_dialog.add_argument("paths", nargs="*")
+    status_dialog.set_defaults(func=cmd_status_dialog)
+
     diff = subparsers.add_parser("diff", help="show Git diff")
     diff.add_argument("paths", nargs="*")
     diff.set_defaults(func=cmd_diff)
+
+    diff_dialog = subparsers.add_parser("diff-dialog", help="show Git diff in Meld")
+    diff_dialog.add_argument("paths", nargs="*")
+    diff_dialog.set_defaults(func=cmd_diff_dialog)
 
     log = subparsers.add_parser("log", help="show Git log")
     log.add_argument("-n", "--limit", type=int, default=50)
     log.add_argument("paths", nargs="*")
     log.set_defaults(func=cmd_log)
+
+    log_dialog = subparsers.add_parser("log-dialog", help="show Git log in a GTK logger")
+    log_dialog.add_argument("-n", "--limit", type=int, default=50)
+    log_dialog.add_argument("paths", nargs="*")
+    log_dialog.set_defaults(func=cmd_log_dialog)
 
     update = subparsers.add_parser("update", help="update the current Git repository")
     update.add_argument("paths", nargs="*")
@@ -187,8 +273,20 @@ def build_parser() -> argparse.ArgumentParser:
     settings = subparsers.add_parser("settings", help="show NemoVCS settings")
     settings.set_defaults(func=cmd_settings)
 
+    settings_dialog = subparsers.add_parser(
+        "settings-dialog",
+        help="show NemoVCS settings in a GTK dialog",
+    )
+    settings_dialog.set_defaults(func=cmd_settings_dialog)
+
     about = subparsers.add_parser("about", help="show NemoVCS information")
     about.set_defaults(func=cmd_about)
+
+    about_dialog = subparsers.add_parser(
+        "about-dialog",
+        help="show NemoVCS information in a GTK dialog",
+    )
+    about_dialog.set_defaults(func=cmd_about_dialog)
 
     run_terminal = subparsers.add_parser(
         "run-terminal",

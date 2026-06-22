@@ -121,6 +121,37 @@ class GitHelpersTest(unittest.TestCase):
         self.assertEqual(results[0].returncode, 127)
         self.assertIn(git.MELD_MISSING_MESSAGE, results[0].stderr)
 
+    def test_diff_commands_builds_meld_difftool_command(self):
+        with mock.patch("nemovcs.git.group_by_repo") as group_by_repo:
+            group_by_repo.return_value = {self.root: ["tracked.txt"]}
+            with mock.patch("nemovcs.git.shutil.which", return_value="/usr/bin/meld"):
+                results = git.diff_commands([self.root / "tracked.txt"])
+
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0].returncode, 0)
+        self.assertEqual(
+            results[0].args,
+            (
+                "git",
+                "-C",
+                str(self.root),
+                "difftool",
+                "--tool=meld",
+                "--dir-diff",
+                "--no-prompt",
+                "--",
+                "tracked.txt",
+            ),
+        )
+
+    def test_diff_commands_reports_missing_meld(self):
+        with mock.patch("nemovcs.git.shutil.which", return_value=None):
+            results = git.diff_commands([self.root])
+
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0].returncode, 127)
+        self.assertIn(git.MELD_MISSING_MESSAGE, results[0].stderr)
+
     def test_commit_paths_commits_explicit_paths(self):
         path = self.root / "tracked.txt"
         path.write_text("old\n", encoding="utf-8")

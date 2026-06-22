@@ -1,11 +1,11 @@
 [Nemo Action]
 Name=Diff...
 Comment=Open Git diff for the selected path in Meld
-Exec=nemovcs run-terminal diff %F
+Exec=nemovcs diff-dialog %F
 Icon-Name=<nemovcs-icons/rabbitvcs/actions/rabbitvcs-diff.svg>
 Selection=notnone
 Extensions=any;
 Dependencies=git;nemovcs;meld;
 UriScheme=file
 Conditions=exec nemovcs action-visible inside-worktree %F
-Terminal=true
+Terminal=false
