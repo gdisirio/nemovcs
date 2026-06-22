@@ -1,5 +1,6 @@
 from pathlib import Path
 import unittest
+from unittest import mock
 
 from nemovcs.backends.base import BackendChangeItem
 from nemovcs.ui.stage_dialog import StageDialog, stage_phases
@@ -10,12 +11,13 @@ class StageDialogCommandTest(unittest.TestCase):
         root = Path("/tmp/example")
         other_root = Path("/tmp/other")
 
-        phases = stage_phases(
-            {
-                root: ["src/app.py", "README.md"],
-                other_root: ["lib/tool.py"],
-            }
-        )
+        with mock.patch("nemovcs.git.is_inside_worktree", return_value=True):
+            phases = stage_phases(
+                {
+                    root: ["src/app.py", "README.md"],
+                    other_root: ["lib/tool.py"],
+                }
+            )
 
         self.assertEqual([phase.title for phase in phases], ["Stage example", "Stage other"])
         self.assertEqual(
@@ -30,7 +32,8 @@ class StageDialogCommandTest(unittest.TestCase):
     def test_stage_phases_skip_empty_repositories(self):
         root = Path("/tmp/example")
 
-        self.assertEqual(stage_phases({root: []}), [])
+        with mock.patch("nemovcs.git.is_inside_worktree", return_value=True):
+            self.assertEqual(stage_phases({root: []}), [])
 
     def test_default_selection_includes_untracked_but_excludes_conflicted(self):
         root = Path("/tmp/example")

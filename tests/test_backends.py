@@ -6,6 +6,7 @@ from nemovcs import backends
 from nemovcs import git
 from nemovcs.backends.base import (
     BackendChangeItem,
+    BackendCommandPhase,
     BackendStatusItem,
     BackendWorktreeIdentity,
 )
@@ -104,6 +105,22 @@ class BackendRegistryTest(unittest.TestCase):
 
         current_branch.assert_called_once_with(root)
 
+    def test_stage_phases_uses_detected_backend(self):
+        root = Path("/tmp/repo")
+        phase = BackendCommandPhase(
+            title="Stage repo",
+            cwd=root,
+            command=("fake", "stage"),
+        )
+
+        with mock.patch("nemovcs.git.is_inside_worktree", return_value=True), mock.patch(
+            "nemovcs.backends.git.GitBackend.stage_phases",
+            return_value=[phase],
+        ) as stage_phases:
+            self.assertEqual(backends.stage_phases({root: ["src/app.py"]}), [phase])
+
+        stage_phases.assert_called_once_with({root: ["src/app.py"]})
+
     def test_git_backend_delegates_status_to_existing_git_helpers(self):
         backend = GitBackend()
         expected = object()
@@ -113,6 +130,31 @@ class BackendRegistryTest(unittest.TestCase):
 
         self.assertIs(result, expected)
         status.assert_called_once_with([Path("/tmp/repo")])
+
+    def test_git_backend_builds_stage_phases(self):
+        backend = GitBackend()
+        root = Path("/tmp/repo")
+
+        phases = backend.stage_phases({root: ["src/app.py", "README.md"]})
+
+        self.assertEqual(
+            phases,
+            [
+                BackendCommandPhase(
+                    title="Stage repo",
+                    cwd=root,
+                    command=(
+                        "git",
+                        "-C",
+                        str(root),
+                        "add",
+                        "--",
+                        "src/app.py",
+                        "README.md",
+                    ),
+                )
+            ],
+        )
 
     def test_git_backend_translates_commit_items(self):
         backend = GitBackend()

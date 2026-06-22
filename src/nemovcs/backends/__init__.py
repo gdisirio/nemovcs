@@ -5,7 +5,12 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Iterable, Sequence
 
-from .base import Backend, BackendChangeItem, BackendWorktreeIdentity
+from .base import (
+    Backend,
+    BackendChangeItem,
+    BackendCommandPhase,
+    BackendWorktreeIdentity,
+)
 from .git import GitBackend
 
 
@@ -72,3 +77,17 @@ def current_branch(root: str | Path) -> str:
     if backend is None:
         return "unknown"
     return backend.current_branch(root)
+
+
+def stage_phases(
+    paths_by_root: dict[Path, Sequence[str]],
+) -> list[BackendCommandPhase]:
+    phases: list[BackendCommandPhase] = []
+    for root, relpaths in paths_by_root.items():
+        if not relpaths:
+            continue
+        backend = detect_backend(root)
+        if backend is None:
+            continue
+        phases.extend(backend.stage_phases({root: relpaths}))
+    return phases

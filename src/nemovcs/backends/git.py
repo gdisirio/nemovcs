@@ -13,6 +13,7 @@ from typing import Iterable, Sequence
 from nemovcs import git
 from nemovcs.backends.base import (
     BackendChangeItem,
+    BackendCommandPhase,
     BackendStatusItem,
     BackendStatusScan,
     BackendWorktreeIdentity,
@@ -96,6 +97,20 @@ class GitBackend:
     def current_branch(self, root: str | Path) -> str:
         return git.current_branch(root)
 
+    def stage_phases(
+        self,
+        paths_by_root: dict[Path, Sequence[str]],
+    ) -> list[BackendCommandPhase]:
+        return [
+            self._git_phase(
+                f"Stage {root.name}",
+                root,
+                ["add", "--", *relpaths],
+            )
+            for root, relpaths in paths_by_root.items()
+            if relpaths
+        ]
+
     def update(self, paths: Sequence[str | Path]) -> list[git.GitResult]:
         return git.update(paths)
 
@@ -116,6 +131,19 @@ class GitBackend:
                 return f"detached at {sha}"
 
         return "unknown"
+
+    def _git_phase(
+        self,
+        title: str,
+        cwd: str | Path,
+        args: Sequence[str],
+    ) -> BackendCommandPhase:
+        cwd_path = Path(cwd)
+        return BackendCommandPhase(
+            title=title,
+            cwd=cwd_path,
+            command=("git", "-C", str(cwd_path), *args),
+        )
 
     def _change_item(self, item: git.CommitItem) -> BackendChangeItem:
         return BackendChangeItem(

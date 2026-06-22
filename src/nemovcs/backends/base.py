@@ -50,6 +50,13 @@ class BackendChangeItem:
         return (self.path,)
 
 
+@dataclass(frozen=True)
+class BackendCommandPhase:
+    title: str
+    cwd: Path
+    command: tuple[str, ...]
+
+
 class Backend(Protocol):
     id: str
     label: str
@@ -72,6 +79,11 @@ class Backend(Protocol):
     ) -> dict[Path, list[BackendChangeItem]]: ...
 
     def current_branch(self, root: str | Path) -> str: ...
+
+    def stage_phases(
+        self,
+        paths_by_root: dict[Path, Sequence[str]],
+    ) -> list[BackendCommandPhase]: ...
 
     def update(self, paths: Sequence[str | Path]) -> list[Any]: ...
 

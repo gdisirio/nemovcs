@@ -16,7 +16,7 @@ from gi.repository import GdkPixbuf  # noqa: E402
 from gi.repository import Pango  # noqa: E402
 
 from nemovcs import backends
-from nemovcs.backends.base import BackendChangeItem
+from nemovcs.backends.base import BackendChangeItem, BackendCommandPhase
 from nemovcs.ui import logger
 
 
@@ -245,7 +245,7 @@ class StageDialog(Gtk.Window):
     def stage_phases(
         self,
         paths_by_root: dict[Path, Sequence[str]],
-    ) -> list[logger.CommandPhase]:
+    ) -> list[BackendCommandPhase]:
         return stage_phases(paths_by_root)
 
     @staticmethod
@@ -504,16 +504,8 @@ class StageDialog(Gtk.Window):
 
 def stage_phases(
     paths_by_root: dict[Path, Sequence[str]],
-) -> list[logger.CommandPhase]:
-    return [
-        logger.CommandPhase.git(
-            f"Stage {root.name}",
-            root,
-            ["add", "--", *relpaths],
-        )
-        for root, relpaths in paths_by_root.items()
-        if relpaths
-    ]
+) -> list[BackendCommandPhase]:
+    return backends.stage_phases(paths_by_root)
 
 
 if __name__ == "__main__":
