@@ -114,6 +114,7 @@ class SvnBackend:
                 error=result.stderr.strip() or result.stdout.strip(),
             )
 
+        items = [item for item in self.parse_status(root, result.stdout) if item.tracked]
         return BackendStatusScan(
             ok=True,
             items=tuple(
@@ -122,7 +123,7 @@ class SvnBackend:
                     old_path=item.old_path,
                     conflicted=item.conflicted,
                 )
-                for item in self.parse_status(root, result.stdout)
+                for item in items
             ),
         )
 

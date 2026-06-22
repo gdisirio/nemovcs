@@ -11,7 +11,7 @@ from nemovcs.backends.base import (
     BackendWorktreeIdentity,
 )
 from nemovcs.backends.git import GitBackend
-from nemovcs.backends.svn import SvnBackend
+from nemovcs.backends.svn import SvnBackend, SvnResult
 
 
 class BackendRegistryTest(unittest.TestCase):
@@ -582,6 +582,35 @@ class BackendRegistryTest(unittest.TestCase):
                     conflicted=True,
                 ),
             ],
+        )
+
+    def test_svn_backend_scan_status_ignores_unversioned_items(self):
+        backend = SvnBackend()
+        root = Path("/tmp/wc")
+        xml = """<?xml version="1.0"?>
+<status>
+  <target path=".">
+    <entry path="modified.txt"><wc-status item="modified"/></entry>
+    <entry path="generated.txt"><wc-status item="unversioned"/></entry>
+    <entry path="conflict.txt"><wc-status item="conflicted"/></entry>
+  </target>
+</status>
+"""
+
+        with mock.patch.object(
+            backend,
+            "run",
+            return_value=SvnResult(("svn", "status", "--xml"), root, 0, xml, ""),
+        ):
+            result = backend.scan_status(root)
+
+        self.assertTrue(result.ok)
+        self.assertEqual(
+            result.items,
+            (
+                BackendStatusItem(path="modified.txt"),
+                BackendStatusItem(path="conflict.txt", conflicted=True),
+            ),
         )
 
     def test_svn_backend_builds_add_commit_and_update_phases(self):
