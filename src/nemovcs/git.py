@@ -332,14 +332,7 @@ def diff(paths: Sequence[str | Path]) -> list[GitResult]:
     grouped = group_by_repo(paths or [Path.cwd()])
     results: list[GitResult] = []
     for root, relpaths in grouped.items():
-        args = [
-            "difftool",
-            "--tool=meld",
-            "--dir-diff",
-            "--no-prompt",
-            "--",
-            *relpaths,
-        ]
+        args = diff_tool_args(root, relpaths)
         if shutil.which("meld") is None:
             command = ("git", "-C", str(root), *args)
             results.append(
@@ -356,14 +349,7 @@ def diff_commands(paths: Sequence[str | Path]) -> list[GitResult]:
     grouped = group_by_repo(paths or [Path.cwd()])
     results: list[GitResult] = []
     for root, relpaths in grouped.items():
-        args = [
-            "difftool",
-            "--tool=meld",
-            "--dir-diff",
-            "--no-prompt",
-            "--",
-            *relpaths,
-        ]
+        args = diff_tool_args(root, relpaths)
         command = ("git", "-C", str(root), *args)
         if shutil.which("meld") is None:
             results.append(
@@ -372,6 +358,24 @@ def diff_commands(paths: Sequence[str | Path]) -> list[GitResult]:
             continue
         results.append(GitResult(command, root, 0, "", ""))
     return results
+
+
+def diff_tool_args(root: str | Path, relpaths: Sequence[str]) -> list[str]:
+    args = ["difftool", "--tool=meld"]
+    if diff_uses_dir_mode(root, relpaths):
+        args.append("--dir-diff")
+    args.extend(["--no-prompt", "--", *relpaths])
+    return args
+
+
+def diff_uses_dir_mode(root: str | Path, relpaths: Sequence[str]) -> bool:
+    if not relpaths:
+        return True
+    root_path = Path(root)
+    return any(
+        relpath in {"", "."} or (root_path / relpath).is_dir()
+        for relpath in relpaths
+    )
 
 
 def update(paths: Sequence[str | Path]) -> list[GitResult]:

@@ -178,6 +178,9 @@ Expected Git command:
 git -C REPO difftool --tool=meld --dir-diff --no-prompt -- PATH...
 ```
 
+For file selections, omit `--dir-diff` so Meld opens in file compare mode. Use
+`--dir-diff` for directory selections and repository-root selections.
+
 NemoVCS should use Meld for visual diffs instead of building its own diff UI.
 If Meld is not installed, the Nemo Action should be hidden through action
 dependencies and the CLI should report a clear error.

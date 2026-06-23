@@ -89,7 +89,7 @@ class GitHelpersTest(unittest.TestCase):
         self.assertEqual(items[3].status, "conflicted")
         self.assertFalse(items[3].default_selected)
 
-    def test_diff_uses_meld_difftool(self):
+    def test_diff_uses_file_meld_difftool_for_file(self):
         fake_result = git.GitResult(("git",), self.root, 0, "", "")
         with mock.patch("nemovcs.git.group_by_repo") as group_by_repo:
             group_by_repo.return_value = {self.root: ["tracked.txt"]}
@@ -105,10 +105,33 @@ class GitHelpersTest(unittest.TestCase):
             [
                 "difftool",
                 "--tool=meld",
-                "--dir-diff",
                 "--no-prompt",
                 "--",
                 "tracked.txt",
+            ],
+            timeout=3600,
+        )
+
+    def test_diff_uses_dir_meld_difftool_for_directory(self):
+        fake_result = git.GitResult(("git",), self.root, 0, "", "")
+        with mock.patch("nemovcs.git.group_by_repo") as group_by_repo:
+            group_by_repo.return_value = {self.root: ["."]}
+            with mock.patch("nemovcs.git.shutil.which", return_value="/usr/bin/meld"):
+                with mock.patch(
+                    "nemovcs.git.run_git", return_value=fake_result
+                ) as run_git:
+                    results = git.diff([self.root])
+
+        self.assertEqual(results, [fake_result])
+        run_git.assert_called_once_with(
+            self.root,
+            [
+                "difftool",
+                "--tool=meld",
+                "--dir-diff",
+                "--no-prompt",
+                "--",
+                ".",
             ],
             timeout=3600,
         )
@@ -121,7 +144,7 @@ class GitHelpersTest(unittest.TestCase):
         self.assertEqual(results[0].returncode, 127)
         self.assertIn(git.MELD_MISSING_MESSAGE, results[0].stderr)
 
-    def test_diff_commands_builds_meld_difftool_command(self):
+    def test_diff_commands_builds_file_meld_difftool_command_for_file(self):
         with mock.patch("nemovcs.git.group_by_repo") as group_by_repo:
             group_by_repo.return_value = {self.root: ["tracked.txt"]}
             with mock.patch("nemovcs.git.shutil.which", return_value="/usr/bin/meld"):
@@ -137,10 +160,32 @@ class GitHelpersTest(unittest.TestCase):
                 str(self.root),
                 "difftool",
                 "--tool=meld",
-                "--dir-diff",
                 "--no-prompt",
                 "--",
                 "tracked.txt",
+            ),
+        )
+
+    def test_diff_commands_builds_dir_meld_difftool_command_for_directory(self):
+        with mock.patch("nemovcs.git.group_by_repo") as group_by_repo:
+            group_by_repo.return_value = {self.root: ["."]}
+            with mock.patch("nemovcs.git.shutil.which", return_value="/usr/bin/meld"):
+                results = git.diff_commands([self.root])
+
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0].returncode, 0)
+        self.assertEqual(
+            results[0].args,
+            (
+                "git",
+                "-C",
+                str(self.root),
+                "difftool",
+                "--tool=meld",
+                "--dir-diff",
+                "--no-prompt",
+                "--",
+                ".",
             ),
         )
 
