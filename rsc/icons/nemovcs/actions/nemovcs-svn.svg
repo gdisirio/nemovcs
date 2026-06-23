@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48" version="1.1">
+  <title>NemoVCS SVN</title>
+  <rect x="6" y="6" width="36" height="36" rx="8" fill="#4b78b8"/>
+  <path d="M14 30c4-7 7-11 10-11 3 0 4 4 7 4 2 0 3-2 4-5" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M14 36c4-7 7-11 10-11 3 0 4 4 7 4 2 0 3-2 4-5" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" opacity=".75"/>
+</svg>

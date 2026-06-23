@@ -339,6 +339,7 @@ class NemoVCSInfoProviderCoreTest(unittest.TestCase):
             groups = core.submenu_groups(["/tmp/repo/src/app.py"])
 
         self.assertEqual([group.label for group in groups], ["Git NemoVCS"])
+        self.assertEqual(groups[0].icon, "nemovcs-git")
         specs = list(groups[0].items)
         commands = [spec.command for spec in specs if not spec.separator]
         icons_by_label = {
@@ -380,7 +381,7 @@ class NemoVCSInfoProviderCoreTest(unittest.TestCase):
         self.assertEqual(icons_by_label["Status..."], "nemovcs-status")
         self.assertEqual(icons_by_label["Log..."], "nemovcs-show-log")
         self.assertEqual(icons_by_label["Settings..."], "nemovcs-settings")
-        self.assertEqual(icons_by_label["About..."], "nemovcs-about")
+        self.assertEqual(icons_by_label["About..."], "nemovcs")
 
     def test_git_top_level_specs_use_common_dialog_commands(self):
         core = nemo_plugin.NemoVCSInfoProviderCore()
@@ -414,6 +415,7 @@ class NemoVCSInfoProviderCoreTest(unittest.TestCase):
             groups = core.submenu_groups(["/tmp/wc/tracked.c"])
 
         self.assertEqual([group.label for group in groups], ["SVN NemoVCS"])
+        self.assertEqual(groups[0].icon, "nemovcs-svn")
         specs = list(groups[0].items)
         commands = [spec.command for spec in specs if not spec.separator]
         icons_by_label = {
@@ -485,6 +487,10 @@ class NemoVCSInfoProviderCoreTest(unittest.TestCase):
             [group.label for group in groups],
             ["Git NemoVCS", "SVN NemoVCS"],
         )
+        self.assertEqual(
+            [group.icon for group in groups],
+            ["nemovcs-git", "nemovcs-svn"],
+        )
         self.assertEqual([spec.label for spec in top_level_specs], ["Diff..."])
 
     def test_clone_submenu_groups_offer_git_clone_and_svn_checkout(self):
@@ -497,6 +503,10 @@ class NemoVCSInfoProviderCoreTest(unittest.TestCase):
         self.assertEqual(
             [group.label for group in groups],
             ["Git NemoVCS", "SVN NemoVCS"],
+        )
+        self.assertEqual(
+            [group.icon for group in groups],
+            ["nemovcs-git", "nemovcs-svn"],
         )
         specs = [spec for group in groups for spec in group.items]
         commands = [spec.command for spec in specs if not spec.separator]

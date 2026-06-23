@@ -3,8 +3,8 @@
 Most icons in this directory are temporary development assets derived from
 RabbitVCS icon assets.
 
-The app icons under `apps/` are NemoVCS-native folder/branch artwork and are
-not derived from RabbitVCS.
+The app icons under `apps/` and the `nemovcs-git` / `nemovcs-svn` action icons
+are NemoVCS-native artwork and are not derived from RabbitVCS.
 
 The default `normal`, `modified`, and `conflicted` emblems use a cropped
 `viewBox` so Nemo renders the overlay artwork larger. The `*-small.svg`

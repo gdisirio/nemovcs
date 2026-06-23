@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48" version="1.1">
+  <title>NemoVCS Git</title>
+  <rect x="6" y="6" width="36" height="36" rx="8" fill="#f05033"/>
+  <path d="M15 24h18" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round"/>
+  <path d="M24 15v18" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round"/>
+  <circle cx="15" cy="24" r="4.5" fill="#fff"/>
+  <circle cx="24" cy="15" r="4.5" fill="#fff"/>
+  <circle cx="33" cy="24" r="4.5" fill="#fff"/>
+</svg>

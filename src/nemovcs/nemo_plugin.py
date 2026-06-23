@@ -26,16 +26,18 @@ PRIMARY_EMBLEMS = {
     "ok": "nemovcs-normal",
 }
 MENU_ICON = "nemovcs"
-ABOUT_ICON = "nemovcs-about"
+ABOUT_ICON = MENU_ICON
 ADD_ICON = "nemovcs-add"
 CHECKOUT_ICON = "nemovcs-checkout"
 COMMIT_ICON = "nemovcs-commit"
 DIFF_ICON = "nemovcs-diff"
+GIT_ICON = "nemovcs-git"
 LOG_ICON = "nemovcs-show-log"
 PUSH_ICON = "nemovcs-push"
 REVERT_ICON = "nemovcs-revert"
 SETTINGS_ICON = "nemovcs-settings"
 STATUS_ICON = "nemovcs-status"
+SVN_ICON = "nemovcs-svn"
 UPDATE_ICON = "nemovcs-update"
 
 
@@ -241,12 +243,14 @@ class NemoVCSInfoProviderCore:
                     name="NemoVCS::GitMenu",
                     label="Git NemoVCS",
                     tip="Git actions",
+                    icon=GIT_ICON,
                     items=tuple(git_clone_menu_specs(normalized)),
                 ),
                 MenuGroupSpec(
                     name="NemoVCS::SvnMenu",
                     label="SVN NemoVCS",
                     tip="Subversion actions",
+                    icon=SVN_ICON,
                     items=tuple(svn_checkout_menu_specs(normalized)),
                 ),
             ]
@@ -259,6 +263,7 @@ class NemoVCSInfoProviderCore:
                         name="NemoVCS::GitMenu",
                         label="Git NemoVCS",
                         tip="Git actions",
+                        icon=GIT_ICON,
                         items=tuple(git_menu_specs(normalized)),
                     )
                 )
@@ -268,6 +273,7 @@ class NemoVCSInfoProviderCore:
                         name="NemoVCS::SvnMenu",
                         label="SVN NemoVCS",
                         tip="Subversion actions",
+                        icon=SVN_ICON,
                         items=tuple(svn_menu_specs(normalized)),
                     )
                 )

@@ -21,11 +21,13 @@ ACTION_ICON_NAMES = [
     "nemovcs-checkout.svg",
     "nemovcs-commit.svg",
     "nemovcs-diff.svg",
+    "nemovcs-git.svg",
     "nemovcs-push.svg",
     "nemovcs-revert.svg",
     "nemovcs-settings.svg",
     "nemovcs-show-log.svg",
     "nemovcs-status.svg",
+    "nemovcs-svn.svg",
     "nemovcs-update.svg",
 ]
 APP_ICON_NAMES = [
