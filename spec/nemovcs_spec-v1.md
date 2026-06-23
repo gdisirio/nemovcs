@@ -311,8 +311,8 @@ policy belongs in settings and later GUI flows.
 ## Nemo Menu Integration
 
 The current prototype uses the nemo-python extension for both top-level menu
-items and the `NemoVCS` submenu. This keeps all NemoVCS entries in one context
-menu group and avoids the action manager listing duplicate Git/SVN actions.
+items and backend submenus. This keeps all NemoVCS entries in one context menu
+group and avoids the action manager listing duplicate Git/SVN actions.
 
 Initial menu items:
 
@@ -327,22 +327,27 @@ Initial menu items:
 - about placeholder
 
 NemoVCS should present different menu items depending on the repository type.
-Git is the only operation backend for v1, but repository detection should leave
-room for SVN and other VCS types later.
+Git and SVN should work independently. If a path is inside both a Git worktree
+and an SVN working copy, both backend submenus should be shown.
 
 Examples:
 
-- Git worktree: show common VCS actions plus Git-specific submenu actions.
-- SVN working copy: show common VCS actions plus SVN-specific submenu actions.
+- Git worktree: show common VCS actions plus a `Git NemoVCS` submenu.
+- SVN working copy: show common VCS actions plus an `SVN NemoVCS` submenu.
+- Git+SVN path: show both backend submenus.
+- Unversioned directory: show `Git NemoVCS` with clone and `SVN NemoVCS` with
+  checkout.
 - Unknown or unsupported path: show no repository actions.
 
 Some high-frequency commands may appear at the first context-menu level. Other
-commands should appear under a `NemoVCS` submenu to avoid clutter.
+commands should appear under backend submenus to avoid clutter.
 
 current v1 default placement:
 
-- first level: commit, update, diff
-- `NemoVCS` submenu: backend-specific operations plus status, log, settings,
+- first level: diff
+- `Git NemoVCS` submenu: commit, update, stage, revert, push, status, log,
+  settings, about
+- `SVN NemoVCS` submenu: commit, update, add, revert, status, log, settings,
   about
 
 The first-level versus submenu placement should be modeled as action metadata,
@@ -429,7 +434,8 @@ commit dialog and update action. It is the planned replacement for
 The current prototype has demonstrated:
 
 - contextual Nemo Action visibility inside Git working trees,
-- native Nemo submenu layout with `Commit...` and `Update...` at top level,
+- native Nemo submenu layout with `Diff...` at top level,
+- separate Git and SVN backend submenus,
 - first GTK commit dialog with a flat changed-file checklist,
 - reusable GTK logger with `Summary` and `Output` tabs,
 - logger-backed commit and update flows,
@@ -1120,5 +1126,5 @@ The first milestone is complete when:
 - `nemovcs commit PATH` works inside a Git repo.
 - Nemo Action files install for the current user.
 - Nemo shows the actions only inside Git worktrees.
-- Nemo shows the expected top-level items and `NemoVCS` submenu.
+- Nemo shows the expected top-level items and backend submenus.
 - Existing unit tests pass.

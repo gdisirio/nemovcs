@@ -330,20 +330,30 @@ class NemoVCSInfoProviderCoreTest(unittest.TestCase):
         with mock.patch("pathlib.Path.open", side_effect=OSError("denied")):
             diagnostics.log("event")
 
-    def test_git_submenu_specs_use_existing_dialog_commands(self):
+    def test_git_submenu_group_uses_existing_dialog_commands(self):
         core = nemo_plugin.NemoVCSInfoProviderCore()
 
         with mock.patch("nemovcs.nemo_plugin.is_clone_target", return_value=False), (
-            mock.patch("nemovcs.nemo_plugin.selected_backend_id", return_value="git")
+            mock.patch("nemovcs.nemo_plugin.matching_backend_ids", return_value=["git"])
         ):
-            specs = core.submenu_specs(["/tmp/repo/src/app.py"])
+            groups = core.submenu_groups(["/tmp/repo/src/app.py"])
 
+        self.assertEqual([group.label for group in groups], ["Git NemoVCS"])
+        specs = list(groups[0].items)
         commands = [spec.command for spec in specs if not spec.separator]
         icons_by_label = {
             spec.label: spec.icon
             for spec in specs
             if not spec.separator
         }
+        self.assertIn(
+            ("nemovcs", "commit-dialog", "/tmp/repo/src/app.py"),
+            commands,
+        )
+        self.assertIn(
+            ("nemovcs", "update-dialog", "/tmp/repo/src/app.py"),
+            commands,
+        )
         self.assertIn(
             (
                 "nemovcs",
@@ -362,6 +372,8 @@ class NemoVCSInfoProviderCoreTest(unittest.TestCase):
             ("nemovcs", "push-dialog", "/tmp/repo/src/app.py"),
             commands,
         )
+        self.assertEqual(icons_by_label["Commit..."], "nemovcs-commit")
+        self.assertEqual(icons_by_label["Update..."], "nemovcs-update")
         self.assertEqual(icons_by_label["Stage..."], "nemovcs-add")
         self.assertEqual(icons_by_label["Revert..."], "nemovcs-revert")
         self.assertEqual(icons_by_label["Push..."], "nemovcs-push")
@@ -374,41 +386,49 @@ class NemoVCSInfoProviderCoreTest(unittest.TestCase):
         core = nemo_plugin.NemoVCSInfoProviderCore()
 
         with mock.patch("nemovcs.nemo_plugin.is_clone_target", return_value=False), (
-            mock.patch("nemovcs.nemo_plugin.selected_backend_id", return_value="git")
+            mock.patch("nemovcs.nemo_plugin.matching_backend_ids", return_value=["git"])
         ):
             specs = core.top_level_specs(["/tmp/repo/src/app.py"])
 
         self.assertEqual(
             [spec.label for spec in specs],
-            ["Commit...", "Update...", "Diff..."],
+            ["Diff..."],
         )
         self.assertEqual(
             [spec.icon for spec in specs],
-            ["nemovcs-commit", "nemovcs-update", "nemovcs-diff"],
+            ["nemovcs-diff"],
         )
         self.assertEqual(
             [spec.command for spec in specs],
             [
-                ("nemovcs", "commit-dialog", "/tmp/repo/src/app.py"),
-                ("nemovcs", "update-dialog", "/tmp/repo/src/app.py"),
                 ("nemovcs", "diff-dialog", "/tmp/repo/src/app.py"),
             ],
         )
 
-    def test_svn_submenu_specs_use_existing_dialog_commands(self):
+    def test_svn_submenu_group_uses_existing_dialog_commands(self):
         core = nemo_plugin.NemoVCSInfoProviderCore()
 
         with mock.patch("nemovcs.nemo_plugin.is_clone_target", return_value=False), (
-            mock.patch("nemovcs.nemo_plugin.selected_backend_id", return_value="svn")
+            mock.patch("nemovcs.nemo_plugin.matching_backend_ids", return_value=["svn"])
         ):
-            specs = core.submenu_specs(["/tmp/wc/tracked.c"])
+            groups = core.submenu_groups(["/tmp/wc/tracked.c"])
 
+        self.assertEqual([group.label for group in groups], ["SVN NemoVCS"])
+        specs = list(groups[0].items)
         commands = [spec.command for spec in specs if not spec.separator]
         icons_by_label = {
             spec.label: spec.icon
             for spec in specs
             if not spec.separator
         }
+        self.assertIn(
+            ("nemovcs", "commit-dialog", "/tmp/wc/tracked.c"),
+            commands,
+        )
+        self.assertIn(
+            ("nemovcs", "update-dialog", "/tmp/wc/tracked.c"),
+            commands,
+        )
         self.assertIn(
             (
                 "nemovcs",
@@ -427,6 +447,8 @@ class NemoVCSInfoProviderCoreTest(unittest.TestCase):
             ("nemovcs", "push-dialog", "/tmp/wc/tracked.c"),
             commands,
         )
+        self.assertEqual(icons_by_label["Commit..."], "nemovcs-commit")
+        self.assertEqual(icons_by_label["Update..."], "nemovcs-update")
         self.assertEqual(icons_by_label["Add..."], "nemovcs-add")
         self.assertEqual(icons_by_label["Revert..."], "nemovcs-revert")
         self.assertEqual(icons_by_label["Status..."], "nemovcs-status")
@@ -436,32 +458,49 @@ class NemoVCSInfoProviderCoreTest(unittest.TestCase):
         core = nemo_plugin.NemoVCSInfoProviderCore()
 
         with mock.patch("nemovcs.nemo_plugin.is_clone_target", return_value=False), (
-            mock.patch("nemovcs.nemo_plugin.selected_backend_id", return_value="svn")
+            mock.patch("nemovcs.nemo_plugin.matching_backend_ids", return_value=["svn"])
         ):
             specs = core.top_level_specs(["/tmp/wc/tracked.c"])
 
         self.assertEqual(
             [spec.command for spec in specs],
             [
-                ("nemovcs", "commit-dialog", "/tmp/wc/tracked.c"),
-                ("nemovcs", "update-dialog", "/tmp/wc/tracked.c"),
                 ("nemovcs", "diff-dialog", "/tmp/wc/tracked.c"),
             ],
         )
 
-    def test_clone_submenu_specs_offer_git_clone_and_svn_checkout(self):
+    def test_both_backend_matches_get_separate_submenu_groups(self):
+        core = nemo_plugin.NemoVCSInfoProviderCore()
+
+        with mock.patch("nemovcs.nemo_plugin.is_clone_target", return_value=False), (
+            mock.patch(
+                "nemovcs.nemo_plugin.matching_backend_ids",
+                return_value=["git", "svn"],
+            )
+        ):
+            groups = core.submenu_groups(["/tmp/combined"])
+            top_level_specs = core.top_level_specs(["/tmp/combined"])
+
+        self.assertEqual(
+            [group.label for group in groups],
+            ["Git NemoVCS", "SVN NemoVCS"],
+        )
+        self.assertEqual([spec.label for spec in top_level_specs], ["Diff..."])
+
+    def test_clone_submenu_groups_offer_git_clone_and_svn_checkout(self):
         core = nemo_plugin.NemoVCSInfoProviderCore()
 
         with mock.patch("nemovcs.nemo_plugin.is_clone_target", return_value=True):
-            specs = core.submenu_specs(["/tmp/target"])
+            groups = core.submenu_groups(["/tmp/target"])
             top_level_specs = core.top_level_specs(["/tmp/target"])
 
+        self.assertEqual(
+            [group.label for group in groups],
+            ["Git NemoVCS", "SVN NemoVCS"],
+        )
+        specs = [spec for group in groups for spec in group.items]
         commands = [spec.command for spec in specs if not spec.separator]
-        icons_by_label = {
-            spec.label: spec.icon
-            for spec in specs
-            if not spec.separator
-        }
+        icons_by_label = {spec.label: spec.icon for spec in specs if not spec.separator}
         self.assertIn(
             ("nemovcs", "clone-dialog", "--vcs", "git", "/tmp/target"),
             commands,
@@ -474,13 +513,13 @@ class NemoVCSInfoProviderCoreTest(unittest.TestCase):
         self.assertEqual(icons_by_label["SVN Checkout..."], "nemovcs-checkout")
         self.assertEqual(top_level_specs, [])
 
-    def test_mixed_or_unknown_backend_has_no_submenu_specs(self):
+    def test_mixed_or_unknown_backend_has_no_submenu_groups(self):
         core = nemo_plugin.NemoVCSInfoProviderCore()
 
         with mock.patch("nemovcs.nemo_plugin.is_clone_target", return_value=False), (
-            mock.patch("nemovcs.nemo_plugin.selected_backend_id", return_value=None)
+            mock.patch("nemovcs.nemo_plugin.matching_backend_ids", return_value=[])
         ):
-            self.assertEqual(core.submenu_specs(["/tmp/path"]), [])
+            self.assertEqual(core.submenu_groups(["/tmp/path"]), [])
             self.assertEqual(core.top_level_specs(["/tmp/path"]), [])
 
 

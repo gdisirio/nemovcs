@@ -80,16 +80,18 @@ from Nemo's action layout. Unrelated Nemo actions are preserved.
 Open Nemo inside a Git or Subversion working tree.
 
 The context menu is provided by the NemoVCS nemo-python extension so the
-top-level items and the `NemoVCS` submenu stay in the same menu group.
+top-level items and backend submenus stay in the same menu group.
 
 Top-level actions:
 
-- `Commit...`
-- `Update...`
 - `Diff...`
 
-`NemoVCS` submenu actions:
+Backend submenu actions:
 
+- `Git NemoVCS`
+- `SVN NemoVCS`
+- `Commit...`
+- `Update...`
 - `Git Clone...`
 - `SVN Checkout...`
 - `Stage...`
