@@ -26,6 +26,17 @@ PRIMARY_EMBLEMS = {
     "ok": "nemovcs-normal",
 }
 MENU_ICON = "nemovcs"
+ABOUT_ICON = "nemovcs-about"
+ADD_ICON = "nemovcs-add"
+CHECKOUT_ICON = "nemovcs-checkout"
+COMMIT_ICON = "nemovcs-commit"
+DIFF_ICON = "nemovcs-diff"
+LOG_ICON = "nemovcs-show-log"
+PUSH_ICON = "nemovcs-push"
+REVERT_ICON = "nemovcs-revert"
+SETTINGS_ICON = "nemovcs-settings"
+STATUS_ICON = "nemovcs-status"
+UPDATE_ICON = "nemovcs-update"
 
 
 @dataclass(frozen=True)
@@ -225,6 +236,15 @@ class NemoVCSInfoProviderCore:
             return svn_menu_specs(normalized)
         return []
 
+    def top_level_specs(self, paths: Sequence[str | Path]) -> list[MenuActionSpec]:
+        normalized = [str(Path(path).resolve(strict=False)) for path in paths]
+        if not normalized or all(is_clone_target(path) for path in normalized):
+            return []
+
+        if selected_backend_id(normalized) in {"git", "svn"}:
+            return common_top_level_specs(normalized)
+        return []
+
 
 class PluginDiagnostics:
     def __init__(self, path: str | Path):
@@ -267,11 +287,18 @@ class NemoVCSInfoProviderMixin:
         return self.nemovcs_menu_items([path] if path else [])
 
     def nemovcs_menu_items(self, paths: Sequence[str]) -> list[object]:
-        specs = self.nemovcs_core.submenu_specs(paths)
-        if not specs:
+        top_level_specs = self.nemovcs_core.top_level_specs(paths)
+        submenu_specs = self.nemovcs_core.submenu_specs(paths)
+        if not top_level_specs and not submenu_specs:
             return []
 
         from gi.repository import Nemo
+
+        items = [
+            self.nemovcs_menu_item(Nemo, spec)
+            for spec in top_level_specs
+            if not spec.separator
+        ]
 
         submenu_item = Nemo.MenuItem(
             name="NemoVCS::Menu",
@@ -282,20 +309,25 @@ class NemoVCSInfoProviderMixin:
         submenu = Nemo.Menu()
         submenu_item.set_submenu(submenu)
 
-        for spec in specs:
+        for spec in submenu_specs:
             if spec.separator:
                 submenu.append_item(Nemo.MenuItem.new_separator(spec.name))
                 continue
-            item = Nemo.MenuItem(
-                name=spec.name,
-                label=spec.label,
-                tip=spec.tip,
-                icon=spec.icon,
-            )
-            item.connect("activate", self.on_menu_item_activate, spec.command)
-            submenu.append_item(item)
+            submenu.append_item(self.nemovcs_menu_item(Nemo, spec))
 
-        return [submenu_item]
+        items.append(submenu_item)
+        items.append(Nemo.MenuItem.new_separator("NemoVCS::AfterMenu"))
+        return items
+
+    def nemovcs_menu_item(self, Nemo, spec: MenuActionSpec):
+        item = Nemo.MenuItem(
+            name=spec.name,
+            label=spec.label,
+            tip=spec.tip,
+            icon=spec.icon,
+        )
+        item.connect("activate", self.on_menu_item_activate, spec.command)
+        return item
 
     def on_menu_item_activate(self, _item, command: Sequence[str]) -> None:
         try:
@@ -365,47 +397,82 @@ def is_clone_target(path: str | Path) -> bool:
 
 def git_menu_specs(paths: Sequence[str]) -> list[MenuActionSpec]:
     return [
-        action("GitStage", "Stage...", ["stage-dialog", "--operation", "stage", *paths]),
-        action("GitRevert", "Revert...", ["revert-dialog", *paths]),
-        action("GitPush", "Push...", ["push-dialog", *paths]),
+        action(
+            "GitStage",
+            "Stage...",
+            ["stage-dialog", "--operation", "stage", *paths],
+            icon=ADD_ICON,
+        ),
+        action("GitRevert", "Revert...", ["revert-dialog", *paths], icon=REVERT_ICON),
+        action("GitPush", "Push...", ["push-dialog", *paths], icon=PUSH_ICON),
         separator("GitSep1"),
-        action("GitStatus", "Status...", ["status-dialog", *paths]),
-        action("GitLog", "Log...", ["log-dialog", *paths]),
+        action("GitStatus", "Status...", ["status-dialog", *paths], icon=STATUS_ICON),
+        action("GitLog", "Log...", ["log-dialog", *paths], icon=LOG_ICON),
         separator("GitSep2"),
-        action("GitSettings", "Settings...", ["settings-dialog"]),
-        action("GitAbout", "About...", ["about-dialog"]),
+        action("GitSettings", "Settings...", ["settings-dialog"], icon=SETTINGS_ICON),
+        action("GitAbout", "About...", ["about-dialog"], icon=ABOUT_ICON),
+    ]
+
+
+def common_top_level_specs(paths: Sequence[str]) -> list[MenuActionSpec]:
+    return [
+        action("Commit", "Commit...", ["commit-dialog", *paths], icon=COMMIT_ICON),
+        action("Update", "Update...", ["update-dialog", *paths], icon=UPDATE_ICON),
+        action("Diff", "Diff...", ["diff-dialog", *paths], icon=DIFF_ICON),
     ]
 
 
 def svn_menu_specs(paths: Sequence[str]) -> list[MenuActionSpec]:
     return [
-        action("SvnAdd", "Add...", ["stage-dialog", "--operation", "add", *paths]),
-        action("SvnRevert", "Revert...", ["revert-dialog", *paths]),
+        action(
+            "SvnAdd",
+            "Add...",
+            ["stage-dialog", "--operation", "add", *paths],
+            icon=ADD_ICON,
+        ),
+        action("SvnRevert", "Revert...", ["revert-dialog", *paths], icon=REVERT_ICON),
         separator("SvnSep1"),
-        action("SvnStatus", "Status...", ["status-dialog", *paths]),
-        action("SvnLog", "Log...", ["log-dialog", *paths]),
+        action("SvnStatus", "Status...", ["status-dialog", *paths], icon=STATUS_ICON),
+        action("SvnLog", "Log...", ["log-dialog", *paths], icon=LOG_ICON),
         separator("SvnSep2"),
-        action("SvnSettings", "Settings...", ["settings-dialog"]),
-        action("SvnAbout", "About...", ["about-dialog"]),
+        action("SvnSettings", "Settings...", ["settings-dialog"], icon=SETTINGS_ICON),
+        action("SvnAbout", "About...", ["about-dialog"], icon=ABOUT_ICON),
     ]
 
 
 def clone_menu_specs(paths: Sequence[str]) -> list[MenuActionSpec]:
     return [
-        action("GitClone", "Git Clone...", ["clone-dialog", "--vcs", "git", *paths]),
-        action("SvnCheckout", "SVN Checkout...", ["clone-dialog", "--vcs", "svn", *paths]),
+        action(
+            "GitClone",
+            "Git Clone...",
+            ["clone-dialog", "--vcs", "git", *paths],
+            icon=CHECKOUT_ICON,
+        ),
+        action(
+            "SvnCheckout",
+            "SVN Checkout...",
+            ["clone-dialog", "--vcs", "svn", *paths],
+            icon=CHECKOUT_ICON,
+        ),
         separator("CloneSep1"),
-        action("CloneSettings", "Settings...", ["settings-dialog"]),
-        action("CloneAbout", "About...", ["about-dialog"]),
+        action("CloneSettings", "Settings...", ["settings-dialog"], icon=SETTINGS_ICON),
+        action("CloneAbout", "About...", ["about-dialog"], icon=ABOUT_ICON),
     ]
 
 
-def action(name: str, label: str, args: Sequence[str]) -> MenuActionSpec:
+def action(
+    name: str,
+    label: str,
+    args: Sequence[str],
+    *,
+    icon: str = MENU_ICON,
+) -> MenuActionSpec:
     return MenuActionSpec(
         name=f"NemoVCS::{name}",
         label=label,
         command=("nemovcs", *args),
         tip=label.removesuffix("..."),
+        icon=icon,
     )
 
 

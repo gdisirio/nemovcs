@@ -71,6 +71,46 @@ class InstallNemoExtensionTest(unittest.TestCase):
                     / "emblem-nemovcs-normal.svg"
                 ).exists()
             )
+            self.assertTrue(
+                (
+                    Path(tmp)
+                    / "icons"
+                    / "hicolor"
+                    / "scalable"
+                    / "actions"
+                    / "nemovcs-commit.svg"
+                ).exists()
+            )
+            self.assertTrue(
+                (
+                    Path(tmp)
+                    / "icons"
+                    / "hicolor"
+                    / "scalable"
+                    / "actions"
+                    / "nemovcs-diff.svg"
+                ).exists()
+            )
+            self.assertTrue(
+                (
+                    Path(tmp)
+                    / "icons"
+                    / "hicolor"
+                    / "scalable"
+                    / "actions"
+                    / "nemovcs-revert.svg"
+                ).exists()
+            )
+            self.assertTrue(
+                (
+                    Path(tmp)
+                    / "icons"
+                    / "hicolor"
+                    / "scalable"
+                    / "apps"
+                    / "nemovcs.svg"
+                ).exists()
+            )
 
 
 if __name__ == "__main__":

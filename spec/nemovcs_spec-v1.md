@@ -43,25 +43,17 @@ the primary target environment.
 
 ## Distribution Model
 
-v1 uses two pieces:
+v1 uses these pieces:
 
 - Python package providing the `nemovcs` command.
-- Nemo Action files that call the command.
+- A nemo-python extension that provides context menus, emblems, and later
+  property pages.
+- A session DBus service for cached status.
 
-The action files are installed for a user into:
-
-```text
-~/.local/share/nemo/actions
-```
-
-or, when `$XDG_DATA_HOME` is set:
-
-```text
-$XDG_DATA_HOME/nemo/actions
-```
-
-System-wide packaging can install equivalent files under the system Nemo action
-directory later.
+Early prototypes used Nemo Action files. Current installs should remove those
+legacy files and prune their layout entries, because mixing Nemo Actions with
+nemo-python menu items causes Nemo to place them in different context-menu
+groups.
 
 ## Runtime Dependencies
 
@@ -115,7 +107,7 @@ The CLI command is:
 nemovcs
 ```
 
-The CLI must be useful both from Nemo Actions and from a terminal.
+The CLI must be useful both from Nemo menu callbacks and from a terminal.
 
 ### Common Rules
 
@@ -316,15 +308,13 @@ Behavior:
 This command is intentionally basic in v1. More complete pull/fetch/rebase
 policy belongs in settings and later GUI flows.
 
-## Nemo Actions
+## Nemo Menu Integration
 
-v1 action files live in:
+The current prototype uses the nemo-python extension for both top-level menu
+items and the `NemoVCS` submenu. This keeps all NemoVCS entries in one context
+menu group and avoids the action manager listing duplicate Git/SVN actions.
 
-```text
-data/nemo/actions
-```
-
-Initial actions:
+Initial menu items:
 
 - selected path status
 - background folder status
@@ -342,8 +332,8 @@ room for SVN and other VCS types later.
 
 Examples:
 
-- Git worktree: show Git actions.
-- SVN working copy: do not show Git actions.
+- Git worktree: show common VCS actions plus Git-specific submenu actions.
+- SVN working copy: show common VCS actions plus SVN-specific submenu actions.
 - Unknown or unsupported path: show no repository actions.
 
 Some high-frequency commands may appear at the first context-menu level. Other
@@ -351,33 +341,32 @@ commands should appear under a `NemoVCS` submenu to avoid clutter.
 
 current v1 default placement:
 
-- first level: commit, update
-- `NemoVCS` submenu: status, diff, log, settings, about
+- first level: commit, update, diff
+- `NemoVCS` submenu: backend-specific operations plus status, log, settings,
+  about
 
 The first-level versus submenu placement should be modeled as action metadata,
 not hard-coded deep inside command handlers. User-configurable placement is a
 v2 feature.
 
-Actions should use:
+Common top-level items should use backend-neutral visibility equivalent to:
 
 ```text
-Dependencies=git;nemovcs;
-UriScheme=file
-Conditions=exec nemovcs action-visible inside-worktree ...
+nemovcs action-visible inside-worktree ...
 ```
 
-Actions that require an external helper can add it to `Dependencies`. For
-example, `Diff...` depends on `meld`.
+Items that require an external helper should check or report it before running.
+For example, `Diff...` depends on `meld`.
 
 Visibility should be contextual:
 
-- Selected-file actions should only appear when selected paths are inside a Git
-  worktree.
+- Selected-file actions should only appear when selected paths are inside a
+  supported working tree.
 - Background folder actions should only appear when the current folder is inside
-  a Git worktree.
-
-v1 actions can use `Terminal=true`. Actions that have moved to the GTK logger
-should use `Terminal=false`.
+  a supported working tree.
+- Backend-specific submenu items should still use backend-specific visibility
+  such as the same internal checks behind `inside-backend git` or
+  `inside-backend svn`.
 
 Menu items that open a terminal or future dialog should use an ellipsis in their
 label. The early prototype uses temporary third-party icons stored under
@@ -428,7 +417,7 @@ completion state and direct the user to `Output` for details. The raw output tab
 should always be available because it is the most useful troubleshooting view
 and preserves exactly what Git reported.
 
-The logger should be reusable by Nemo Actions, future plugin actions, and any
+The logger should be reusable by Nemo menu callbacks, future plugin actions, and any
 standalone repository browser.
 
 The initial GTK logger is reusable across command phases and is used by the
@@ -474,7 +463,8 @@ Expected plugin responsibilities:
 - Add emblems for visible files/folders.
 - Add optional columns.
 - Add a repository-related property page in Nemo's file properties dialog.
-- Add dynamic menus if Nemo Actions become too limited.
+- Keep dynamic menus in the nemo-python extension rather than static Nemo
+  Actions.
 - Keep Nemo UI callbacks fast.
 
 The plugin should not run expensive Git commands directly on the UI path.

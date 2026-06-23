@@ -11,19 +11,10 @@ SPEC.loader.exec_module(install_layout)
 
 
 class InstallLayoutTest(unittest.TestCase):
-    def test_build_layout_has_top_level_and_submenu_actions(self):
+    def test_build_layout_installs_no_static_nemovcs_actions(self):
         layout = install_layout.build_nemovcs_layout()
 
-        self.assertEqual(layout[0]["uuid"], "nemovcs-commit.nemo_action")
-        self.assertEqual(layout[1]["uuid"], "nemovcs-update.nemo_action")
-        self.assertEqual(layout[2]["uuid"], "nemovcs-background-update.nemo_action")
-        self.assertEqual(layout[3]["uuid"], "nemovcs-diff.nemo_action")
-        self.assertEqual(layout[4]["uuid"], "nemovcs-svn-commit.nemo_action")
-        self.assertEqual(layout[5]["uuid"], "nemovcs-svn-update.nemo_action")
-        self.assertEqual(layout[6]["uuid"], "nemovcs-background-svn-update.nemo_action")
-        self.assertEqual(layout[7]["uuid"], "nemovcs-svn-diff.nemo_action")
-        self.assertEqual(len(layout), 8)
-        self.assertNotIn("NemoVCS", [node["uuid"] for node in layout])
+        self.assertEqual(layout, [])
 
     def test_normalize_separators_removes_duplicates_and_edges(self):
         nodes = [

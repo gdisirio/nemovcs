@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Install a Nemo action layout for NemoVCS."""
+"""Prune legacy NemoVCS action entries from Nemo's action layout."""
 
 from __future__ import annotations
 
@@ -42,46 +42,6 @@ NEMOVCS_ACTIONS = {
     "nemovcs-svn-update.nemo_action",
     "nemovcs-update.nemo_action",
 }
-
-TOP_LEVEL_ACTIONS = [
-    "nemovcs-commit.nemo_action",
-    "nemovcs-update.nemo_action",
-    "nemovcs-background-update.nemo_action",
-    "nemovcs-diff.nemo_action",
-    "nemovcs-svn-commit.nemo_action",
-    "nemovcs-svn-update.nemo_action",
-    "nemovcs-background-svn-update.nemo_action",
-    "nemovcs-svn-diff.nemo_action",
-]
-
-SUBMENU_ACTIONS = [
-    "nemovcs-clone.nemo_action",
-    "nemovcs-background-clone.nemo_action",
-    "nemovcs-svn-checkout.nemo_action",
-    "nemovcs-background-svn-checkout.nemo_action",
-    "nemovcs-stage.nemo_action",
-    "nemovcs-svn-add.nemo_action",
-    "nemovcs-revert.nemo_action",
-    "nemovcs-svn-revert.nemo_action",
-    "nemovcs-push.nemo_action",
-    "nemovcs-background-push.nemo_action",
-    "separator",
-    "nemovcs-status.nemo_action",
-    "nemovcs-background-status.nemo_action",
-    "nemovcs-svn-status.nemo_action",
-    "nemovcs-background-svn-status.nemo_action",
-    "nemovcs-log.nemo_action",
-    "nemovcs-svn-log.nemo_action",
-    "nemovcs-settings.nemo_action",
-    "nemovcs-background-settings.nemo_action",
-    "nemovcs-svn-settings.nemo_action",
-    "nemovcs-background-svn-settings.nemo_action",
-    "nemovcs-about.nemo_action",
-    "nemovcs-background-about.nemo_action",
-    "nemovcs-svn-about.nemo_action",
-    "nemovcs-background-svn-about.nemo_action",
-]
-
 
 def action_node(filename: str) -> dict[str, object]:
     return {
@@ -187,9 +147,7 @@ def load_layout(path: Path) -> dict[str, object]:
 
 
 def build_nemovcs_layout() -> list[dict[str, object]]:
-    return [
-        *(action_node(name) for name in TOP_LEVEL_ACTIONS),
-    ]
+    return []
 
 
 def main() -> int:
@@ -216,7 +174,7 @@ def main() -> int:
         f.write("\n")
     tmp_path.replace(layout_path)
 
-    print(f"Installed NemoVCS action layout to {layout_path}")
+    print(f"Pruned NemoVCS action layout entries from {layout_path}")
     return 0
 
 

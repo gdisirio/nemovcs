@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import os
 import shutil
+import subprocess
 from pathlib import Path
 
 
@@ -13,6 +14,23 @@ EMBLEM_ICON_NAMES = [
     "emblem-nemovcs-conflicted.svg",
     "emblem-nemovcs-modified.svg",
     "emblem-nemovcs-normal.svg",
+]
+ACTION_ICON_NAMES = [
+    "nemovcs-about.svg",
+    "nemovcs-add.svg",
+    "nemovcs-checkout.svg",
+    "nemovcs-commit.svg",
+    "nemovcs-diff.svg",
+    "nemovcs-push.svg",
+    "nemovcs-revert.svg",
+    "nemovcs-settings.svg",
+    "nemovcs-show-log.svg",
+    "nemovcs-status.svg",
+    "nemovcs-update.svg",
+]
+APP_ICON_NAMES = [
+    "nemovcs-small.svg",
+    "nemovcs.svg",
 ]
 
 
@@ -75,16 +93,53 @@ def icon_target_dir(data_home: Path | None = None) -> Path:
     return data_home / "icons" / "hicolor" / "scalable" / "emblems"
 
 
-def install_icons(repo_root: Path, data_home: Path | None = None) -> list[Path]:
-    source_dir = repo_root / "rsc" / "icons" / "nemovcs" / "emblems"
-    target = icon_target_dir(data_home)
-    target.mkdir(parents=True, exist_ok=True)
+def hicolor_target_dir(subdir: str, data_home: Path | None = None) -> Path:
+    if data_home is None:
+        data_home = Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local/share"))
+    return data_home / "icons" / "hicolor" / "scalable" / subdir
 
+
+def hicolor_theme_dir(data_home: Path | None = None) -> Path:
+    if data_home is None:
+        data_home = Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local/share"))
+    return data_home / "icons" / "hicolor"
+
+
+def copy_icon_set(
+    source_dir: Path,
+    target_dir: Path,
+    names: list[str],
+) -> list[Path]:
+    target_dir.mkdir(parents=True, exist_ok=True)
     installed: list[Path] = []
-    for name in EMBLEM_ICON_NAMES:
-        destination = target / name
+    for name in names:
+        destination = target_dir / name
         shutil.copy2(source_dir / name, destination)
         installed.append(destination)
+    return installed
+
+
+def install_icons(repo_root: Path, data_home: Path | None = None) -> list[Path]:
+    source_root = repo_root / "rsc" / "icons" / "nemovcs"
+    installed = copy_icon_set(
+        source_root / "emblems",
+        icon_target_dir(data_home),
+        EMBLEM_ICON_NAMES,
+    )
+    installed.extend(
+        copy_icon_set(
+            source_root / "actions",
+            hicolor_target_dir("actions", data_home),
+            ACTION_ICON_NAMES,
+        )
+    )
+    installed.extend(
+        copy_icon_set(
+            source_root / "apps",
+            hicolor_target_dir("apps", data_home),
+            APP_ICON_NAMES,
+        )
+    )
     return installed
 
 
@@ -97,9 +152,22 @@ def install(repo_root: Path, data_home: Path | None = None) -> Path:
     return extension_path
 
 
+def update_icon_cache(data_home: Path | None = None) -> bool:
+    updater = shutil.which("gtk-update-icon-cache")
+    if updater is None:
+        return False
+
+    subprocess.run(
+        [updater, "-f", "-t", str(hicolor_theme_dir(data_home))],
+        check=False,
+    )
+    return True
+
+
 def main() -> int:
     repo_root = Path(__file__).resolve().parents[1]
     extension_path = install(repo_root)
+    update_icon_cache()
     print(f"Installed NemoVCS nemo-python extension to {extension_path}")
     print("Restart Nemo with: nemo --quit")
     return 0

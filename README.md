@@ -50,8 +50,8 @@ nemo --quit
 
 What this installs:
 
-- Nemo action files into `~/.local/share/nemo/actions`.
-- Temporary action icons under `~/.local/share/nemo/actions/nemovcs-icons`.
+- Legacy NemoVCS action files are removed from `~/.local/share/nemo/actions`
+  and pruned from Nemo's action layout.
 - The generated nemo-python extension:
   `~/.local/share/nemo-python/extensions/NemoVCS.py`.
 - Status emblem icons into `~/.local/share/icons/hicolor/scalable/emblems`.
@@ -78,6 +78,9 @@ from Nemo's action layout. Unrelated Nemo actions are preserved.
 ## Use
 
 Open Nemo inside a Git or Subversion working tree.
+
+The context menu is provided by the NemoVCS nemo-python extension so the
+top-level items and the `NemoVCS` submenu stay in the same menu group.
 
 Top-level actions:
 
