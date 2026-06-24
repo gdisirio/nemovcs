@@ -185,7 +185,10 @@ class StageDialog(Gtk.Window):
 
     def load_items(self) -> None:
         self.store.clear()
-        self.items_by_root = backends.commit_items(self.paths)
+        self.items_by_root = {
+            root: filter_items_for_operation(items, self.operation)
+            for root, items in backends.commit_items(self.paths).items()
+        }
 
         total = 0
         changed = 0
@@ -217,7 +220,10 @@ class StageDialog(Gtk.Window):
                 f"{changed} changed, {untracked} untracked, {conflicted} conflicted"
             )
         elif repo_count:
-            self.status_label.set_text(f"No changed files in {repo_count} repository(s).")
+            self.status_label.set_text(
+                f"No files to {operation_verb(self.operation)} "
+                f"in {repo_count} repository(s)."
+            )
         else:
             self.status_label.set_text("No versioned repository selected.")
             self.exit_code = 1
@@ -498,6 +504,15 @@ def stage_phases(
     paths_by_root: dict[Path, Sequence[str]],
 ) -> list[BackendCommandPhase]:
     return backends.stage_phases(paths_by_root)
+
+
+def filter_items_for_operation(
+    items: Sequence[BackendChangeItem],
+    operation: Operation,
+) -> list[BackendChangeItem]:
+    if operation == "add":
+        return [item for item in items if not item.tracked]
+    return list(items)
 
 
 def operation_title(operation: Operation) -> str:

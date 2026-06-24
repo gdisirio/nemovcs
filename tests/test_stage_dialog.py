@@ -3,7 +3,7 @@ import unittest
 from unittest import mock
 
 from nemovcs.backends.base import BackendChangeItem
-from nemovcs.ui.stage_dialog import StageDialog, stage_phases
+from nemovcs.ui.stage_dialog import StageDialog, filter_items_for_operation, stage_phases
 
 
 class StageDialogCommandTest(unittest.TestCase):
@@ -35,6 +35,27 @@ class StageDialogCommandTest(unittest.TestCase):
         with mock.patch("nemovcs.git.is_inside_worktree", return_value=True):
             self.assertEqual(stage_phases({root: []}), [])
 
+    def test_stage_phases_keep_multi_selection_files_and_directories(self):
+        root = Path("/tmp/example")
+
+        with mock.patch("nemovcs.git.is_inside_worktree", return_value=True):
+            phases = stage_phases({root: ["new.txt", "new-dir", "src/app.py"]})
+
+        self.assertEqual(len(phases), 1)
+        self.assertEqual(
+            phases[0].command,
+            (
+                "git",
+                "-C",
+                str(root),
+                "add",
+                "--",
+                "new.txt",
+                "new-dir",
+                "src/app.py",
+            ),
+        )
+
     def test_default_selection_includes_untracked_but_excludes_conflicted(self):
         root = Path("/tmp/example")
         untracked = BackendChangeItem(
@@ -54,6 +75,48 @@ class StageDialogCommandTest(unittest.TestCase):
 
         self.assertTrue(StageDialog.default_selected(untracked))
         self.assertFalse(StageDialog.default_selected(conflicted))
+
+    def test_add_operation_shows_only_untracked_items(self):
+        root = Path("/tmp/example")
+        modified = BackendChangeItem(
+            backend_id="svn",
+            root=root,
+            path="modified.txt",
+            status="modified",
+        )
+        untracked = BackendChangeItem(
+            backend_id="svn",
+            root=root,
+            path="new.txt",
+            status="untracked",
+            tracked=False,
+        )
+
+        self.assertEqual(
+            filter_items_for_operation([modified, untracked], "add"),
+            [untracked],
+        )
+
+    def test_stage_operation_keeps_changed_and_untracked_items(self):
+        root = Path("/tmp/example")
+        modified = BackendChangeItem(
+            backend_id="git",
+            root=root,
+            path="modified.txt",
+            status="modified",
+        )
+        untracked = BackendChangeItem(
+            backend_id="git",
+            root=root,
+            path="new.txt",
+            status="untracked",
+            tracked=False,
+        )
+
+        self.assertEqual(
+            filter_items_for_operation([modified, untracked], "stage"),
+            [modified, untracked],
+        )
 
     def test_file_diff_command_uses_item_repository(self):
         root = Path("/tmp/example")
