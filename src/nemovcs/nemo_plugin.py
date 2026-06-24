@@ -26,6 +26,7 @@ PRIMARY_EMBLEMS = {
     "unversioned": "nemovcs-unversioned",
     "ok": "nemovcs-normal",
 }
+DIFFABLE_STATUSES = {"conflicted", "modified"}
 MENU_ICON = "nemovcs"
 ABOUT_ICON = MENU_ICON
 ADD_ICON = "nemovcs-add"
@@ -285,9 +286,20 @@ class NemoVCSInfoProviderCore:
         if not normalized or all(is_clone_target(path) for path in normalized):
             return []
 
-        if matching_backend_ids(normalized):
+        if matching_backend_ids(normalized) and self.diff_paths_visible(normalized):
             return common_top_level_specs(normalized)
         return []
+
+    def diff_paths_visible(self, paths: Sequence[str]) -> bool:
+        if not paths:
+            return False
+        for path in paths:
+            record = self.cache.get(path)
+            if record is None:
+                record = self.update_path(path)
+            if record is None or record.get("status", "") not in DIFFABLE_STATUSES:
+                return False
+        return True
 
 
 class PluginDiagnostics:

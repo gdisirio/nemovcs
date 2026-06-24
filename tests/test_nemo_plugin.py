@@ -389,6 +389,15 @@ class NemoVCSInfoProviderCoreTest(unittest.TestCase):
 
     def test_git_top_level_specs_use_common_dialog_commands(self):
         core = nemo_plugin.NemoVCSInfoProviderCore()
+        core.cache.update(
+            [
+                {
+                    "path": "/tmp/repo/src/app.py",
+                    "worktree_id": "git:/tmp/repo",
+                    "status": "modified",
+                }
+            ]
+        )
 
         with mock.patch("nemovcs.nemo_plugin.is_clone_target", return_value=False), (
             mock.patch("nemovcs.nemo_plugin.matching_backend_ids", return_value=["git"])
@@ -409,6 +418,76 @@ class NemoVCSInfoProviderCoreTest(unittest.TestCase):
                 ("nemovcs", "diff-dialog", "/tmp/repo/src/app.py"),
             ],
         )
+
+    def test_top_level_diff_is_hidden_for_clean_path(self):
+        core = nemo_plugin.NemoVCSInfoProviderCore()
+        core.cache.update(
+            [
+                {
+                    "path": "/tmp/repo/src/app.py",
+                    "worktree_id": "git:/tmp/repo",
+                    "status": "ok",
+                }
+            ]
+        )
+
+        with mock.patch("nemovcs.nemo_plugin.is_clone_target", return_value=False), (
+            mock.patch("nemovcs.nemo_plugin.matching_backend_ids", return_value=["git"])
+        ):
+            specs = core.top_level_specs(["/tmp/repo/src/app.py"])
+
+        self.assertEqual(specs, [])
+
+    def test_top_level_diff_is_hidden_for_unversioned_path(self):
+        core = nemo_plugin.NemoVCSInfoProviderCore()
+        core.cache.update(
+            [
+                {
+                    "path": "/tmp/repo/tmp",
+                    "worktree_id": "git:/tmp/repo",
+                    "status": "unversioned",
+                }
+            ]
+        )
+
+        with mock.patch("nemovcs.nemo_plugin.is_clone_target", return_value=False), (
+            mock.patch("nemovcs.nemo_plugin.matching_backend_ids", return_value=["git"])
+        ):
+            specs = core.top_level_specs(["/tmp/repo/tmp"])
+
+        self.assertEqual(specs, [])
+
+    def test_top_level_diff_is_hidden_when_status_is_not_cached(self):
+        core = nemo_plugin.NemoVCSInfoProviderCore(
+            seen=lambda paths: [],
+            get_status=lambda paths: [],
+        )
+
+        with mock.patch("nemovcs.nemo_plugin.is_clone_target", return_value=False), (
+            mock.patch("nemovcs.nemo_plugin.matching_backend_ids", return_value=["git"])
+        ):
+            specs = core.top_level_specs(["/tmp/repo/src/app.py"])
+
+        self.assertEqual(specs, [])
+
+    def test_top_level_diff_uses_daemon_status_when_status_is_not_cached(self):
+        core = nemo_plugin.NemoVCSInfoProviderCore(
+            seen=lambda paths: ["git:/tmp/repo"],
+            get_status=lambda paths: [
+                {
+                    "path": "/tmp/repo/src/app.py",
+                    "worktree_id": "git:/tmp/repo",
+                    "status": "modified",
+                }
+            ],
+        )
+
+        with mock.patch("nemovcs.nemo_plugin.is_clone_target", return_value=False), (
+            mock.patch("nemovcs.nemo_plugin.matching_backend_ids", return_value=["git"])
+        ):
+            specs = core.top_level_specs(["/tmp/repo/src/app.py"])
+
+        self.assertEqual([spec.label for spec in specs], ["Diff..."])
 
     def test_svn_submenu_group_uses_existing_dialog_commands(self):
         core = nemo_plugin.NemoVCSInfoProviderCore()
@@ -462,6 +541,15 @@ class NemoVCSInfoProviderCoreTest(unittest.TestCase):
 
     def test_svn_top_level_specs_use_common_dialog_commands(self):
         core = nemo_plugin.NemoVCSInfoProviderCore()
+        core.cache.update(
+            [
+                {
+                    "path": "/tmp/wc/tracked.c",
+                    "worktree_id": "svn:/tmp/wc",
+                    "status": "modified",
+                }
+            ]
+        )
 
         with mock.patch("nemovcs.nemo_plugin.is_clone_target", return_value=False), (
             mock.patch("nemovcs.nemo_plugin.matching_backend_ids", return_value=["svn"])
@@ -477,6 +565,15 @@ class NemoVCSInfoProviderCoreTest(unittest.TestCase):
 
     def test_both_backend_matches_get_separate_submenu_groups(self):
         core = nemo_plugin.NemoVCSInfoProviderCore()
+        core.cache.update(
+            [
+                {
+                    "path": "/tmp/combined",
+                    "worktree_id": "git:/tmp/combined",
+                    "status": "conflicted",
+                }
+            ]
+        )
 
         with mock.patch("nemovcs.nemo_plugin.is_clone_target", return_value=False), (
             mock.patch(
