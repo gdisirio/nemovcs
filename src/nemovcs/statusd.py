@@ -27,6 +27,7 @@ DBUS_INTERFACE = "io.github.gdisirio.NemoVCS.Statusd"
 class EmblemStatus(StrEnum):
     CONFLICTED = "conflicted"
     MODIFIED = "modified"
+    UNVERSIONED = "unversioned"
     OK = "ok"
     LOADING = "loading"
     STALE = "stale"
@@ -37,6 +38,7 @@ EMBLEM_PRIORITY = {
     EmblemStatus.ERROR: 50,
     EmblemStatus.CONFLICTED: 40,
     EmblemStatus.MODIFIED: 30,
+    EmblemStatus.UNVERSIONED: 25,
     EmblemStatus.STALE: 20,
     EmblemStatus.LOADING: 10,
     EmblemStatus.OK: 0,
@@ -60,6 +62,7 @@ class WorktreeIdentity:
 class WorktreeEntry:
     identity: WorktreeIdentity
     statuses: dict[str, EmblemStatus] = field(default_factory=dict)
+    tracked_paths: set[str] = field(default_factory=set)
     scanned: bool = False
     error: str = ""
     stale: bool = False
@@ -311,6 +314,7 @@ def scan_worktree(entry: WorktreeEntry) -> None:
     result = backend.scan_status(entry.identity.root)
     if not result.ok:
         entry.statuses.clear()
+        entry.tracked_paths.clear()
         entry.scanned = True
         entry.error = result.error
         return
@@ -323,6 +327,7 @@ def scan_worktree(entry: WorktreeEntry) -> None:
             statuses[item.old_path] = status
 
     entry.statuses = statuses
+    entry.tracked_paths = set(result.tracked_paths)
     entry.scanned = True
     entry.error = ""
 
@@ -330,6 +335,8 @@ def scan_worktree(entry: WorktreeEntry) -> None:
 def item_to_emblem_status(item: BackendStatusItem) -> EmblemStatus:
     if item.conflicted:
         return EmblemStatus.CONFLICTED
+    if item.status in {"untracked", "unversioned"}:
+        return EmblemStatus.UNVERSIONED
     return EmblemStatus.MODIFIED
 
 
@@ -345,7 +352,12 @@ def path_status(entry: WorktreeEntry, path: str | Path) -> EmblemStatus:
         relpath = relative_path_in_worktree(entry.identity, path)
         if not entry.stale_paths or relpath in entry.stale_paths:
             return EmblemStatus.STALE
-    return entry.statuses.get(relpath, EmblemStatus.OK)
+    status = entry.statuses.get(relpath)
+    if status is not None:
+        return status
+    if is_unversioned_directory(entry, relpath, path):
+        return EmblemStatus.UNVERSIONED
+    return EmblemStatus.OK
 
 
 def aggregate_status(entry: WorktreeEntry, path: str | Path) -> EmblemStatus:
@@ -376,7 +388,31 @@ def aggregate_status(entry: WorktreeEntry, path: str | Path) -> EmblemStatus:
             continue
         if EMBLEM_PRIORITY[status] > EMBLEM_PRIORITY[best]:
             best = status
+    if best == EmblemStatus.OK and is_unversioned_directory(entry, relpath, path):
+        return EmblemStatus.UNVERSIONED
     return best
+
+
+def is_unversioned_directory(
+    entry: WorktreeEntry,
+    relpath: str,
+    path: str | Path,
+) -> bool:
+    if entry.identity.backend_id != "git" or relpath == ".":
+        return False
+
+    candidate = Path(path).expanduser()
+    if not candidate.is_absolute():
+        candidate = Path.cwd() / candidate
+    candidate = candidate.resolve(strict=False)
+    if not candidate.is_dir():
+        return False
+
+    prefix = relpath.rstrip("/") + "/"
+    return not any(
+        tracked == relpath or tracked.startswith(prefix)
+        for tracked in entry.tracked_paths
+    )
 
 
 def relative_path_in_worktree(

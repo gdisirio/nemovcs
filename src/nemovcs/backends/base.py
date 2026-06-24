@@ -18,6 +18,7 @@ class BackendWorktreeIdentity:
 @dataclass(frozen=True)
 class BackendStatusItem:
     path: str
+    status: str = "modified"
     old_path: str | None = None
     conflicted: bool = False
 
@@ -26,6 +27,7 @@ class BackendStatusItem:
 class BackendStatusScan:
     ok: bool
     items: tuple[BackendStatusItem, ...] = ()
+    tracked_paths: tuple[str, ...] = ()
     error: str = ""
 
 

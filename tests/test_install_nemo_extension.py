@@ -68,6 +68,16 @@ class InstallNemoExtensionTest(unittest.TestCase):
                     / "hicolor"
                     / "scalable"
                     / "emblems"
+                    / "emblem-nemovcs-unversioned.svg"
+                ).exists()
+            )
+            self.assertTrue(
+                (
+                    Path(tmp)
+                    / "icons"
+                    / "hicolor"
+                    / "scalable"
+                    / "emblems"
                     / "emblem-nemovcs-normal.svg"
                 ).exists()
             )

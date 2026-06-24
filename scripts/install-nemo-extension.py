@@ -14,6 +14,7 @@ EMBLEM_ICON_NAMES = [
     "emblem-nemovcs-conflicted.svg",
     "emblem-nemovcs-modified.svg",
     "emblem-nemovcs-normal.svg",
+    "emblem-nemovcs-unversioned.svg",
 ]
 ACTION_ICON_NAMES = [
     "nemovcs-about.svg",

@@ -89,11 +89,17 @@ class GitBackend:
         return results
 
     def scan_status(self, root: str | Path) -> BackendStatusScan:
-        result = git.run_git(root, ["status", "--porcelain=v2", "-z"])
+        result = git.run_git(root, ["status", "--porcelain=v2", "-z", "-uall"])
         if not result.ok:
             return BackendStatusScan(
                 ok=False,
                 error=result.stderr.strip() or result.stdout.strip(),
+            )
+        tracked = git.run_git(root, ["ls-files", "-z"])
+        if not tracked.ok:
+            return BackendStatusScan(
+                ok=False,
+                error=tracked.stderr.strip() or tracked.stdout.strip(),
             )
 
         items = git.parse_status_porcelain_v2_z(
@@ -105,11 +111,13 @@ class GitBackend:
             items=tuple(
                 BackendStatusItem(
                     path=item.path,
+                    status="unversioned" if not item.tracked else "modified",
                     old_path=item.old_path,
                     conflicted=item.conflicted or item.status == "conflicted",
                 )
                 for item in items
             ),
+            tracked_paths=tuple(parse_ls_files_z(tracked.stdout)),
         )
 
     def commit_items(
@@ -260,3 +268,7 @@ class GitBackend:
             tracked=item.tracked,
             conflicted=item.conflicted,
         )
+
+
+def parse_ls_files_z(data: str) -> list[str]:
+    return [path for path in data.split("\0") if path]

@@ -23,6 +23,7 @@ DEFAULT_MAX_VISIBLE_ITEMS = 2048
 PRIMARY_EMBLEMS = {
     "conflicted": "nemovcs-conflicted",
     "modified": "nemovcs-modified",
+    "unversioned": "nemovcs-unversioned",
     "ok": "nemovcs-normal",
 }
 MENU_ICON = "nemovcs"

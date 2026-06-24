@@ -433,7 +433,7 @@ class WorktreeScanTest(unittest.TestCase):
         )
         self.assertEqual(
             statusd.path_status(self.entry, self.root / "untracked.txt"),
-            statusd.EmblemStatus.MODIFIED,
+            statusd.EmblemStatus.UNVERSIONED,
         )
         self.assertEqual(
             statusd.path_status(self.entry, self.root / "deleted.txt"),
@@ -450,6 +450,38 @@ class WorktreeScanTest(unittest.TestCase):
         self.assertEqual(
             statusd.path_status(self.entry, self.root / "dir" / "clean.txt"),
             statusd.EmblemStatus.OK,
+        )
+
+    def test_scan_reports_nested_untracked_files_individually(self):
+        (self.root / "untracked-dir").mkdir()
+        (self.root / "untracked-dir" / "nested.txt").write_text(
+            "new\n",
+            encoding="utf-8",
+        )
+
+        statusd.scan_worktree(self.entry)
+
+        self.assertEqual(
+            statusd.path_status(self.entry, self.root / "untracked-dir" / "nested.txt"),
+            statusd.EmblemStatus.UNVERSIONED,
+        )
+        self.assertEqual(
+            statusd.aggregate_status(self.entry, self.root / "untracked-dir"),
+            statusd.EmblemStatus.UNVERSIONED,
+        )
+
+    def test_scan_reports_empty_untracked_directory_as_unversioned(self):
+        (self.root / "empty-untracked-dir").mkdir()
+
+        statusd.scan_worktree(self.entry)
+
+        self.assertEqual(
+            statusd.path_status(self.entry, self.root / "empty-untracked-dir"),
+            statusd.EmblemStatus.UNVERSIONED,
+        )
+        self.assertEqual(
+            statusd.aggregate_status(self.entry, self.root / "empty-untracked-dir"),
+            statusd.EmblemStatus.UNVERSIONED,
         )
 
     def test_conflict_maps_to_conflicted_and_dominates_folder_aggregate(self):

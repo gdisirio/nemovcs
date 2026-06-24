@@ -472,7 +472,10 @@ class BackendRegistryTest(unittest.TestCase):
         with mock.patch("nemovcs.git.run_git") as run_git, mock.patch(
             "nemovcs.git.parse_status_porcelain_v2_z"
         ) as parse_status:
-            run_git.return_value = git.GitResult(("git",), root, 0, "raw", "")
+            run_git.side_effect = [
+                git.GitResult(("git",), root, 0, "raw", ""),
+                git.GitResult(("git",), root, 0, "tracked.txt\0renamed.txt\0", ""),
+            ]
             parse_status.return_value = [
                 git.CommitItem(
                     root=root,
@@ -497,17 +500,34 @@ class BackendRegistryTest(unittest.TestCase):
                     worktree_status="U",
                     conflicted=True,
                 ),
+                git.CommitItem(
+                    root=root,
+                    path="new.txt",
+                    status="untracked",
+                    index_status="?",
+                    worktree_status="?",
+                    tracked=False,
+                ),
             ]
 
             result = backend.scan_status(root)
 
+        self.assertEqual(
+            run_git.call_args_list,
+            [
+                mock.call(root, ["status", "--porcelain=v2", "-z", "-uall"]),
+                mock.call(root, ["ls-files", "-z"]),
+            ],
+        )
         self.assertTrue(result.ok)
+        self.assertEqual(result.tracked_paths, ("tracked.txt", "renamed.txt"))
         self.assertEqual(
             result.items,
             (
                 BackendStatusItem(path="tracked.txt"),
                 BackendStatusItem(path="renamed.txt", old_path="old.txt"),
                 BackendStatusItem(path="conflicted.txt", conflicted=True),
+                BackendStatusItem(path="new.txt", status="unversioned"),
             ),
         )
         parse_status.assert_called_once_with(
