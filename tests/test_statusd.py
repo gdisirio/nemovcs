@@ -470,6 +470,26 @@ class WorktreeScanTest(unittest.TestCase):
             statusd.EmblemStatus.UNVERSIONED,
         )
 
+    def test_scan_reports_root_with_untracked_child_as_modified(self):
+        (self.root / "untracked.txt").write_text("new\n", encoding="utf-8")
+
+        statusd.scan_worktree(self.entry)
+
+        self.assertEqual(
+            statusd.aggregate_status(self.entry, self.root),
+            statusd.EmblemStatus.MODIFIED,
+        )
+
+    def test_scan_reports_versioned_directory_with_untracked_child_as_modified(self):
+        (self.root / "dir" / "untracked.txt").write_text("new\n", encoding="utf-8")
+
+        statusd.scan_worktree(self.entry)
+
+        self.assertEqual(
+            statusd.aggregate_status(self.entry, self.root / "dir"),
+            statusd.EmblemStatus.MODIFIED,
+        )
+
     def test_scan_reports_empty_untracked_directory_as_unversioned(self):
         (self.root / "empty-untracked-dir").mkdir()
 

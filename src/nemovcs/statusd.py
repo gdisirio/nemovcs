@@ -378,6 +378,11 @@ def aggregate_status(entry: WorktreeEntry, path: str | Path) -> EmblemStatus:
             best = status
     if best == EmblemStatus.OK and is_unversioned_directory(entry, relpath, path):
         return EmblemStatus.UNVERSIONED
+    if (
+        best == EmblemStatus.UNVERSIONED
+        and not is_unversioned_directory(entry, relpath, path)
+    ):
+        return EmblemStatus.MODIFIED
     return best
 
 
