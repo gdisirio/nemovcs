@@ -515,8 +515,12 @@ class BackendRegistryTest(unittest.TestCase):
         self.assertEqual(
             run_git.call_args_list,
             [
-                mock.call(root, ["status", "--porcelain=v2", "-z", "-uall"]),
-                mock.call(root, ["ls-files", "-z"]),
+                mock.call(
+                    root,
+                    ["status", "--porcelain=v2", "-z", "-uall"],
+                    env=GitBackend.scan_env,
+                ),
+                mock.call(root, ["ls-files", "-z"], env=GitBackend.scan_env),
             ],
         )
         self.assertTrue(result.ok)

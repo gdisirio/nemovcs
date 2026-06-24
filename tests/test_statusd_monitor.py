@@ -57,9 +57,12 @@ class WorktreeMonitorManagerTest(unittest.TestCase):
             paths,
             [
                 first.root,
+                first.gitdir,
                 first.gitdir / "index",
                 first.gitdir / "HEAD",
                 first.common_gitdir / "refs",
+                first.common_gitdir / "refs" / "heads",
+                first.common_gitdir / "refs" / "tags",
                 first.common_gitdir / "packed-refs",
             ],
         )
@@ -76,9 +79,13 @@ class WorktreeMonitorManagerTest(unittest.TestCase):
         paths = statusd_monitor.monitor_paths(linked)
 
         self.assertIn(linked.root, paths)
+        self.assertIn(linked.gitdir, paths)
+        self.assertIn(linked.common_gitdir, paths)
         self.assertIn(linked.gitdir / "index", paths)
         self.assertIn(linked.gitdir / "HEAD", paths)
         self.assertIn(linked.common_gitdir / "refs", paths)
+        self.assertIn(linked.common_gitdir / "refs" / "heads", paths)
+        self.assertIn(linked.common_gitdir / "refs" / "tags", paths)
 
     def test_svn_paths_watch_worktree_and_wc_database(self):
         root = Path("/tmp/svn")
@@ -130,6 +137,27 @@ class WorktreeMonitorManagerTest(unittest.TestCase):
 
         self.assertTrue(entry.stale)
         self.assertEqual(entry.stale_paths, {"changed.txt"})
+        self.assertEqual(len(timer.scheduled), 1)
+
+    def test_git_metadata_event_marks_whole_worktree_stale(self):
+        timer = FakeTimer()
+        factory = FakeMonitorFactory()
+        first = identity("repo")
+        cache = statusd.WorktreeCache()
+        entry = cache.touch(first)
+        entry.scanned = True
+        core = statusd.StatusDaemonCore(cache, timer=timer)
+        manager = statusd_monitor.WorktreeMonitorManager(
+            core,
+            monitor_factory=factory,
+        )
+        core.set_monitor_manager(manager)
+        manager.ensure(entry)
+
+        factory.handles[1].emit(first.gitdir / "index.lock")
+
+        self.assertTrue(entry.stale)
+        self.assertEqual(entry.stale_paths, set())
         self.assertEqual(len(timer.scheduled), 1)
 
     def test_stop_cancels_all_worktree_monitors(self):

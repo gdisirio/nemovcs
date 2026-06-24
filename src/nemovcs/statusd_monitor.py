@@ -33,8 +33,9 @@ class WorktreeMonitorManager:
             handles.append(
                 self.monitor_factory(
                     path,
-                    lambda changed_path, key=worktree_id: self.on_changed(
+                    lambda changed_path, key=worktree_id, identity=entry.identity: self.on_changed(
                         key,
+                        identity,
                         changed_path,
                     ),
                 )
@@ -52,7 +53,15 @@ class WorktreeMonitorManager:
         for worktree_id in list(self.monitors):
             self.stop(worktree_id)
 
-    def on_changed(self, worktree_id: str, changed_path: Path) -> None:
+    def on_changed(
+        self,
+        worktree_id: str,
+        identity: statusd.WorktreeIdentity,
+        changed_path: Path,
+    ) -> None:
+        if is_vcs_metadata_path(identity, changed_path):
+            self.core.mark_stale(worktree_id)
+            return
         self.core.mark_stale(worktree_id, [changed_path])
 
 
@@ -62,12 +71,33 @@ def monitor_paths(identity: statusd.WorktreeIdentity) -> list[Path]:
 
     candidates = [
         identity.root,
+        identity.gitdir,
+        identity.common_gitdir,
         identity.gitdir / "index",
         identity.gitdir / "HEAD",
         identity.common_gitdir / "refs",
+        identity.common_gitdir / "refs" / "heads",
+        identity.common_gitdir / "refs" / "tags",
         identity.common_gitdir / "packed-refs",
     ]
     return list(dict.fromkeys(candidates))
+
+
+def is_vcs_metadata_path(identity: statusd.WorktreeIdentity, path: Path) -> bool:
+    if identity.backend_id == "svn":
+        return is_relative_to(path, identity.gitdir)
+    return is_relative_to(path, identity.gitdir) or is_relative_to(
+        path,
+        identity.common_gitdir,
+    )
+
+
+def is_relative_to(path: Path, parent: Path) -> bool:
+    try:
+        path.resolve(strict=False).relative_to(parent.resolve(strict=False))
+    except ValueError:
+        return False
+    return True
 
 
 def gio_monitor(path: Path, callback: MonitorCallback):

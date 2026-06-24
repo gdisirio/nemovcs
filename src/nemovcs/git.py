@@ -7,10 +7,11 @@ runtime dependencies low and delegates repository edge cases to Git itself.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import os
 from pathlib import Path
 import shutil
 import subprocess
-from typing import Iterable, Sequence
+from typing import Iterable, Mapping, Sequence
 
 
 DEFAULT_TIMEOUT_SECONDS = 15
@@ -89,11 +90,16 @@ def run_git(
     *,
     timeout: int = DEFAULT_TIMEOUT_SECONDS,
     check: bool = False,
+    env: Mapping[str, str] | None = None,
 ) -> GitResult:
     """Run `git` in `cwd` and return captured text output."""
 
     resolved_cwd = path_for_git(cwd)
     command = ("git", "-C", str(resolved_cwd), *args)
+    process_env = None
+    if env is not None:
+        process_env = os.environ.copy()
+        process_env.update(env)
     proc = subprocess.run(
         command,
         check=False,
@@ -101,6 +107,7 @@ def run_git(
         stderr=subprocess.PIPE,
         text=True,
         timeout=timeout,
+        env=process_env,
     )
     result = GitResult(command, resolved_cwd, proc.returncode, proc.stdout, proc.stderr)
     if check and not result.ok:

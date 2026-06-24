@@ -23,6 +23,7 @@ from nemovcs.backends.base import (
 class GitBackend:
     id = "git"
     label = "Git"
+    scan_env = {"GIT_OPTIONAL_LOCKS": "0"}
 
     def is_worktree(self, path: str | Path) -> bool:
         return git.is_inside_worktree(path)
@@ -89,13 +90,17 @@ class GitBackend:
         return results
 
     def scan_status(self, root: str | Path) -> BackendStatusScan:
-        result = git.run_git(root, ["status", "--porcelain=v2", "-z", "-uall"])
+        result = git.run_git(
+            root,
+            ["status", "--porcelain=v2", "-z", "-uall"],
+            env=self.scan_env,
+        )
         if not result.ok:
             return BackendStatusScan(
                 ok=False,
                 error=result.stderr.strip() or result.stdout.strip(),
             )
-        tracked = git.run_git(root, ["ls-files", "-z"])
+        tracked = git.run_git(root, ["ls-files", "-z"], env=self.scan_env)
         if not tracked.ok:
             return BackendStatusScan(
                 ok=False,

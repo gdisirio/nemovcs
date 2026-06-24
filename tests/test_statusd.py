@@ -202,7 +202,7 @@ class StatusDaemonSchedulerTest(unittest.TestCase):
         self.assertEqual(entry.stale_paths, {"a.txt", "b.txt"})
         self.assertEqual(
             statusd.path_status(entry, first.root / "a.txt"),
-            statusd.EmblemStatus.STALE,
+            statusd.EmblemStatus.OK,
         )
 
         timer.fire_next()

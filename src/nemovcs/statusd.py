@@ -348,10 +348,6 @@ def path_status(entry: WorktreeEntry, path: str | Path) -> EmblemStatus:
         return EmblemStatus.LOADING
     if entry.error:
         return EmblemStatus.ERROR
-    if entry.stale:
-        relpath = relative_path_in_worktree(entry.identity, path)
-        if not entry.stale_paths or relpath in entry.stale_paths:
-            return EmblemStatus.STALE
     status = entry.statuses.get(relpath)
     if status is not None:
         return status
@@ -368,14 +364,6 @@ def aggregate_status(entry: WorktreeEntry, path: str | Path) -> EmblemStatus:
         return EmblemStatus.LOADING
     if entry.error:
         return EmblemStatus.ERROR
-    if entry.stale:
-        if not entry.stale_paths:
-            return EmblemStatus.STALE
-        for stale_path in entry.stale_paths:
-            if relpath == "." or stale_path == relpath or stale_path.startswith(
-                relpath.rstrip("/") + "/"
-            ):
-                return EmblemStatus.STALE
 
     if relpath == ".":
         prefix = ""
