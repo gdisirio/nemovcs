@@ -489,6 +489,51 @@ class NemoVCSInfoProviderCoreTest(unittest.TestCase):
 
         self.assertEqual([spec.label for spec in specs], ["Diff..."])
 
+    def test_top_level_diff_compares_two_selected_files_with_meld(self):
+        core = nemo_plugin.NemoVCSInfoProviderCore()
+        with tempfile.TemporaryDirectory() as tmp:
+            left = Path(tmp) / "left.txt"
+            right = Path(tmp) / "right.txt"
+            left.write_text("left\n", encoding="utf-8")
+            right.write_text("right\n", encoding="utf-8")
+
+            specs = core.top_level_specs([left, right])
+
+        self.assertEqual([spec.label for spec in specs], ["Diff..."])
+        self.assertEqual(specs[0].command, ("meld", str(left), str(right)))
+
+    def test_top_level_diff_compares_two_selected_directories_with_meld(self):
+        core = nemo_plugin.NemoVCSInfoProviderCore()
+        with tempfile.TemporaryDirectory() as tmp:
+            left = Path(tmp) / "left"
+            right = Path(tmp) / "right"
+            left.mkdir()
+            right.mkdir()
+
+            specs = core.top_level_specs([left, right])
+
+        self.assertEqual([spec.label for spec in specs], ["Diff..."])
+        self.assertEqual(specs[0].command, ("meld", str(left), str(right)))
+
+    def test_top_level_diff_hides_mixed_two_path_compare(self):
+        core = nemo_plugin.NemoVCSInfoProviderCore(
+            seen=lambda paths: [],
+            get_status=lambda paths: [],
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp) / "dir"
+            file_path = Path(tmp) / "file.txt"
+            directory.mkdir()
+            file_path.write_text("file\n", encoding="utf-8")
+
+            with mock.patch(
+                "nemovcs.nemo_plugin.matching_backend_ids",
+                return_value=[],
+            ):
+                specs = core.top_level_specs([directory, file_path])
+
+        self.assertEqual(specs, [])
+
     def test_svn_submenu_group_uses_existing_dialog_commands(self):
         core = nemo_plugin.NemoVCSInfoProviderCore()
 

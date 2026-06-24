@@ -283,7 +283,14 @@ class NemoVCSInfoProviderCore:
 
     def top_level_specs(self, paths: Sequence[str | Path]) -> list[MenuActionSpec]:
         normalized = [str(Path(path).resolve(strict=False)) for path in paths]
-        if not normalized or all(is_clone_target(path) for path in normalized):
+        if not normalized:
+            return []
+
+        compare_spec = two_path_compare_spec(normalized)
+        if compare_spec is not None:
+            return [compare_spec]
+
+        if all(is_clone_target(path) for path in normalized):
             return []
 
         if matching_backend_ids(normalized) and self.diff_paths_visible(normalized):
@@ -480,6 +487,22 @@ def common_top_level_specs(paths: Sequence[str]) -> list[MenuActionSpec]:
     return [
         action("Diff", "Diff...", ["diff-dialog", *paths], icon=DIFF_ICON),
     ]
+
+
+def two_path_compare_spec(paths: Sequence[str]) -> MenuActionSpec | None:
+    if len(paths) != 2:
+        return None
+
+    left, right = (Path(path) for path in paths)
+    if (left.is_file() and right.is_file()) or (left.is_dir() and right.is_dir()):
+        return MenuActionSpec(
+            name="NemoVCS::Compare",
+            label="Diff...",
+            command=("meld", str(left), str(right)),
+            tip="Compare selected paths",
+            icon=DIFF_ICON,
+        )
+    return None
 
 
 def svn_menu_specs(paths: Sequence[str]) -> list[MenuActionSpec]:
