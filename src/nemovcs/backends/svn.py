@@ -123,12 +123,13 @@ class SvnBackend:
                 error=result.stderr.strip() or result.stdout.strip(),
             )
 
-        items = [item for item in self.parse_status(root, result.stdout) if item.tracked]
+        items = self.parse_status(root, result.stdout)
         return BackendStatusScan(
             ok=True,
             items=tuple(
                 BackendStatusItem(
                     path=item.path,
+                    status="unversioned" if not item.tracked else "modified",
                     old_path=item.old_path,
                     conflicted=item.conflicted,
                 )

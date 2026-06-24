@@ -629,7 +629,7 @@ class BackendRegistryTest(unittest.TestCase):
             ],
         )
 
-    def test_svn_backend_scan_status_ignores_unversioned_items(self):
+    def test_svn_backend_scan_status_includes_unversioned_items(self):
         backend = SvnBackend()
         root = Path("/tmp/wc")
         xml = """<?xml version="1.0"?>
@@ -654,6 +654,7 @@ class BackendRegistryTest(unittest.TestCase):
             result.items,
             (
                 BackendStatusItem(path="modified.txt"),
+                BackendStatusItem(path="generated.txt", status="unversioned"),
                 BackendStatusItem(path="conflict.txt", conflicted=True),
             ),
         )

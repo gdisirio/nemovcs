@@ -303,6 +303,56 @@ class StatusDaemonSchedulerTest(unittest.TestCase):
         self.assertEqual(record["worktree_id"], first.cache_key)
         self.assertEqual(record["status"], statusd.EmblemStatus.MODIFIED)
 
+    def test_git_unversioned_file_aggregate_remains_unversioned(self):
+        first = identity("one")
+        cache = statusd.WorktreeCache()
+        entry = cache.touch(first)
+        entry.scanned = True
+        entry.statuses["new.txt"] = statusd.EmblemStatus.UNVERSIONED
+
+        self.assertEqual(
+            statusd.aggregate_status(entry, first.root / "new.txt"),
+            statusd.EmblemStatus.UNVERSIONED,
+        )
+
+    def test_svn_unversioned_file_aggregate_remains_unversioned(self):
+        root = Path("/tmp/wc")
+        svn = statusd.WorktreeIdentity(
+            root=root,
+            gitdir=root / ".svn",
+            common_gitdir=root / ".svn",
+            head_label="trunk",
+            backend_id="svn",
+        )
+        cache = statusd.WorktreeCache()
+        entry = cache.touch(svn)
+        entry.scanned = True
+        entry.statuses["new.txt"] = statusd.EmblemStatus.UNVERSIONED
+
+        self.assertEqual(
+            statusd.aggregate_status(entry, root / "new.txt"),
+            statusd.EmblemStatus.UNVERSIONED,
+        )
+
+    def test_svn_parent_ignores_unversioned_descendants_for_aggregate(self):
+        root = Path("/tmp/wc")
+        svn = statusd.WorktreeIdentity(
+            root=root,
+            gitdir=root / ".svn",
+            common_gitdir=root / ".svn",
+            head_label="trunk",
+            backend_id="svn",
+        )
+        cache = statusd.WorktreeCache()
+        entry = cache.touch(svn)
+        entry.scanned = True
+        entry.statuses["new.txt"] = statusd.EmblemStatus.UNVERSIONED
+
+        self.assertEqual(
+            statusd.aggregate_status(entry, root),
+            statusd.EmblemStatus.OK,
+        )
+
 
 @unittest.skipUnless(have_git(), "git executable is required")
 class WorktreeCacheIntegrationTest(unittest.TestCase):

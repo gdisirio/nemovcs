@@ -370,8 +370,18 @@ def aggregate_status(entry: WorktreeEntry, path: str | Path) -> EmblemStatus:
     else:
         prefix = relpath.rstrip("/") + "/"
 
-    best = entry.statuses.get(relpath, EmblemStatus.OK)
+    direct_status = entry.statuses.get(relpath)
+    if direct_status == EmblemStatus.UNVERSIONED:
+        return EmblemStatus.UNVERSIONED
+
+    best = direct_status or EmblemStatus.OK
     for item_path, status in entry.statuses.items():
+        if (
+            status == EmblemStatus.UNVERSIONED
+            and item_path != relpath
+            and entry.identity.backend_id == "svn"
+        ):
+            continue
         if prefix and not item_path.startswith(prefix):
             continue
         if EMBLEM_PRIORITY[status] > EMBLEM_PRIORITY[best]:
