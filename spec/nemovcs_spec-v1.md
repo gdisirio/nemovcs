@@ -602,6 +602,14 @@ Folder emblems should summarize the highest-priority state of visible or cached
 descendants. Exact propagation rules can evolve, but conflicts must dominate
 modified state, and modified state must dominate clean state.
 
+Future refinement: distinguish a versioned folder that contains only
+unversioned descendants from a folder containing tracked-file changes. The
+current prototype may show both cases as dirty/modified at aggregate folder
+level, while the unversioned leaf itself remains unversioned. A later status
+model could add an internal state such as `contains-unversioned` and map it to
+a separate emblem, the existing unversioned emblem, or no parent emblem
+depending on usability testing.
+
 ### Status Daemon Prototype Milestones
 
 The first prototype can be a normal foreground process started manually from the
