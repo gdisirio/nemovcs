@@ -24,6 +24,7 @@ ACTION_ICON_NAMES = [
     "nemovcs-diff.svg",
     "nemovcs-git.svg",
     "nemovcs-push.svg",
+    "nemovcs-rename.svg",
     "nemovcs-revert.svg",
     "nemovcs-settings.svg",
     "nemovcs-show-log.svg",

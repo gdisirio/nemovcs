@@ -258,6 +258,18 @@ def cmd_revert_dialog(args: argparse.Namespace) -> int:
     return revert_dialog.run(args.paths or ["."])
 
 
+def cmd_rename_dialog(args: argparse.Namespace) -> int:
+    from .ui import rename_dialog
+
+    if len(args.paths) != 1:
+        print("select exactly one path to rename", file=sys.stderr)
+        return 1
+    if not backends.group_by_backend(args.paths):
+        print("not inside a versioned working tree", file=sys.stderr)
+        return 1
+    return rename_dialog.run(args.paths)
+
+
 def cmd_clone_dialog(args: argparse.Namespace) -> int:
     from .ui import clone_dialog
 
@@ -508,6 +520,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     revert_dialog.add_argument("paths", nargs="*")
     revert_dialog.set_defaults(func=cmd_revert_dialog)
+
+    rename_dialog = subparsers.add_parser(
+        "rename-dialog",
+        help="open the GTK rename dialog",
+    )
+    rename_dialog.add_argument("paths", nargs="*")
+    rename_dialog.set_defaults(func=cmd_rename_dialog)
 
     clone_dialog = subparsers.add_parser(
         "clone-dialog",

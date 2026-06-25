@@ -212,6 +212,25 @@ class BackendRegistryTest(unittest.TestCase):
 
         commit_phases.assert_called_once_with(root, ["src/app.py"], "message")
 
+    def test_rename_phases_uses_detected_backend(self):
+        root = Path("/tmp/repo")
+        phase = BackendCommandPhase(
+            title="Rename app.py",
+            cwd=root,
+            command=("fake", "rename"),
+        )
+
+        with mock.patch("nemovcs.git.is_inside_worktree", return_value=True), mock.patch(
+            "nemovcs.backends.git.GitBackend.rename_phases",
+            return_value=[phase],
+        ) as rename_phases:
+            self.assertEqual(
+                backends.rename_phases(root, "src/app.py", "src/main.py"),
+                [phase],
+            )
+
+        rename_phases.assert_called_once_with(root, "src/app.py", "src/main.py")
+
     def test_git_backend_delegates_status_to_existing_git_helpers(self):
         backend = GitBackend()
         expected = object()
@@ -389,6 +408,27 @@ class BackendRegistryTest(unittest.TestCase):
                 "--",
                 "src/app.py",
                 "README.md",
+            ),
+        )
+
+    def test_git_backend_builds_rename_phases(self):
+        backend = GitBackend()
+        root = Path("/tmp/repo")
+
+        phases = backend.rename_phases(root, "src/app.py", "src/main.py")
+
+        self.assertEqual(len(phases), 1)
+        self.assertEqual(phases[0].title, "Rename app.py")
+        self.assertEqual(
+            phases[0].command,
+            (
+                "git",
+                "-C",
+                str(root),
+                "mv",
+                "--",
+                "src/app.py",
+                "src/main.py",
             ),
         )
 
@@ -704,11 +744,13 @@ class BackendRegistryTest(unittest.TestCase):
         commit = backend.commit_phases(root, ["new.txt"], "message")
         update = backend.update_phases({root: ["."]})
         revert = backend.revert_phases({root: ["modified.txt"]})
+        rename = backend.rename_phases(root, "old.txt", "new.txt")
 
         self.assertEqual(add[0].command, ("svn", "add", "--parents", "new.txt"))
         self.assertEqual(commit[0].command, ("svn", "commit", "-m", "message", "new.txt"))
         self.assertEqual(update[0].command, ("svn", "update"))
         self.assertEqual(revert[0].command, ("svn", "revert", "modified.txt"))
+        self.assertEqual(rename[0].command, ("svn", "move", "old.txt", "new.txt"))
 
 
 if __name__ == "__main__":

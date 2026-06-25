@@ -222,6 +222,20 @@ class SvnBackend:
             if relpaths
         ]
 
+    def rename_phases(
+        self,
+        root: str | Path,
+        source_relpath: str,
+        target_relpath: str,
+    ) -> list[BackendCommandPhase]:
+        return [
+            self.phase(
+                f"Rename {Path(source_relpath).name}",
+                root,
+                ["move", source_relpath, target_relpath],
+            )
+        ]
+
     def file_diff_command(self, item: BackendChangeItem) -> list[str]:
         return ["nemovcs", "svn-meld-diff", str(item.root / item.path)]
 

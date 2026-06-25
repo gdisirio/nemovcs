@@ -127,6 +127,13 @@ class Backend(Protocol):
         paths_by_root: dict[Path, Sequence[str]],
     ) -> list[BackendCommandPhase]: ...
 
+    def rename_phases(
+        self,
+        root: str | Path,
+        source_relpath: str,
+        target_relpath: str,
+    ) -> list[BackendCommandPhase]: ...
+
     def file_diff_command(self, item: BackendChangeItem) -> list[str]: ...
 
     def update(self, paths: Sequence[str | Path]) -> list[Any]: ...

@@ -12,6 +12,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 import time
 from typing import Sequence
 
@@ -36,6 +37,7 @@ DIFF_ICON = "nemovcs-diff"
 GIT_ICON = "nemovcs-git"
 LOG_ICON = "nemovcs-show-log"
 PUSH_ICON = "nemovcs-push"
+RENAME_ICON = "nemovcs-rename"
 REVERT_ICON = "nemovcs-revert"
 SETTINGS_ICON = "nemovcs-settings"
 STATUS_ICON = "nemovcs-status"
@@ -395,13 +397,14 @@ class NemoVCSInfoProviderMixin:
         return item
 
     def on_menu_item_activate(self, _item, command: Sequence[str]) -> None:
+        launch_command = menu_launch_command(command)
         try:
-            subprocess.Popen(list(command))
+            subprocess.Popen(launch_command, env=menu_launch_env(command))
         except OSError as exc:
             self.nemovcs_core.last_error = str(exc)
             self.nemovcs_core.log(
                 "menu-spawn-error",
-                command=" ".join(command),
+                command=" ".join(launch_command),
                 error=str(exc),
             )
 
@@ -437,6 +440,23 @@ def subscribe_daemon_status_changed(callback):
     return statusd_dbus.subscribe_status_changed(callback)
 
 
+def menu_launch_command(command: Sequence[str]) -> list[str]:
+    if command and command[0] == "nemovcs":
+        return [sys.executable, "-m", *command]
+    return list(command)
+
+
+def menu_launch_env(command: Sequence[str]) -> dict[str, str] | None:
+    if not command or command[0] != "nemovcs":
+        return None
+
+    source_root = str(Path(__file__).resolve().parents[1])
+    env = os.environ.copy()
+    current = env.get("PYTHONPATH")
+    env["PYTHONPATH"] = source_root if not current else f"{source_root}:{current}"
+    return env
+
+
 def primary_emblem(status: str) -> str | None:
     return PRIMARY_EMBLEMS.get(status)
 
@@ -462,7 +482,7 @@ def is_clone_target(path: str | Path) -> bool:
 
 
 def git_menu_specs(paths: Sequence[str]) -> list[MenuActionSpec]:
-    return [
+    specs = [
         action("GitCommit", "Commit...", ["commit-dialog", *paths], icon=COMMIT_ICON),
         action("GitUpdate", "Update...", ["update-dialog", *paths], icon=UPDATE_ICON),
         separator("GitSep0"),
@@ -472,15 +492,29 @@ def git_menu_specs(paths: Sequence[str]) -> list[MenuActionSpec]:
             ["stage-dialog", "--operation", "stage", *paths],
             icon=ADD_ICON,
         ),
-        action("GitRevert", "Revert...", ["revert-dialog", *paths], icon=REVERT_ICON),
-        action("GitPush", "Push...", ["push-dialog", *paths], icon=PUSH_ICON),
-        separator("GitSep1"),
-        action("GitStatus", "Status...", ["status-dialog", *paths], icon=STATUS_ICON),
-        action("GitLog", "Log...", ["log-dialog", *paths], icon=LOG_ICON),
-        separator("GitSep2"),
-        action("GitSettings", "Settings...", ["settings-dialog"], icon=SETTINGS_ICON),
-        action("GitAbout", "About...", ["about-dialog"], icon=ABOUT_ICON),
     ]
+    if len(paths) == 1:
+        specs.append(
+            action("GitRename", "Rename...", ["rename-dialog", *paths], icon=RENAME_ICON)
+        )
+    specs.extend(
+        [
+            action(
+                "GitRevert",
+                "Revert...",
+                ["revert-dialog", *paths],
+                icon=REVERT_ICON,
+            ),
+            action("GitPush", "Push...", ["push-dialog", *paths], icon=PUSH_ICON),
+            separator("GitSep1"),
+            action("GitStatus", "Status...", ["status-dialog", *paths], icon=STATUS_ICON),
+            action("GitLog", "Log...", ["log-dialog", *paths], icon=LOG_ICON),
+            separator("GitSep2"),
+            action("GitSettings", "Settings...", ["settings-dialog"], icon=SETTINGS_ICON),
+            action("GitAbout", "About...", ["about-dialog"], icon=ABOUT_ICON),
+        ]
+    )
+    return specs
 
 
 def common_top_level_specs(paths: Sequence[str]) -> list[MenuActionSpec]:
@@ -506,7 +540,7 @@ def two_path_compare_spec(paths: Sequence[str]) -> MenuActionSpec | None:
 
 
 def svn_menu_specs(paths: Sequence[str]) -> list[MenuActionSpec]:
-    return [
+    specs = [
         action("SvnCommit", "Commit...", ["commit-dialog", *paths], icon=COMMIT_ICON),
         action("SvnUpdate", "Update...", ["update-dialog", *paths], icon=UPDATE_ICON),
         separator("SvnSep0"),
@@ -516,14 +550,28 @@ def svn_menu_specs(paths: Sequence[str]) -> list[MenuActionSpec]:
             ["stage-dialog", "--operation", "add", *paths],
             icon=ADD_ICON,
         ),
-        action("SvnRevert", "Revert...", ["revert-dialog", *paths], icon=REVERT_ICON),
-        separator("SvnSep1"),
-        action("SvnStatus", "Status...", ["status-dialog", *paths], icon=STATUS_ICON),
-        action("SvnLog", "Log...", ["log-dialog", *paths], icon=LOG_ICON),
-        separator("SvnSep2"),
-        action("SvnSettings", "Settings...", ["settings-dialog"], icon=SETTINGS_ICON),
-        action("SvnAbout", "About...", ["about-dialog"], icon=ABOUT_ICON),
     ]
+    if len(paths) == 1:
+        specs.append(
+            action("SvnRename", "Rename...", ["rename-dialog", *paths], icon=RENAME_ICON)
+        )
+    specs.extend(
+        [
+            action(
+                "SvnRevert",
+                "Revert...",
+                ["revert-dialog", *paths],
+                icon=REVERT_ICON,
+            ),
+            separator("SvnSep1"),
+            action("SvnStatus", "Status...", ["status-dialog", *paths], icon=STATUS_ICON),
+            action("SvnLog", "Log...", ["log-dialog", *paths], icon=LOG_ICON),
+            separator("SvnSep2"),
+            action("SvnSettings", "Settings...", ["settings-dialog"], icon=SETTINGS_ICON),
+            action("SvnAbout", "About...", ["about-dialog"], icon=ABOUT_ICON),
+        ]
+    )
+    return specs
 
 
 def git_clone_menu_specs(paths: Sequence[str]) -> list[MenuActionSpec]:

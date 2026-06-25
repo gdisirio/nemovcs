@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+import sys
 import tempfile
 import unittest
 from unittest import mock
@@ -334,6 +335,37 @@ class NemoVCSInfoProviderCoreTest(unittest.TestCase):
         with mock.patch("pathlib.Path.open", side_effect=OSError("denied")):
             diagnostics.log("event")
 
+    def test_menu_launch_command_runs_nemovcs_through_current_python(self):
+        command = nemo_plugin.menu_launch_command(("nemovcs", "rename-dialog", "/tmp/repo"))
+
+        self.assertEqual(
+            command,
+            [
+                sys.executable,
+                "-m",
+                "nemovcs",
+                "rename-dialog",
+                "/tmp/repo",
+            ],
+        )
+
+    def test_menu_launch_env_prepends_source_root_for_nemovcs_commands(self):
+        env = nemo_plugin.menu_launch_env(("nemovcs", "rename-dialog", "/tmp/repo"))
+
+        self.assertIsNotNone(env)
+        assert env is not None
+        self.assertEqual(
+            env["PYTHONPATH"].split(":", 1)[0],
+            str(Path(nemo_plugin.__file__).resolve().parents[1]),
+        )
+
+    def test_menu_launch_command_leaves_external_tools_unchanged(self):
+        self.assertEqual(
+            nemo_plugin.menu_launch_command(("meld", "/tmp/a", "/tmp/b")),
+            ["meld", "/tmp/a", "/tmp/b"],
+        )
+        self.assertIsNone(nemo_plugin.menu_launch_env(("meld", "/tmp/a", "/tmp/b")))
+
     def test_git_submenu_group_uses_existing_dialog_commands(self):
         core = nemo_plugin.NemoVCSInfoProviderCore()
 
@@ -374,12 +406,17 @@ class NemoVCSInfoProviderCoreTest(unittest.TestCase):
             commands,
         )
         self.assertIn(
+            ("nemovcs", "rename-dialog", "/tmp/repo/src/app.py"),
+            commands,
+        )
+        self.assertIn(
             ("nemovcs", "push-dialog", "/tmp/repo/src/app.py"),
             commands,
         )
         self.assertEqual(icons_by_label["Commit..."], "nemovcs-commit")
         self.assertEqual(icons_by_label["Update..."], "nemovcs-update")
         self.assertEqual(icons_by_label["Stage..."], "nemovcs-add")
+        self.assertEqual(icons_by_label["Rename..."], "nemovcs-rename")
         self.assertEqual(icons_by_label["Revert..."], "nemovcs-revert")
         self.assertEqual(icons_by_label["Push..."], "nemovcs-push")
         self.assertEqual(icons_by_label["Status..."], "nemovcs-status")
@@ -573,6 +610,10 @@ class NemoVCSInfoProviderCoreTest(unittest.TestCase):
             ("nemovcs", "revert-dialog", "/tmp/wc/tracked.c"),
             commands,
         )
+        self.assertIn(
+            ("nemovcs", "rename-dialog", "/tmp/wc/tracked.c"),
+            commands,
+        )
         self.assertNotIn(
             ("nemovcs", "push-dialog", "/tmp/wc/tracked.c"),
             commands,
@@ -580,6 +621,7 @@ class NemoVCSInfoProviderCoreTest(unittest.TestCase):
         self.assertEqual(icons_by_label["Commit..."], "nemovcs-commit")
         self.assertEqual(icons_by_label["Update..."], "nemovcs-update")
         self.assertEqual(icons_by_label["Add..."], "nemovcs-add")
+        self.assertEqual(icons_by_label["Rename..."], "nemovcs-rename")
         self.assertEqual(icons_by_label["Revert..."], "nemovcs-revert")
         self.assertEqual(icons_by_label["Status..."], "nemovcs-status")
         self.assertEqual(icons_by_label["Log..."], "nemovcs-show-log")

@@ -190,6 +190,17 @@ def revert_phases(
     return phases
 
 
+def rename_phases(
+    root: str | Path,
+    source_relpath: str,
+    target_relpath: str,
+) -> list[BackendCommandPhase]:
+    backend = detect_backend(root)
+    if backend is None:
+        return []
+    return backend.rename_phases(root, source_relpath, target_relpath)
+
+
 def file_diff_command(item: BackendChangeItem) -> list[str]:
     backend = backend_by_id(item.backend_id)
     if backend is None:

@@ -1,19 +1,23 @@
 # NemoVCS
 
-NemoVCS is a Git integration for the Nemo file manager.
+NemoVCS is version-control integration for the Nemo file manager, focused on
+fast context-menu operations and live file status inside Cinnamon/Nemo.
 
-Status: alpha. It is usable for local testing, but still needs broader manual
-testing and hardening before unattended daily use.
+Status: alpha. It is usable for source-tree testing, but still needs broader
+manual testing and hardening before unattended daily use.
 
 ## Features
 
 - Context menu actions inside Git and Subversion working trees.
-- GTK dialogs for stage, commit, status, update, push, log, settings, and about.
-- Meld integration for diffs.
+- Clone and checkout actions for unversioned directories.
+- GTK dialogs for stage/add, commit, rename, revert, status, update, push, log,
+  settings, and about.
+- Meld integration for selected-path diffs and two-path comparisons.
 - Live status emblems in Nemo:
   - clean paths,
   - modified paths and folders,
-  - conflicted paths and folders.
+  - conflicted paths and folders,
+  - unversioned paths and folders.
 - DBus-activated status daemon with cached status and filesystem monitoring.
 - Linked Git worktrees are treated as independent worktrees.
 
@@ -48,13 +52,13 @@ From the repository root:
 nemo --quit
 ```
 
-What this installs:
+What this does:
 
 - Legacy NemoVCS action files are removed from `~/.local/share/nemo/actions`
   and pruned from Nemo's action layout.
 - The generated nemo-python extension:
   `~/.local/share/nemo-python/extensions/NemoVCS.py`.
-- Status emblem icons into `~/.local/share/icons/hicolor/scalable/emblems`.
+- NemoVCS icons into `~/.local/share/icons/hicolor/scalable`.
 - The status daemon wrapper:
   `~/.local/bin/nemovcs-statusd`.
 - The DBus activation file:
@@ -77,7 +81,8 @@ from Nemo's action layout. Unrelated Nemo actions are preserved.
 
 ## Use
 
-Open Nemo inside a Git or Subversion working tree.
+Open Nemo inside a Git or Subversion working tree, or on an unversioned
+directory where you want to clone or check out a working copy.
 
 The context menu is provided by the NemoVCS nemo-python extension so the
 top-level items and backend submenus stay in the same menu group.
@@ -96,6 +101,7 @@ Backend submenu actions:
 - `SVN Checkout...`
 - `Stage...`
 - `Add...`
+- `Rename...`
 - `Revert...`
 - `Push...`
 - `Status...`
@@ -105,6 +111,15 @@ Backend submenu actions:
 
 The status daemon is started automatically through session DBus activation when
 Nemo asks for status.
+
+The same operations are available from the source tree through the CLI:
+
+```sh
+PYTHONPATH=src python3 -m nemovcs status .
+PYTHONPATH=src python3 -m nemovcs log .
+PYTHONPATH=src python3 -m nemovcs commit-dialog .
+PYTHONPATH=src python3 -m nemovcs status-cache --dbus .
+```
 
 ## Troubleshooting
 
@@ -134,6 +149,10 @@ NEMOVCS_PLUGIN_LOG=/tmp/nemovcs-plugin.log nemo
 
 ## Development
 
+NemoVCS intentionally keeps runtime dependencies small. Core repository
+operations shell out to `git` and `svn`; machine-readable state is parsed from
+stable command output such as Git porcelain status and SVN XML status.
+
 Run the CLI directly from the source tree:
 
 ```sh
@@ -161,6 +180,7 @@ python3 -m pip install -e .
 
 ## Notes
 
-Temporary icons are currently derived from RabbitVCS assets under GPL-2.0. They
-should be replaced with NemoVCS-native icons or kept with complete attribution
-before a broader release.
+- RabbitVCS is useful reference material, but NemoVCS is a separate project and
+  does not reuse RabbitVCS internals.
+- Some icons are temporary and should be replaced with NemoVCS-native artwork or
+  kept with complete attribution before a broader release.

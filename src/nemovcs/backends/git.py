@@ -216,6 +216,20 @@ class GitBackend:
             if relpaths
         ]
 
+    def rename_phases(
+        self,
+        root: str | Path,
+        source_relpath: str,
+        target_relpath: str,
+    ) -> list[BackendCommandPhase]:
+        return [
+            self._git_phase(
+                f"Rename {Path(source_relpath).name}",
+                root,
+                ["mv", "--", source_relpath, target_relpath],
+            )
+        ]
+
     def file_diff_command(self, item: BackendChangeItem) -> list[str]:
         return [
             "git",
