@@ -93,6 +93,15 @@ Remove the per-user development install:
 nemo --quit
 ```
 
+## Session Handoff
+
+Keep `spec/session-notes.md` updated as durable context for work that moves
+between PCs or Codex sessions.
+
+Before pushing changes, update `spec/session-notes.md` with the current focus,
+last tested behavior, known issues, and likely next task. This is a project
+rule, not optional housekeeping.
+
 ## Editing Style
 
 - Keep the initial code small and direct.
