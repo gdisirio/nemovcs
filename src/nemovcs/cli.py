@@ -281,15 +281,13 @@ def cmd_clone_dialog(args: argparse.Namespace) -> int:
 
 
 def cmd_settings(args: argparse.Namespace) -> int:
-    print("NemoVCS settings are not implemented yet.")
-    print("This placeholder is installed to validate the Nemo menu layout.")
-    return 0
+    return cmd_settings_dialog(args)
 
 
 def cmd_settings_dialog(args: argparse.Namespace) -> int:
-    from .ui import info_dialog
+    from .ui import settings_dialog
 
-    return info_dialog.run_settings_placeholder()
+    return settings_dialog.run()
 
 
 def cmd_about(args: argparse.Namespace) -> int:

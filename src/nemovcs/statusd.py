@@ -14,11 +14,12 @@ from enum import StrEnum
 from pathlib import Path
 
 from . import backends
+from . import config
 from .backends.base import BackendStatusItem
 
 
-DEFAULT_MAX_WORKTREES = 12
-DEFAULT_DEBOUNCE_SECONDS = 0.75
+DEFAULT_MAX_WORKTREES = config.DEFAULT_MAX_WORKTREES
+DEFAULT_DEBOUNCE_SECONDS = config.DEFAULT_DEBOUNCE_SECONDS
 DBUS_BUS_NAME = "io.github.gdisirio.NemoVCS.Statusd"
 DBUS_OBJECT_PATH = "/io/github/gdisirio/NemoVCS/Statusd"
 DBUS_INTERFACE = "io.github.gdisirio.NemoVCS.Statusd"
@@ -136,25 +137,42 @@ class WorktreeCache:
         if self.evict_callback is not None:
             self.evict_callback(entry)
 
+    def resize(self, max_worktrees: int) -> None:
+        if max_worktrees < 1:
+            raise ValueError("max_worktrees must be at least 1")
+        self.max_worktrees = max_worktrees
+        self._evict_oldest()
+
 
 class StatusDaemonCore:
     def __init__(
         self,
         cache: WorktreeCache | None = None,
         *,
-        debounce_seconds: float = DEFAULT_DEBOUNCE_SECONDS,
+        debounce_seconds: float | None = None,
         timer: Callable[[float, Callable[[], None]], object] | None = None,
         scan_func: Callable[[WorktreeEntry], None] | None = None,
         status_changed_callback: Callable[[str, list[str]], None] | None = None,
     ):
         self.cache = cache if cache is not None else WorktreeCache()
-        self.debounce_seconds = debounce_seconds
+        self.debounce_seconds = (
+            debounce_seconds if debounce_seconds is not None else DEFAULT_DEBOUNCE_SECONDS
+        )
         self.timer = timer if timer is not None else immediate_timer
         self.scan_func = scan_func if scan_func is not None else scan_worktree
         self.status_changed_callback = status_changed_callback
         self.changed_worktrees: list[str] = []
         self.monitor_manager = None
         self.cache.evict_callback = self.on_cache_evict
+
+    @classmethod
+    def from_config(cls, **kwargs) -> "StatusDaemonCore":
+        settings = config.load_statusd_settings()
+        return cls(
+            cache=WorktreeCache(max_worktrees=settings.max_worktrees),
+            debounce_seconds=settings.debounce_seconds,
+            **kwargs,
+        )
 
     def set_monitor_manager(self, monitor_manager) -> None:
         self.monitor_manager = monitor_manager
@@ -244,6 +262,23 @@ class StatusDaemonCore:
             records.append(self.status_record(path))
         return records
 
+    def cache_records(self) -> list[dict[str, str]]:
+        return [cache_record(entry) for entry in self.cache.entries()]
+
+    def settings_record(self) -> dict[str, str]:
+        return {
+            "max_worktrees": str(self.cache.max_worktrees),
+            "debounce_seconds": f"{self.debounce_seconds:g}",
+            "config_path": str(config.settings_path()),
+        }
+
+    def set_settings(self, values: dict[str, str]) -> dict[str, str]:
+        settings = config.StatusdSettings.from_mapping(values)
+        config.save_statusd_settings(settings)
+        self.cache.resize(settings.max_worktrees)
+        self.debounce_seconds = settings.debounce_seconds
+        return self.settings_record()
+
     def status_record(self, path: str | Path) -> dict[str, str]:
         identity = identify_worktree(path)
         if identity is None:
@@ -284,6 +319,27 @@ class StatusDaemonCore:
             "status": aggregate_status(entry, path),
             "error": entry.error,
         }
+
+
+def cache_record(entry: WorktreeEntry) -> dict[str, str]:
+    if entry.error:
+        status = EmblemStatus.ERROR
+    elif not entry.scanned:
+        status = EmblemStatus.LOADING
+    else:
+        status = aggregate_status(entry, entry.identity.root)
+
+    return {
+        "path": str(entry.identity.root),
+        "backend": entry.identity.backend_id,
+        "worktree_id": entry.identity.cache_key,
+        "root": str(entry.identity.root),
+        "gitdir": str(entry.identity.gitdir),
+        "common_gitdir": str(entry.identity.common_gitdir),
+        "head": entry.identity.head_label,
+        "status": str(status),
+        "error": entry.error,
+    }
 
 
 def identify_worktree(path: str | Path) -> WorktreeIdentity | None:

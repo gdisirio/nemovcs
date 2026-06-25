@@ -18,6 +18,8 @@ from nemovcs.cli import (
     cmd_push,
     cmd_revert_dialog,
     cmd_rename_dialog,
+    cmd_settings,
+    cmd_settings_dialog,
     cmd_stage_dialog,
     cmd_status,
     cmd_status_dialog,
@@ -413,6 +415,15 @@ class CliParserTest(unittest.TestCase):
         self.assertEqual(parser.parse_args(["about"]).command, "about")
         self.assertEqual(parser.parse_args(["settings-dialog"]).command, "settings-dialog")
         self.assertEqual(parser.parse_args(["about-dialog"]).command, "about-dialog")
+
+    def test_settings_commands_open_settings_dialog(self):
+        parser = build_parser()
+
+        with mock.patch("nemovcs.ui.settings_dialog.run", return_value=0) as run_dialog:
+            self.assertEqual(cmd_settings(parser.parse_args(["settings"])), 0)
+            self.assertEqual(cmd_settings_dialog(parser.parse_args(["settings-dialog"])), 0)
+
+        self.assertEqual(run_dialog.call_count, 2)
 
     def test_status_cache_accepts_paths(self):
         parser = build_parser()

@@ -21,6 +21,16 @@ INTROSPECTION_XML = f"""<!DOCTYPE node PUBLIC
       <arg name="paths" type="as" direction="in"/>
       <arg name="records" type="aa{{ss}}" direction="out"/>
     </method>
+    <method name="GetCacheEntries">
+      <arg name="records" type="aa{{ss}}" direction="out"/>
+    </method>
+    <method name="GetSettings">
+      <arg name="settings" type="a{{ss}}" direction="out"/>
+    </method>
+    <method name="SetSettings">
+      <arg name="settings" type="a{{ss}}" direction="in"/>
+      <arg name="saved_settings" type="a{{ss}}" direction="out"/>
+    </method>
     <signal name="StatusChanged">
       <arg name="worktree_id" type="s"/>
       <arg name="paths" type="as"/>
@@ -39,7 +49,7 @@ def run_foreground() -> int:
     dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
     bus = dbus.SessionBus()
     bus_name = dbus.service.BusName(statusd.DBUS_BUS_NAME, bus=bus)
-    core = statusd.StatusDaemonCore(timer=glib_timer)
+    core = statusd.StatusDaemonCore.from_config(timer=glib_timer)
     monitor_manager = statusd_monitor.WorktreeMonitorManager(core)
     core.set_monitor_manager(monitor_manager)
     StatusDaemonDBusService(bus, core)
@@ -82,6 +92,39 @@ def call_get_status(paths: Sequence[str]) -> list[dict[str, str]]:
         {str(key): str(value) for key, value in dict(record).items()}
         for record in proxy.GetStatus(list(paths), dbus_interface=statusd.DBUS_INTERFACE)
     ]
+
+
+def call_cache_entries() -> list[dict[str, str]]:
+    proxy = _statusd_proxy()
+    return [
+        {str(key): str(value) for key, value in dict(record).items()}
+        for record in proxy.GetCacheEntries(dbus_interface=statusd.DBUS_INTERFACE)
+    ]
+
+
+def call_settings() -> dict[str, str]:
+    proxy = _statusd_proxy()
+    return {
+        str(key): str(value)
+        for key, value in dict(
+            proxy.GetSettings(dbus_interface=statusd.DBUS_INTERFACE)
+        ).items()
+    }
+
+
+def call_set_settings(settings: dict[str, str]) -> dict[str, str]:
+    import dbus
+
+    proxy = _statusd_proxy()
+    return {
+        str(key): str(value)
+        for key, value in dict(
+            proxy.SetSettings(
+                dbus.Dictionary(settings, signature="ss"),
+                dbus_interface=statusd.DBUS_INTERFACE,
+            )
+        ).items()
+    }
 
 
 def subscribe_status_changed(callback):
@@ -138,6 +181,36 @@ def make_service_class():
                 dbus.Dictionary(record, signature="ss")
                 for record in records
             ]
+
+        @dbus.service.method(
+            statusd.DBUS_INTERFACE,
+            in_signature="",
+            out_signature="aa{ss}",
+        )
+        def GetCacheEntries(self):
+            return [
+                dbus.Dictionary(record, signature="ss")
+                for record in self.core.cache_records()
+            ]
+
+        @dbus.service.method(
+            statusd.DBUS_INTERFACE,
+            in_signature="",
+            out_signature="a{ss}",
+        )
+        def GetSettings(self):
+            return dbus.Dictionary(self.core.settings_record(), signature="ss")
+
+        @dbus.service.method(
+            statusd.DBUS_INTERFACE,
+            in_signature="a{ss}",
+            out_signature="a{ss}",
+        )
+        def SetSettings(self, settings):
+            saved = self.core.set_settings(
+                {str(key): str(value) for key, value in dict(settings).items()}
+            )
+            return dbus.Dictionary(saved, signature="ss")
 
         @dbus.service.signal(
             statusd.DBUS_INTERFACE,

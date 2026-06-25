@@ -303,6 +303,76 @@ class StatusDaemonSchedulerTest(unittest.TestCase):
         self.assertEqual(record["worktree_id"], first.cache_key)
         self.assertEqual(record["status"], statusd.EmblemStatus.MODIFIED)
 
+    def test_cache_records_include_one_record_per_worktree(self):
+        first = identity("one")
+        cache = statusd.WorktreeCache()
+        entry = cache.touch(first)
+        entry.scanned = True
+        entry.statuses["src/app.py"] = statusd.EmblemStatus.MODIFIED
+        entry.statuses["tmp/generated.txt"] = statusd.EmblemStatus.UNVERSIONED
+        core = statusd.StatusDaemonCore(cache)
+
+        records = core.cache_records()
+
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0]["path"], str(first.root))
+        self.assertEqual(records[0]["worktree_id"], first.cache_key)
+        self.assertEqual(records[0]["status"], "modified")
+
+    def test_cache_records_show_loading_for_unscanned_worktree(self):
+        first = identity("one")
+        cache = statusd.WorktreeCache()
+        cache.touch(first)
+        core = statusd.StatusDaemonCore(cache)
+
+        records = core.cache_records()
+
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0]["path"], str(first.root))
+        self.assertEqual(records[0]["status"], "loading")
+
+    def test_settings_record_reports_cache_size_and_debounce(self):
+        cache = statusd.WorktreeCache(max_worktrees=7)
+        core = statusd.StatusDaemonCore(cache, debounce_seconds=1.25)
+
+        record = core.settings_record()
+
+        self.assertEqual(record["max_worktrees"], "7")
+        self.assertEqual(record["debounce_seconds"], "1.25")
+        self.assertTrue(record["config_path"].endswith("nemovcs/settings.json"))
+
+    def test_from_config_uses_persisted_statusd_settings(self):
+        with mock.patch("nemovcs.statusd.config.load_statusd_settings") as load_settings:
+            load_settings.return_value = statusd.config.StatusdSettings(
+                max_worktrees=5,
+                debounce_seconds=2.5,
+            )
+
+            core = statusd.StatusDaemonCore.from_config()
+
+        self.assertEqual(core.cache.max_worktrees, 5)
+        self.assertEqual(core.debounce_seconds, 2.5)
+
+    def test_set_settings_saves_and_applies_statusd_settings(self):
+        cache = statusd.WorktreeCache(max_worktrees=7)
+        core = statusd.StatusDaemonCore(cache, debounce_seconds=1.25)
+
+        with mock.patch("nemovcs.statusd.config.save_statusd_settings") as save_settings:
+            record = core.set_settings(
+                {
+                    "max_worktrees": "3",
+                    "debounce_seconds": "0.5",
+                }
+            )
+
+        self.assertEqual(core.cache.max_worktrees, 3)
+        self.assertEqual(core.debounce_seconds, 0.5)
+        self.assertEqual(record["max_worktrees"], "3")
+        self.assertEqual(record["debounce_seconds"], "0.5")
+        save_settings.assert_called_once_with(
+            statusd.config.StatusdSettings(max_worktrees=3, debounce_seconds=0.5)
+        )
+
     def test_git_unversioned_file_aggregate_remains_unversioned(self):
         first = identity("one")
         cache = statusd.WorktreeCache()
