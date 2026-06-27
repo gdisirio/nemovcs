@@ -29,6 +29,7 @@ class EmblemStatus(StrEnum):
     CONFLICTED = "conflicted"
     MODIFIED = "modified"
     UNVERSIONED = "unversioned"
+    IGNORED = "ignored"
     OK = "ok"
     LOADING = "loading"
     STALE = "stale"
@@ -42,6 +43,7 @@ EMBLEM_PRIORITY = {
     EmblemStatus.UNVERSIONED: 25,
     EmblemStatus.STALE: 20,
     EmblemStatus.LOADING: 10,
+    EmblemStatus.IGNORED: 0,
     EmblemStatus.OK: 0,
 }
 
@@ -409,6 +411,8 @@ def path_status(entry: WorktreeEntry, path: str | Path) -> EmblemStatus:
         return status
     if is_unversioned_directory(entry, relpath, path):
         return EmblemStatus.UNVERSIONED
+    if is_ignored_path(entry, relpath, path):
+        return EmblemStatus.IGNORED
     return EmblemStatus.OK
 
 
@@ -444,6 +448,8 @@ def aggregate_status(entry: WorktreeEntry, path: str | Path) -> EmblemStatus:
             best = status
     if best == EmblemStatus.OK and is_unversioned_directory(entry, relpath, path):
         return EmblemStatus.UNVERSIONED
+    if best == EmblemStatus.OK and is_ignored_path(entry, relpath, path):
+        return EmblemStatus.IGNORED
     if (
         best == EmblemStatus.UNVERSIONED
         and not is_unversioned_directory(entry, relpath, path)
@@ -472,6 +478,23 @@ def is_unversioned_directory(
         tracked == relpath or tracked.startswith(prefix)
         for tracked in entry.tracked_paths
     )
+
+
+def is_ignored_path(
+    entry: WorktreeEntry,
+    relpath: str,
+    path: str | Path,
+) -> bool:
+    if entry.identity.backend_id != "git" or relpath == ".":
+        return False
+    if relpath in entry.tracked_paths:
+        return False
+
+    candidate = Path(path).expanduser()
+    if not candidate.is_absolute():
+        candidate = Path.cwd() / candidate
+    candidate = candidate.resolve(strict=False)
+    return candidate.is_file()
 
 
 def relative_path_in_worktree(

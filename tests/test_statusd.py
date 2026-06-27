@@ -624,6 +624,28 @@ class WorktreeScanTest(unittest.TestCase):
             statusd.EmblemStatus.UNVERSIONED,
         )
 
+    def test_scan_reports_ignored_file_without_dirtying_parent(self):
+        (self.root / ".git" / "info" / "exclude").write_text(
+            "ignored.bin\n",
+            encoding="utf-8",
+        )
+        (self.root / "ignored.bin").write_text("ignored\n", encoding="utf-8")
+
+        statusd.scan_worktree(self.entry)
+
+        self.assertEqual(
+            statusd.path_status(self.entry, self.root / "ignored.bin"),
+            statusd.EmblemStatus.IGNORED,
+        )
+        self.assertEqual(
+            statusd.aggregate_status(self.entry, self.root / "ignored.bin"),
+            statusd.EmblemStatus.IGNORED,
+        )
+        self.assertEqual(
+            statusd.aggregate_status(self.entry, self.root),
+            statusd.EmblemStatus.OK,
+        )
+
     def test_conflict_maps_to_conflicted_and_dominates_folder_aggregate(self):
         subprocess.run(
             ["git", "checkout", "-b", "other"],

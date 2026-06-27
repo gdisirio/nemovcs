@@ -130,6 +130,7 @@ class NemoVCSInfoProviderCoreTest(unittest.TestCase):
             "nemovcs-unversioned",
         )
         self.assertEqual(nemo_plugin.primary_emblem("ok"), "nemovcs-normal")
+        self.assertIsNone(nemo_plugin.primary_emblem("ignored"))
         self.assertIsNone(nemo_plugin.primary_emblem("loading"))
         self.assertIsNone(nemo_plugin.primary_emblem("stale"))
         self.assertIsNone(nemo_plugin.primary_emblem("error"))

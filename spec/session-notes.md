@@ -37,6 +37,11 @@ sessions. Update this file before pushing changes.
   detection working on systems without Subversion installed.
 - `git.run_git()` now mirrors that behavior for missing `git`, so SVN-only
   menu detection is not broken by Git absence.
+- Ignored Git files are now distinguished from clean tracked files internally.
+  Example: `chibios_tools/tools/chibiscope/chibiscope` is ignored by
+  `tools/chibiscope/.gitignore`, so it should not receive the clean/green
+  emblem; the parent directory remains unversioned when it has no tracked
+  descendants.
 
 ## Next Likely Tasks
 
