@@ -296,15 +296,18 @@ class SvnBackend:
     ) -> SvnResult:
         resolved_cwd = self.path_for_svn(cwd)
         command = ("svn", *args)
-        proc = subprocess.run(
-            command,
-            cwd=str(resolved_cwd),
-            check=False,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            timeout=timeout,
-        )
+        try:
+            proc = subprocess.run(
+                command,
+                cwd=str(resolved_cwd),
+                check=False,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                timeout=timeout,
+            )
+        except FileNotFoundError:
+            return SvnResult(command, resolved_cwd, 127, "", "svn executable not found\n")
         return SvnResult(command, resolved_cwd, proc.returncode, proc.stdout, proc.stderr)
 
     def phase(

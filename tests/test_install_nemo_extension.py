@@ -1,4 +1,5 @@
 import importlib.util
+import json
 from pathlib import Path
 import tempfile
 import unittest
@@ -150,6 +151,48 @@ class InstallNemoExtensionTest(unittest.TestCase):
                     / "apps"
                     / "nemovcs.svg"
                 ).exists()
+            )
+
+    def test_install_removes_legacy_actions_and_layout_entries(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            data_home = root / "share"
+            config_home = root / "config"
+            actions_dir = data_home / "nemo" / "actions"
+            actions_dir.mkdir(parents=True)
+            legacy_action = actions_dir / "nemovcs-status.nemo_action"
+            legacy_action.write_text("[Nemo Action]\n", encoding="utf-8")
+            other_action = actions_dir / "other.nemo_action"
+            other_action.write_text("[Nemo Action]\n", encoding="utf-8")
+            legacy_icon = actions_dir / "nemovcs-icons" / "icon.svg"
+            legacy_icon.parent.mkdir(parents=True)
+            legacy_icon.write_text("icon\n", encoding="utf-8")
+            layout = config_home / "nemo" / "actions-tree.json"
+            layout.parent.mkdir(parents=True)
+            layout.write_text(
+                json.dumps(
+                    {
+                        "toplevel": [
+                            {"uuid": "nemovcs-status.nemo_action", "type": "action"},
+                            {"uuid": "other.nemo_action", "type": "action"},
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            removed = install_nemo_extension.remove_legacy_actions(
+                data_home=data_home,
+                config_dir=config_home,
+            )
+
+            self.assertIn(legacy_action, removed)
+            self.assertFalse(legacy_action.exists())
+            self.assertFalse(legacy_icon.parent.exists())
+            self.assertTrue(other_action.exists())
+            self.assertEqual(
+                json.loads(layout.read_text(encoding="utf-8"))["toplevel"],
+                [{"uuid": "other.nemo_action", "type": "action"}],
             )
 
 

@@ -10,8 +10,8 @@ General direction:
 
 - Git-only initially.
 - Nemo-first because Cinnamon/Nemo is underserved compared with KDE/GNOME.
-- Use Nemo Actions first for easy installation and context-menu operations.
-- Add a Nemo plugin later for live integration such as emblems, columns, dynamic menus, or panels.
+- Use the nemo-python extension for context-menu operations and live
+  integration such as emblems, columns, dynamic menus, or panels.
 - Add a status daemon later only when cached live status is needed.
 
 RabbitVCS can be used as reference material, but do not copy its architecture blindly.
@@ -77,10 +77,9 @@ Install locally for development:
 python3 -m pip install -e .
 ```
 
-Install Nemo action files for the current user:
+Install the Nemo integration for the current user:
 
 ```sh
-./scripts/install-actions.sh
 ./scripts/install-nemo-extension.sh
 ./scripts/install-statusd-service.sh
 nemo --quit
@@ -106,7 +105,8 @@ rule, not optional housekeeping.
 
 - Keep the initial code small and direct.
 - Add tests for Git parsing and command behavior before broadening features.
-- Keep Nemo Actions as thin integration glue.
+- Keep legacy Nemo Action cleanup in the installers/uninstaller, but current
+  context menus come from the nemo-python extension.
 - Keep project naming consistent:
   - project: `NemoVCS`
   - command: `nemovcs`

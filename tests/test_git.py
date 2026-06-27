@@ -12,6 +12,23 @@ def have_git() -> bool:
     return shutil.which("git") is not None
 
 
+class GitExecutableAvailabilityTest(unittest.TestCase):
+    def test_run_git_reports_missing_executable_as_failed_result(self):
+        with mock.patch("nemovcs.git.subprocess.run", side_effect=FileNotFoundError):
+            result = git.run_git("/tmp", ["status"])
+
+        self.assertEqual(result.returncode, 127)
+        self.assertEqual(result.stdout, "")
+        self.assertEqual(result.stderr, "git executable not found\n")
+
+    def test_run_git_check_raises_for_missing_executable(self):
+        with mock.patch("nemovcs.git.subprocess.run", side_effect=FileNotFoundError):
+            with self.assertRaises(git.GitError) as raised:
+                git.run_git("/tmp", ["status"], check=True)
+
+        self.assertEqual(raised.exception.result.returncode, 127)
+
+
 @unittest.skipUnless(have_git(), "git executable is required")
 class GitHelpersTest(unittest.TestCase):
     def setUp(self):

@@ -100,15 +100,21 @@ def run_git(
     if env is not None:
         process_env = os.environ.copy()
         process_env.update(env)
-    proc = subprocess.run(
-        command,
-        check=False,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-        timeout=timeout,
-        env=process_env,
-    )
+    try:
+        proc = subprocess.run(
+            command,
+            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=timeout,
+            env=process_env,
+        )
+    except FileNotFoundError:
+        result = GitResult(command, resolved_cwd, 127, "", "git executable not found\n")
+        if check:
+            raise GitError(result)
+        return result
     result = GitResult(command, resolved_cwd, proc.returncode, proc.stdout, proc.stderr)
     if check and not result.ok:
         raise GitError(result)

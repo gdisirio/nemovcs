@@ -699,6 +699,16 @@ class BackendRegistryTest(unittest.TestCase):
             ),
         )
 
+    def test_svn_backend_reports_missing_executable_as_failed_result(self):
+        backend = SvnBackend()
+
+        with mock.patch("nemovcs.backends.svn.subprocess.run", side_effect=FileNotFoundError):
+            result = backend.run("/tmp", ["info"])
+
+        self.assertEqual(result.returncode, 127)
+        self.assertEqual(result.stdout, "")
+        self.assertEqual(result.stderr, "svn executable not found\n")
+
     def test_svn_backend_builds_meld_diff_commands(self):
         backend = SvnBackend()
         root = Path("/tmp/wc")

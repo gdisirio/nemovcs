@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import subprocess
@@ -10,6 +11,40 @@ from pathlib import Path
 
 
 EXTENSION_NAME = "NemoVCS.py"
+LEGACY_ACTION_FILES = {
+    "nemovcs-about.nemo_action",
+    "nemovcs-background-about.nemo_action",
+    "nemovcs-background-clone.nemo_action",
+    "nemovcs-background-push.nemo_action",
+    "nemovcs-background-settings.nemo_action",
+    "nemovcs-background-status.nemo_action",
+    "nemovcs-background-svn-about.nemo_action",
+    "nemovcs-background-svn-checkout.nemo_action",
+    "nemovcs-background-svn-settings.nemo_action",
+    "nemovcs-background-svn-status.nemo_action",
+    "nemovcs-background-svn-update.nemo_action",
+    "nemovcs-background-update.nemo_action",
+    "nemovcs-clone.nemo_action",
+    "nemovcs-commit.nemo_action",
+    "nemovcs-diff.nemo_action",
+    "nemovcs-log.nemo_action",
+    "nemovcs-push.nemo_action",
+    "nemovcs-revert.nemo_action",
+    "nemovcs-settings.nemo_action",
+    "nemovcs-stage.nemo_action",
+    "nemovcs-status.nemo_action",
+    "nemovcs-svn-about.nemo_action",
+    "nemovcs-svn-add.nemo_action",
+    "nemovcs-svn-checkout.nemo_action",
+    "nemovcs-svn-commit.nemo_action",
+    "nemovcs-svn-diff.nemo_action",
+    "nemovcs-svn-log.nemo_action",
+    "nemovcs-svn-revert.nemo_action",
+    "nemovcs-svn-settings.nemo_action",
+    "nemovcs-svn-status.nemo_action",
+    "nemovcs-svn-update.nemo_action",
+    "nemovcs-update.nemo_action",
+}
 EMBLEM_ICON_NAMES = [
     "emblem-nemovcs-conflicted.svg",
     "emblem-nemovcs-modified.svg",
@@ -109,6 +144,89 @@ def hicolor_theme_dir(data_home: Path | None = None) -> Path:
     return data_home / "icons" / "hicolor"
 
 
+def config_home() -> Path:
+    return Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
+
+
+def remove_tree(path: Path) -> bool:
+    if not path.exists():
+        return False
+    if path.is_symlink() or not path.is_dir():
+        path.unlink()
+        return True
+    shutil.rmtree(path)
+    return True
+
+
+def is_legacy_action_node(node: dict[str, object]) -> bool:
+    uuid = node.get("uuid")
+    if isinstance(uuid, str) and (
+        uuid == "NemoVCS"
+        or uuid.startswith("nemovcs-")
+        or uuid in LEGACY_ACTION_FILES
+    ):
+        return True
+
+    children = node.get("children")
+    return isinstance(children, list) and any(
+        isinstance(child, dict) and is_legacy_action_node(child)
+        for child in children
+    )
+
+
+def prune_legacy_action_layout(config_dir: Path | None = None) -> bool:
+    config_dir = config_dir or config_home()
+    layout_path = config_dir / "nemo" / "actions-tree.json"
+    try:
+        data = json.loads(layout_path.read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError):
+        return False
+
+    if not isinstance(data, dict) or not isinstance(data.get("toplevel"), list):
+        return False
+
+    original = data["toplevel"]
+    pruned = [
+        node
+        for node in original
+        if not (isinstance(node, dict) and is_legacy_action_node(node))
+    ]
+    if pruned == original:
+        return False
+
+    data["toplevel"] = pruned
+    layout_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    return True
+
+
+def remove_legacy_actions(
+    data_home: Path | None = None,
+    config_dir: Path | None = None,
+) -> list[Path]:
+    if data_home is None:
+        data_home = Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local/share"))
+
+    removed: list[Path] = []
+    actions_dir = data_home / "nemo" / "actions"
+    for name in sorted(LEGACY_ACTION_FILES):
+        path = actions_dir / name
+        try:
+            path.unlink()
+        except FileNotFoundError:
+            continue
+        removed.append(path)
+
+    icons_dir = actions_dir / "nemovcs-icons"
+    if remove_tree(icons_dir):
+        removed.append(icons_dir)
+
+    layout_path = (config_dir or config_home()) / "nemo" / "actions-tree.json"
+    if prune_legacy_action_layout(config_dir):
+        removed.append(layout_path)
+
+    return removed
+
+
 def copy_icon_set(
     source_dir: Path,
     target_dir: Path,
@@ -148,6 +266,7 @@ def install_icons(repo_root: Path, data_home: Path | None = None) -> list[Path]:
 
 
 def install(repo_root: Path, data_home: Path | None = None) -> Path:
+    remove_legacy_actions(data_home=data_home)
     target = target_dir(data_home)
     target.mkdir(parents=True, exist_ok=True)
     extension_path = target / EXTENSION_NAME

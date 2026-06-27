@@ -6,8 +6,8 @@ sessions. Update this file before pushing changes.
 ## Current Focus
 
 - Source-tree testing of NemoVCS 0.3.0 after milestone 3.
-- Continue validating Nemo context menus, status emblems, status daemon
-  refresh behavior, and Git/SVN dialog workflows.
+- Nemo Action installer removal: current context menus are provided by the
+  nemo-python extension; legacy action cleanup remains in install/uninstall.
 
 ## Last Known State
 
@@ -28,10 +28,20 @@ sessions. Update this file before pushing changes.
 - Unversioned Git/SVN leaf files should show the unversioned emblem.
 - SVN parent folders should not become dirty only because they contain
   unversioned descendants.
+- `scripts/install-actions.sh`, `scripts/install-layout.py`, and
+  `tests/test_install_layout.py` were removed as obsolete.
+- `scripts/install-nemo-extension.py` now prunes legacy NemoVCS action files,
+  the old `nemovcs-icons` action directory, and Nemo action layout entries.
+- `SvnBackend.run()` now reports a failed result when the `svn` executable is
+  missing instead of raising `FileNotFoundError`; this keeps Git-only menu
+  detection working on systems without Subversion installed.
+- `git.run_git()` now mirrors that behavior for missing `git`, so SVN-only
+  menu detection is not broken by Git absence.
 
 ## Next Likely Tasks
 
-- Continue manual testing from Nemo on real Git and SVN working trees.
+- Continue manual testing from Nemo on real Git and SVN working trees after
+  reinstalling the extension and restarting Nemo.
 - Watch for stale status daemon cache behavior after file changes, VCS
   operations, and daemon restarts.
 - Validate `Rename...` behavior for both Git and SVN files/directories.

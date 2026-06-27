@@ -1135,7 +1135,8 @@ The first milestone is complete when:
 - `nemovcs log PATH` works inside a Git repo.
 - `nemovcs update PATH` works inside a Git repo.
 - `nemovcs commit PATH` works inside a Git repo.
-- Nemo Action files install for the current user.
-- Nemo shows the actions only inside Git worktrees.
+- The nemo-python extension installs for the current user.
+- Nemo shows context-menu items only inside supported working trees or clone
+  targets.
 - Nemo shows the expected top-level items and backend submenus.
 - Existing unit tests pass.

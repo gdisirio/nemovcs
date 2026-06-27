@@ -46,7 +46,6 @@ The current install flow is for per-user source-tree testing.
 From the repository root:
 
 ```sh
-./scripts/install-actions.sh
 ./scripts/install-nemo-extension.sh
 ./scripts/install-statusd-service.sh
 nemo --quit
