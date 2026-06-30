@@ -176,6 +176,32 @@ class NemoVCSInfoProviderCoreTest(unittest.TestCase):
         self.assertEqual(spec.root_label, "repo")
         self.assertEqual(spec.icon, "nemovcs-git")
 
+    def test_location_widget_details_match_tooltip_content(self):
+        spec = nemo_plugin.LocationWidgetSpec(
+            backend="git",
+            backend_label="Git",
+            head="main",
+            status="modified",
+            status_label="modified",
+            root="/tmp/repo",
+            root_label="repo",
+            icon="nemovcs-git",
+        )
+
+        self.assertEqual(
+            nemo_plugin.location_widget_details(spec),
+            [
+                ("Worktree", "/tmp/repo"),
+                ("Head", "main"),
+                ("Status", "modified"),
+                ("Backend", "Git"),
+            ],
+        )
+        self.assertEqual(
+            nemo_plugin.location_widget_tooltip(spec),
+            "Worktree: /tmp/repo\nHead: main\nStatus: modified\nBackend: Git",
+        )
+
     def test_location_widget_spec_hides_non_worktree_path(self):
         core = nemo_plugin.NemoVCSInfoProviderCore(
             seen=lambda paths: [],

@@ -465,14 +465,14 @@ class NemoVCSInfoProviderMixin:
     def nemovcs_location_widget(self, spec: LocationWidgetSpec):
         from gi.repository import Gtk, Pango
 
+        outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        outer.set_border_width(4)
+        outer.set_hexpand(True)
+        outer.set_tooltip_text(location_widget_tooltip(spec))
+
         box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        box.set_border_width(4)
         box.set_hexpand(True)
-        box.set_tooltip_text(
-            f"{spec.backend_label} worktree: {spec.root}\n"
-            f"Head: {spec.head}\n"
-            f"Status: {spec.status_label}"
-        )
+        outer.pack_start(box, False, False, 0)
 
         image = Gtk.Image.new_from_icon_name(spec.icon, Gtk.IconSize.MENU)
         box.pack_start(image, False, False, 0)
@@ -504,8 +504,51 @@ class NemoVCSInfoProviderMixin:
         spacer.set_hexpand(True)
         box.pack_start(spacer, True, True, 0)
 
-        box.show_all()
-        return box
+        details = self.nemovcs_location_details_widget(Gtk, spec)
+        details.set_no_show_all(True)
+        outer.pack_start(details, False, False, 0)
+
+        toggle = Gtk.ToggleButton()
+        toggle.set_relief(Gtk.ReliefStyle.NONE)
+        toggle.set_tooltip_text("Show repository details")
+        toggle.set_image(
+            Gtk.Image.new_from_icon_name("pan-down-symbolic", Gtk.IconSize.MENU)
+        )
+        toggle.connect("toggled", self.on_location_details_toggled, details)
+        box.pack_start(toggle, False, False, 0)
+
+        outer.show_all()
+        details.hide()
+        return outer
+
+    def nemovcs_location_details_widget(self, Gtk, spec: LocationWidgetSpec):
+        grid = Gtk.Grid(column_spacing=10, row_spacing=2)
+        grid.set_margin_start(24)
+
+        for row, (label_text, value_text) in enumerate(location_widget_details(spec)):
+            label = Gtk.Label()
+            label.set_markup(f"<b>{escape(label_text)}</b>")
+            label.set_xalign(0)
+            grid.attach(label, 0, row, 1, 1)
+
+            value = Gtk.Label(label=value_text)
+            value.set_xalign(0)
+            value.set_selectable(True)
+            value.set_line_wrap(True)
+            grid.attach(value, 1, row, 1, 1)
+
+        return grid
+
+    def on_location_details_toggled(self, button, details) -> None:
+        from gi.repository import Gtk
+
+        expanded = button.get_active()
+        details.set_visible(expanded)
+        button.set_tooltip_text(
+            "Hide repository details" if expanded else "Show repository details"
+        )
+        icon = "pan-up-symbolic" if expanded else "pan-down-symbolic"
+        button.set_image(Gtk.Image.new_from_icon_name(icon, Gtk.IconSize.MENU))
 
     def on_menu_item_activate(self, _item, command: Sequence[str]) -> None:
         launch_command = menu_launch_command(command)
@@ -550,6 +593,21 @@ def compact_text(text: str, *, max_chars: int = LOCATION_BAR_MAX_CHARS) -> str:
     if max_chars <= 1:
         return text[:max_chars]
     return text[: max_chars - 1] + "..."
+
+
+def location_widget_details(spec: LocationWidgetSpec) -> list[tuple[str, str]]:
+    return [
+        ("Worktree", spec.root),
+        ("Head", spec.head),
+        ("Status", spec.status_label),
+        ("Backend", spec.backend_label),
+    ]
+
+
+def location_widget_tooltip(spec: LocationWidgetSpec) -> str:
+    return "\n".join(
+        f"{label}: {value}" for label, value in location_widget_details(spec)
+    )
 
 
 def default_get_status(paths):
