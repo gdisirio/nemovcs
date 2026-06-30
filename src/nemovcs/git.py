@@ -16,6 +16,7 @@ from typing import Iterable, Mapping, Sequence
 
 DEFAULT_TIMEOUT_SECONDS = 15
 MELD_MISSING_MESSAGE = "meld is required for visual diffs"
+DEFAULT_RECENT_BRANCH_LIMIT = 10
 
 
 @dataclass(frozen=True)
@@ -306,9 +307,8 @@ def commit_items(paths: Sequence[str | Path]) -> dict[Path, list[CommitItem]]:
 
 
 def current_branch(root: str | Path) -> str:
-    result = run_git(root, ["branch", "--show-current"])
-    branch = result.stdout.strip()
-    if result.ok and branch:
+    branch = current_branch_name(root)
+    if branch:
         return branch
 
     result = run_git(root, ["rev-parse", "--short", "HEAD"])
@@ -316,6 +316,72 @@ def current_branch(root: str | Path) -> str:
     if result.ok and commit:
         return f"detached at {commit}"
     return "unknown"
+
+
+def current_branch_name(root: str | Path) -> str | None:
+    result = run_git(root, ["branch", "--show-current"])
+    branch = result.stdout.strip()
+    if result.ok and branch:
+        return branch
+    return None
+
+
+def recent_branches(
+    root: str | Path,
+    *,
+    limit: int = DEFAULT_RECENT_BRANCH_LIMIT,
+) -> list[str]:
+    result = run_git(
+        root,
+        [
+            "for-each-ref",
+            "--sort=-committerdate",
+            "--format=%(refname:short)",
+            "refs/heads",
+        ],
+    )
+    if not result.ok:
+        return []
+
+    branches: list[str] = []
+    seen: set[str] = set()
+    for line in result.stdout.splitlines():
+        branch = line.strip()
+        if not branch or branch in seen:
+            continue
+        branches.append(branch)
+        seen.add(branch)
+        if len(branches) >= limit:
+            break
+    return branches
+
+
+def worktree_dirty(root: str | Path) -> bool:
+    result = run_git(root, ["status", "--porcelain=v1", "-uall"])
+    return (not result.ok) or bool(result.stdout.strip())
+
+
+def parse_worktree_branch_locations(data: str) -> dict[str, Path]:
+    locations: dict[str, Path] = {}
+    worktree: Path | None = None
+    for line in data.splitlines():
+        if not line:
+            worktree = None
+            continue
+        if line.startswith("worktree "):
+            worktree = Path(line.removeprefix("worktree "))
+            continue
+        if line.startswith("branch refs/heads/") and worktree is not None:
+            branch = line.removeprefix("branch refs/heads/")
+            locations[branch] = worktree
+    return locations
+
+
+def worktree_branch_locations(root: str | Path) -> dict[str, Path]:
+    result = run_git(root, ["worktree", "list", "--porcelain"])
+    if not result.ok:
+        return {}
+    return parse_worktree_branch_locations(result.stdout)
 
 
 def commit_paths(root: str | Path, relpaths: Sequence[str], message: str) -> list[GitResult]:

@@ -591,6 +591,13 @@ Initial cache policy:
 - Actions invoked inside a linked worktree must operate on that worktree's own
   checkout, branch, index, and gitdir. They must not accidentally affect the
   main worktree or another linked worktree.
+- Future branch switch UI should differentiate local and remote branches. The
+  fast context submenu should remain local-branch oriented, while the full
+  branch dialog can add local and remote sections or tabs. Selecting a remote
+  branch should explicitly create or select a local tracking branch rather than
+  hiding that behavior. Branch management actions such as create-and-switch,
+  rename, and delete should also live in the full dialog rather than the fast
+  context submenu.
 
 Initial emblem priority:
 

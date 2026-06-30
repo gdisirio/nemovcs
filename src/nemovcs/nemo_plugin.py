@@ -39,6 +39,7 @@ COMMIT_ICON = "nemovcs-commit"
 DIFF_ICON = "nemovcs-diff"
 GIT_ICON = "nemovcs-git"
 LOG_ICON = "nemovcs-show-log"
+MODIFIED_MENU_ICON = "emblem-nemovcs-modified"
 PUSH_ICON = "nemovcs-push"
 RENAME_ICON = "nemovcs-rename"
 REVERT_ICON = "nemovcs-revert"
@@ -72,8 +73,10 @@ class MenuActionSpec:
     label: str
     command: tuple[str, ...] = ()
     tip: str = ""
-    icon: str = MENU_ICON
+    icon: str | None = MENU_ICON
     separator: bool = False
+    sensitive: bool = True
+    children: tuple["MenuActionSpec", ...] = ()
 
 
 @dataclass(frozen=True)
@@ -445,12 +448,15 @@ class NemoVCSInfoProviderMixin:
         )
         submenu = Nemo.Menu()
         submenu_item.set_submenu(submenu)
-        for spec in group.items:
-            if spec.separator:
-                submenu.append_item(Nemo.MenuItem.new_separator(spec.name))
-                continue
-            submenu.append_item(self.nemovcs_menu_item(Nemo, spec))
+        self.nemovcs_append_menu_specs(Nemo, submenu, group.items)
         return submenu_item
+
+    def nemovcs_append_menu_specs(self, Nemo, menu, specs: Sequence[MenuActionSpec]):
+        for spec in specs:
+            if spec.separator:
+                menu.append_item(Nemo.MenuItem.new_separator(spec.name))
+                continue
+            menu.append_item(self.nemovcs_menu_item(Nemo, spec))
 
     def nemovcs_menu_item(self, Nemo, spec: MenuActionSpec):
         item = Nemo.MenuItem(
@@ -459,7 +465,18 @@ class NemoVCSInfoProviderMixin:
             tip=spec.tip,
             icon=spec.icon,
         )
-        item.connect("activate", self.on_menu_item_activate, spec.command)
+        if spec.children:
+            submenu = Nemo.Menu()
+            item.set_submenu(submenu)
+            self.nemovcs_append_menu_specs(Nemo, submenu, spec.children)
+        elif spec.command:
+            item.connect("activate", self.on_menu_item_activate, spec.command)
+        if not spec.sensitive:
+            set_sensitive = getattr(item, "set_sensitive", None)
+            if set_sensitive is not None:
+                set_sensitive(False)
+            else:
+                item.set_property("sensitive", False)
         return item
 
     def nemovcs_location_widget(self, spec: LocationWidgetSpec):
@@ -717,6 +734,9 @@ def git_menu_specs(paths: Sequence[str]) -> list[MenuActionSpec]:
         specs.append(
             action("GitRename", "Rename...", ["rename-dialog", *paths], icon=RENAME_ICON)
         )
+        switch_spec = git_switch_branch_menu_spec(paths[0])
+        if switch_spec is not None:
+            specs.append(switch_spec)
     specs.extend(
         [
             action(
@@ -735,6 +755,76 @@ def git_menu_specs(paths: Sequence[str]) -> list[MenuActionSpec]:
         ]
     )
     return specs
+
+
+def git_switch_branch_menu_spec(path: str) -> MenuActionSpec | None:
+    from . import git
+
+    root = git.repo_root(path)
+    if root is None:
+        return None
+
+    current = git.current_branch_name(root)
+    dirty = git.worktree_dirty(root)
+    branches = git.recent_branches(root)
+    if current and current not in branches:
+        branches.insert(0, current)
+    branch_locations = git.worktree_branch_locations(root)
+
+    children: list[MenuActionSpec] = []
+    for branch in branches:
+        if branch == current:
+            children.append(
+                MenuActionSpec(
+                    name=f"NemoVCS::GitSwitchCurrent::{menu_name_fragment(branch)}",
+                    label=branch,
+                    tip="Current branch",
+                    icon="object-select-symbolic",
+                    sensitive=False,
+                )
+            )
+            continue
+        branch_location = branch_locations.get(branch)
+        checked_out_elsewhere = (
+            branch_location is not None
+            and branch_location.resolve(strict=False) != root.resolve(strict=False)
+        )
+        branch_tip = branch
+        if dirty:
+            branch_tip = "Working tree has changes"
+        elif checked_out_elsewhere:
+            branch_tip = f"Checked out at {branch_location}"
+        children.append(
+            MenuActionSpec(
+                name=f"NemoVCS::GitSwitchBranch::{menu_name_fragment(branch)}",
+                label=branch,
+                command=("nemovcs", "switch-branch-dialog", str(root), branch),
+                tip=branch_tip,
+                icon=None,
+                sensitive=not dirty and not checked_out_elsewhere,
+            )
+        )
+
+    if children:
+        children.append(separator("GitSwitchBranchSep"))
+    children.append(
+        MenuActionSpec(
+            name="NemoVCS::GitSwitchBranchOthers",
+            label="Others...",
+            command=("nemovcs", "switch-branch-dialog", str(root)),
+            tip="Working tree has changes" if dirty else "Show all branches",
+            icon=None,
+            sensitive=not dirty,
+        )
+    )
+
+    return MenuActionSpec(
+        name="NemoVCS::GitSwitchBranch",
+        label="Switch Branch",
+        tip="Working tree has changes" if dirty else "Switch Git branch",
+        icon=MODIFIED_MENU_ICON if dirty else GIT_ICON,
+        children=tuple(children),
+    )
 
 
 def common_top_level_specs(paths: Sequence[str]) -> list[MenuActionSpec]:
@@ -850,3 +940,7 @@ def action(
 
 def separator(name: str) -> MenuActionSpec:
     return MenuActionSpec(name=f"NemoVCS::{name}", label="", separator=True)
+
+
+def menu_name_fragment(text: str) -> str:
+    return "".join(char if char.isalnum() else "_" for char in text)

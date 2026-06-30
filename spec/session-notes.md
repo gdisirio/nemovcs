@@ -62,6 +62,11 @@ sessions. Update this file before pushing changes.
   its visual density/placement if it feels intrusive.
 - Add Git upstream/origin remote URL data to status records for the expanded
   repository context bar.
+- Future branch switch dialog refinement: differentiate local and remote
+  branches. Keep the fast context submenu local-only; make `Others...` show
+  local and remote sections/tabs, with remote branches creating or selecting a
+  local tracking branch explicitly. The full dialog is also the right place for
+  branch management actions such as create-and-switch, rename, and delete.
 - Watch for stale status daemon cache behavior after file changes, VCS
   operations, and daemon restarts.
 - Validate `Rename...` behavior for both Git and SVN files/directories.

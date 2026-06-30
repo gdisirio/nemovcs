@@ -472,6 +472,37 @@ class NemoVCSInfoProviderCoreTest(unittest.TestCase):
         )
         self.assertIsNone(nemo_plugin.menu_launch_env(("meld", "/tmp/a", "/tmp/b")))
 
+    def test_menu_item_sets_sensitive_property_when_binding_has_no_method(self):
+        class FakeMenuItem:
+            def __init__(self, **kwargs):
+                self.kwargs = kwargs
+                self.properties = {}
+                self.connected = []
+
+            def connect(self, *args):
+                self.connected.append(args)
+
+            def set_property(self, name, value):
+                self.properties[name] = value
+
+        class FakeNemo:
+            MenuItem = FakeMenuItem
+
+        provider = nemo_plugin.NemoVCSInfoProviderMixin.__new__(
+            nemo_plugin.NemoVCSInfoProviderMixin
+        )
+        spec = nemo_plugin.MenuActionSpec(
+            name="NemoVCS::Disabled",
+            label="Disabled",
+            command=("nemovcs", "about-dialog"),
+            sensitive=False,
+        )
+
+        item = provider.nemovcs_menu_item(FakeNemo, spec)
+
+        self.assertEqual(item.properties, {"sensitive": False})
+        self.assertEqual(len(item.connected), 1)
+
     def test_git_submenu_group_uses_existing_dialog_commands(self):
         core = nemo_plugin.NemoVCSInfoProviderCore()
 
@@ -529,6 +560,143 @@ class NemoVCSInfoProviderCoreTest(unittest.TestCase):
         self.assertEqual(icons_by_label["Log..."], "nemovcs-show-log")
         self.assertEqual(icons_by_label["Settings..."], "nemovcs-settings")
         self.assertEqual(icons_by_label["About..."], "nemovcs")
+
+    def test_git_submenu_includes_clean_switch_branch_menu(self):
+        core = nemo_plugin.NemoVCSInfoProviderCore()
+
+        with mock.patch("nemovcs.nemo_plugin.is_clone_target", return_value=False), (
+            mock.patch("nemovcs.nemo_plugin.matching_backend_ids", return_value=["git"])
+        ), mock.patch("nemovcs.git.repo_root", return_value=Path("/tmp/repo")), (
+            mock.patch("nemovcs.git.current_branch_name", return_value="main")
+        ), mock.patch("nemovcs.git.worktree_dirty", return_value=False), (
+            mock.patch(
+                "nemovcs.git.recent_branches",
+                return_value=["feature/new", "main", "release"],
+            )
+        ):
+            groups = core.submenu_groups(["/tmp/repo/src/app.py"])
+
+        switch = next(spec for spec in groups[0].items if spec.label == "Switch Branch")
+
+        self.assertTrue(switch.sensitive)
+        self.assertEqual(switch.icon, "nemovcs-git")
+        self.assertEqual(
+            [child.label for child in switch.children if not child.separator],
+            ["feature/new", "main", "release", "Others..."],
+        )
+        self.assertEqual(
+            switch.children[0].command,
+            (
+                "nemovcs",
+                "switch-branch-dialog",
+                "/tmp/repo",
+                "feature/new",
+            ),
+        )
+        self.assertFalse(switch.children[1].sensitive)
+        self.assertEqual(switch.children[1].icon, "object-select-symbolic")
+        self.assertIsNone(switch.children[0].icon)
+        self.assertIsNone(switch.children[2].icon)
+        self.assertTrue(switch.children[-1].sensitive)
+        self.assertIsNone(switch.children[-1].icon)
+        self.assertEqual(
+            switch.children[-1].command,
+            ("nemovcs", "switch-branch-dialog", "/tmp/repo"),
+        )
+
+    def test_git_switch_branch_menu_stays_active_with_single_branch(self):
+        core = nemo_plugin.NemoVCSInfoProviderCore()
+
+        with mock.patch("nemovcs.nemo_plugin.is_clone_target", return_value=False), (
+            mock.patch("nemovcs.nemo_plugin.matching_backend_ids", return_value=["git"])
+        ), mock.patch("nemovcs.git.repo_root", return_value=Path("/tmp/repo")), (
+            mock.patch("nemovcs.git.current_branch_name", return_value="main")
+        ), mock.patch("nemovcs.git.worktree_dirty", return_value=False), (
+            mock.patch("nemovcs.git.recent_branches", return_value=["main"])
+        ):
+            groups = core.submenu_groups(["/tmp/repo/src/app.py"])
+
+        switch = next(spec for spec in groups[0].items if spec.label == "Switch Branch")
+
+        self.assertTrue(switch.sensitive)
+        self.assertEqual(
+            [child.label for child in switch.children if not child.separator],
+            ["main", "Others..."],
+        )
+        self.assertFalse(switch.children[0].sensitive)
+        self.assertEqual(switch.children[0].icon, "object-select-symbolic")
+        self.assertTrue(switch.children[-1].sensitive)
+
+    def test_git_switch_branch_menu_includes_current_when_recent_list_is_empty(self):
+        core = nemo_plugin.NemoVCSInfoProviderCore()
+
+        with mock.patch("nemovcs.nemo_plugin.is_clone_target", return_value=False), (
+            mock.patch("nemovcs.nemo_plugin.matching_backend_ids", return_value=["git"])
+        ), mock.patch("nemovcs.git.repo_root", return_value=Path("/tmp/repo")), (
+            mock.patch("nemovcs.git.current_branch_name", return_value="main")
+        ), mock.patch("nemovcs.git.worktree_dirty", return_value=False), (
+            mock.patch("nemovcs.git.recent_branches", return_value=[])
+        ):
+            groups = core.submenu_groups(["/tmp/repo/src/app.py"])
+
+        switch = next(spec for spec in groups[0].items if spec.label == "Switch Branch")
+
+        self.assertTrue(switch.sensitive)
+        self.assertEqual(
+            [child.label for child in switch.children if not child.separator],
+            ["main", "Others..."],
+        )
+        self.assertFalse(switch.children[0].sensitive)
+        self.assertEqual(switch.children[0].icon, "object-select-symbolic")
+
+    def test_git_switch_branch_menu_disables_branch_checked_out_elsewhere(self):
+        core = nemo_plugin.NemoVCSInfoProviderCore()
+
+        with mock.patch("nemovcs.nemo_plugin.is_clone_target", return_value=False), (
+            mock.patch("nemovcs.nemo_plugin.matching_backend_ids", return_value=["git"])
+        ), mock.patch("nemovcs.git.repo_root", return_value=Path("/tmp/repo")), (
+            mock.patch("nemovcs.git.current_branch_name", return_value="main")
+        ), mock.patch("nemovcs.git.worktree_dirty", return_value=False), (
+            mock.patch("nemovcs.git.recent_branches", return_value=["main", "feature/new"])
+        ), mock.patch(
+            "nemovcs.git.worktree_branch_locations",
+            return_value={
+                "main": Path("/tmp/repo"),
+                "feature/new": Path("/tmp/feature"),
+            },
+        ):
+            groups = core.submenu_groups(["/tmp/repo/src/app.py"])
+
+        switch = next(spec for spec in groups[0].items if spec.label == "Switch Branch")
+        occupied = next(spec for spec in switch.children if spec.label == "feature/new")
+
+        self.assertFalse(occupied.sensitive)
+        self.assertEqual(occupied.tip, "Checked out at /tmp/feature")
+
+    def test_git_switch_branch_menu_disables_branch_actions_when_worktree_is_dirty(self):
+        core = nemo_plugin.NemoVCSInfoProviderCore()
+
+        with mock.patch("nemovcs.nemo_plugin.is_clone_target", return_value=False), (
+            mock.patch("nemovcs.nemo_plugin.matching_backend_ids", return_value=["git"])
+        ), mock.patch("nemovcs.git.repo_root", return_value=Path("/tmp/repo")), (
+            mock.patch("nemovcs.git.current_branch_name", return_value="main")
+        ), mock.patch("nemovcs.git.worktree_dirty", return_value=True), (
+            mock.patch("nemovcs.git.recent_branches", return_value=["feature/new", "main"])
+        ):
+            groups = core.submenu_groups(["/tmp/repo/src/app.py"])
+
+        switch = next(spec for spec in groups[0].items if spec.label == "Switch Branch")
+
+        self.assertTrue(switch.sensitive)
+        self.assertEqual(switch.icon, "emblem-nemovcs-modified")
+        self.assertEqual(
+            [child.label for child in switch.children if not child.separator],
+            ["feature/new", "main", "Others..."],
+        )
+        self.assertFalse(switch.children[0].sensitive)
+        self.assertFalse(switch.children[1].sensitive)
+        self.assertEqual(switch.children[1].icon, "object-select-symbolic")
+        self.assertFalse(switch.children[-1].sensitive)
 
     def test_git_top_level_specs_use_common_dialog_commands(self):
         core = nemo_plugin.NemoVCSInfoProviderCore()

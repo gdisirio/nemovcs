@@ -226,6 +226,172 @@ def cmd_push_dialog(args: argparse.Namespace) -> int:
     return logger.run("Push", phases)
 
 
+def switch_branch_phase(root: str | Path, branch: str) -> BackendCommandPhase:
+    root_path = Path(root).expanduser().resolve(strict=False)
+    return BackendCommandPhase(
+        title=f"Switch to {branch}",
+        cwd=root_path,
+        command=("git", "-C", str(root_path), "switch", branch),
+    )
+
+
+def cmd_switch_branch_dialog(args: argparse.Namespace) -> int:
+    from . import git
+    from .ui import info_dialog
+    from .ui import logger
+
+    root = git.repo_root(args.path)
+    if root is None:
+        print("not inside a Git working tree", file=sys.stderr)
+        return 1
+
+    if git.worktree_dirty(root):
+        info_dialog.show_error(
+            "Cannot switch branch",
+            "The Git working tree has changes. Commit, revert, or clean it first.",
+        )
+        return 1
+
+    current = git.current_branch(root)
+    target = args.branch or select_switch_branch(root, current)
+    if target is None:
+        return 0
+
+    if current == target:
+        return 0
+
+    if not confirm_switch_branch(root, current, target):
+        return 0
+
+    return logger.run("Switch Branch", [switch_branch_phase(root, target)])
+
+
+def select_switch_branch(root: str | Path, current: str) -> str | None:
+    import gi
+
+    from . import git
+
+    gi.require_version("Gtk", "3.0")
+    from gi.repository import Gtk, Pango  # noqa: E402
+
+    branches = git.recent_branches(root, limit=1000)
+    if current not in branches:
+        branches.insert(0, current)
+    if not branches:
+        return None
+    branch_locations = git.worktree_branch_locations(root)
+    current_root = Path(root).resolve(strict=False)
+
+    dialog = Gtk.Dialog(
+        title="Switch Git Branch",
+        flags=Gtk.DialogFlags.MODAL,
+    )
+    dialog.add_button("Cancel", Gtk.ResponseType.CANCEL)
+    switch_button = dialog.add_button("Switch...", Gtk.ResponseType.OK)
+    dialog.set_default_size(520, 420)
+
+    branch_list = Gtk.ListBox()
+    branch_list.set_selection_mode(Gtk.SelectionMode.SINGLE)
+    branch_list.set_activate_on_single_click(False)
+
+    first_selectable_row = None
+    for branch in branches:
+        branch_location = branch_locations.get(branch)
+        checked_out_elsewhere = (
+            branch_location is not None
+            and branch_location.resolve(strict=False) != current_root
+        )
+        row = Gtk.ListBoxRow()
+        row.nemovcs_branch = branch
+        row.nemovcs_selectable = branch != current and not checked_out_elsewhere
+        row.set_activatable(row.nemovcs_selectable)
+        row.set_selectable(row.nemovcs_selectable)
+
+        box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        box.set_border_width(6)
+        row.add(box)
+
+        image = Gtk.Image.new_from_icon_name(
+            "object-select-symbolic",
+            Gtk.IconSize.MENU,
+        )
+        if branch != current:
+            image.set_opacity(0)
+        box.pack_start(image, False, False, 0)
+
+        label = Gtk.Label(label=branch)
+        label.set_xalign(0)
+        label.set_ellipsize(Pango.EllipsizeMode.END)
+        box.pack_start(label, True, True, 0)
+
+        if checked_out_elsewhere:
+            row.set_tooltip_text(f"Checked out at {branch_location}")
+            label.set_sensitive(False)
+            image.set_sensitive(False)
+
+        branch_list.add(row)
+        if first_selectable_row is None and row.nemovcs_selectable:
+            first_selectable_row = row
+
+    def selected_branch() -> str | None:
+        row = branch_list.get_selected_row()
+        return getattr(row, "nemovcs_branch", None) if row is not None else None
+
+    def update_switch_button(*_args) -> None:
+        row = branch_list.get_selected_row()
+        switch_button.set_sensitive(
+            bool(row is not None and getattr(row, "nemovcs_selectable", False))
+        )
+
+    def on_row_activated(_list, row) -> None:
+        if getattr(row, "nemovcs_selectable", False):
+            dialog.response(Gtk.ResponseType.OK)
+
+    branch_list.connect("row-selected", update_switch_button)
+    branch_list.connect("row-activated", on_row_activated)
+    if first_selectable_row is not None:
+        branch_list.select_row(first_selectable_row)
+    update_switch_button()
+
+    scroll = Gtk.ScrolledWindow()
+    scroll.set_shadow_type(Gtk.ShadowType.IN)
+    scroll.add(branch_list)
+    content = dialog.get_content_area()
+    content.set_spacing(8)
+    content.pack_start(scroll, True, True, 0)
+    dialog.show_all()
+
+    selected = None
+    response = dialog.run()
+    if response == Gtk.ResponseType.OK:
+        branch = selected_branch()
+        if branch != current:
+            selected = branch
+    dialog.destroy()
+    return selected
+
+
+def confirm_switch_branch(root: str | Path, current: str, target: str) -> bool:
+    import gi
+
+    gi.require_version("Gtk", "3.0")
+    from gi.repository import Gtk  # noqa: E402
+
+    dialog = Gtk.MessageDialog(
+        flags=Gtk.DialogFlags.MODAL,
+        message_type=Gtk.MessageType.QUESTION,
+        buttons=Gtk.ButtonsType.CANCEL,
+        text="Switch Git branch?",
+    )
+    dialog.add_button("Switch", Gtk.ResponseType.OK)
+    dialog.format_secondary_text(
+        f"Repository: {Path(root)}\nCurrent branch: {current}\nTarget branch: {target}"
+    )
+    response = dialog.run()
+    dialog.destroy()
+    return response == Gtk.ResponseType.OK
+
+
 def cmd_commit(args: argparse.Namespace) -> int:
     results = backends.commit(args.paths, args.message)
     if not results:
@@ -491,6 +657,14 @@ def build_parser() -> argparse.ArgumentParser:
     )
     push_dialog.add_argument("paths", nargs="*")
     push_dialog.set_defaults(func=cmd_push_dialog)
+
+    switch_branch_dialog = subparsers.add_parser(
+        "switch-branch-dialog",
+        help="confirm and switch the current Git branch",
+    )
+    switch_branch_dialog.add_argument("path")
+    switch_branch_dialog.add_argument("branch", nargs="?")
+    switch_branch_dialog.set_defaults(func=cmd_switch_branch_dialog)
 
     commit = subparsers.add_parser("commit", help="stage selected paths and commit")
     commit.add_argument("-m", "--message")

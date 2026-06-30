@@ -28,6 +28,72 @@ class GitExecutableAvailabilityTest(unittest.TestCase):
 
         self.assertEqual(raised.exception.result.returncode, 127)
 
+    def test_current_branch_name_returns_none_for_detached_head(self):
+        result = git.GitResult(("git",), Path("/tmp/repo"), 0, "\n", "")
+
+        with mock.patch("nemovcs.git.run_git", return_value=result):
+            self.assertIsNone(git.current_branch_name("/tmp/repo"))
+
+    def test_recent_branches_are_sorted_by_git_output_and_limited(self):
+        result = git.GitResult(
+            ("git",),
+            Path("/tmp/repo"),
+            0,
+            "feature/new\nmain\nrelease/1\n",
+            "",
+        )
+
+        with mock.patch("nemovcs.git.run_git", return_value=result):
+            self.assertEqual(
+                git.recent_branches("/tmp/repo", limit=2),
+                ["feature/new", "main"],
+            )
+
+    def test_recent_branches_returns_empty_on_git_failure(self):
+        result = git.GitResult(("git",), Path("/tmp/repo"), 1, "", "failed")
+
+        with mock.patch("nemovcs.git.run_git", return_value=result):
+            self.assertEqual(git.recent_branches("/tmp/repo"), [])
+
+    def test_worktree_dirty_uses_porcelain_status(self):
+        clean = git.GitResult(("git",), Path("/tmp/repo"), 0, "", "")
+        dirty = git.GitResult(("git",), Path("/tmp/repo"), 0, " M app.py\n", "")
+
+        with mock.patch("nemovcs.git.run_git", return_value=clean):
+            self.assertFalse(git.worktree_dirty("/tmp/repo"))
+        with mock.patch("nemovcs.git.run_git", return_value=dirty):
+            self.assertTrue(git.worktree_dirty("/tmp/repo"))
+
+    def test_parse_worktree_branch_locations(self):
+        data = (
+            "worktree /tmp/repo\n"
+            "HEAD 1111111111111111111111111111111111111111\n"
+            "branch refs/heads/main\n"
+            "\n"
+            "worktree /tmp/feature\n"
+            "HEAD 2222222222222222222222222222222222222222\n"
+            "branch refs/heads/feature/new\n"
+            "\n"
+            "worktree /tmp/detached\n"
+            "HEAD 3333333333333333333333333333333333333333\n"
+            "detached\n"
+            "\n"
+        )
+
+        self.assertEqual(
+            git.parse_worktree_branch_locations(data),
+            {
+                "main": Path("/tmp/repo"),
+                "feature/new": Path("/tmp/feature"),
+            },
+        )
+
+    def test_worktree_branch_locations_returns_empty_on_git_failure(self):
+        result = git.GitResult(("git",), Path("/tmp/repo"), 1, "", "failed")
+
+        with mock.patch("nemovcs.git.run_git", return_value=result):
+            self.assertEqual(git.worktree_branch_locations("/tmp/repo"), {})
+
 
 @unittest.skipUnless(have_git(), "git executable is required")
 class GitHelpersTest(unittest.TestCase):

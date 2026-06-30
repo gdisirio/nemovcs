@@ -24,9 +24,11 @@ from nemovcs.cli import (
     cmd_status,
     cmd_status_dialog,
     cmd_svn_meld_diff,
+    cmd_switch_branch_dialog,
     cmd_update,
     log_phases,
     push_phases,
+    switch_branch_phase,
     update_phases,
 )
 
@@ -184,6 +186,19 @@ class CliParserTest(unittest.TestCase):
 
         self.assertEqual(args.command, "push-dialog")
         self.assertEqual(args.paths, ["/tmp/example"])
+
+    def test_switch_branch_dialog_accepts_optional_branch(self):
+        parser = build_parser()
+
+        args = parser.parse_args(["switch-branch-dialog", "/tmp/repo"])
+
+        self.assertEqual(args.command, "switch-branch-dialog")
+        self.assertEqual(args.path, "/tmp/repo")
+        self.assertIsNone(args.branch)
+
+        args = parser.parse_args(["switch-branch-dialog", "/tmp/repo", "feature/new"])
+
+        self.assertEqual(args.branch, "feature/new")
 
     def test_status_uses_backend_registry(self):
         parser = build_parser()
@@ -393,6 +408,62 @@ class CliParserTest(unittest.TestCase):
             phases[0].command,
             ("git", "-C", str(root), "push"),
         )
+
+    def test_switch_branch_phase_runs_git_switch(self):
+        root = Path("/tmp/example")
+
+        phase = switch_branch_phase(root, "feature/new")
+
+        self.assertEqual(phase.title, "Switch to feature/new")
+        self.assertEqual(phase.cwd, root)
+        self.assertEqual(
+            phase.command,
+            ("git", "-C", str(root), "switch", "feature/new"),
+        )
+
+    def test_switch_branch_dialog_rejects_dirty_worktree(self):
+        parser = build_parser()
+        args = parser.parse_args(["switch-branch-dialog", "/tmp/repo", "feature/new"])
+
+        with mock.patch("nemovcs.git.repo_root", return_value=Path("/tmp/repo")), (
+            mock.patch("nemovcs.git.worktree_dirty", return_value=True)
+        ), mock.patch("nemovcs.ui.info_dialog.show_error") as show_error:
+            self.assertEqual(cmd_switch_branch_dialog(args), 1)
+
+        show_error.assert_called_once()
+
+    def test_switch_branch_dialog_confirms_then_runs_logger(self):
+        parser = build_parser()
+        args = parser.parse_args(["switch-branch-dialog", "/tmp/repo", "feature/new"])
+
+        with mock.patch("nemovcs.git.repo_root", return_value=Path("/tmp/repo")), (
+            mock.patch("nemovcs.git.worktree_dirty", return_value=False)
+        ), mock.patch("nemovcs.git.current_branch", return_value="main"), (
+            mock.patch("nemovcs.cli.confirm_switch_branch", return_value=True)
+        ) as confirm, mock.patch("nemovcs.ui.logger.run", return_value=0) as run_logger:
+            self.assertEqual(cmd_switch_branch_dialog(args), 0)
+
+        confirm.assert_called_once_with(Path("/tmp/repo"), "main", "feature/new")
+        run_logger.assert_called_once_with(
+            "Switch Branch",
+            [switch_branch_phase(Path("/tmp/repo"), "feature/new")],
+        )
+
+    def test_switch_branch_dialog_selects_branch_when_target_is_omitted(self):
+        parser = build_parser()
+        args = parser.parse_args(["switch-branch-dialog", "/tmp/repo"])
+
+        with mock.patch("nemovcs.git.repo_root", return_value=Path("/tmp/repo")), (
+            mock.patch("nemovcs.git.worktree_dirty", return_value=False)
+        ), mock.patch("nemovcs.git.current_branch", return_value="main"), (
+            mock.patch("nemovcs.cli.select_switch_branch", return_value="feature/new")
+        ) as select_branch, mock.patch(
+            "nemovcs.cli.confirm_switch_branch",
+            return_value=True,
+        ), mock.patch("nemovcs.ui.logger.run", return_value=0):
+            self.assertEqual(cmd_switch_branch_dialog(args), 0)
+
+        select_branch.assert_called_once_with(Path("/tmp/repo"), "main")
 
     def test_update_phases_pull_each_grouped_repository(self):
         root = Path("/tmp/example")
