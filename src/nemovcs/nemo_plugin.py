@@ -479,23 +479,30 @@ class NemoVCSInfoProviderMixin:
 
         backend = Gtk.Label()
         backend.set_markup(f"<b>{escape(spec.backend_label)}</b>")
+        backend.set_xalign(0)
         box.pack_start(backend, False, False, 0)
 
         head = Gtk.Label(label=compact_text(spec.head))
         head.set_ellipsize(Pango.EllipsizeMode.END)
         head.set_max_width_chars(LOCATION_BAR_MAX_CHARS)
-        head.set_hexpand(True)
+        head.set_xalign(0)
         head.set_selectable(True)
-        box.pack_start(head, True, True, 0)
+        box.pack_start(head, False, False, 0)
 
         status = Gtk.Label(label=f"- {spec.status_label}")
+        status.set_xalign(0)
         box.pack_start(status, False, False, 0)
 
         root = Gtk.Label(label=f"- {compact_text(spec.root_label)}")
         root.set_ellipsize(Pango.EllipsizeMode.END)
         root.set_max_width_chars(LOCATION_BAR_MAX_CHARS)
+        root.set_xalign(0)
         root.set_selectable(True)
         box.pack_start(root, False, False, 0)
+
+        spacer = Gtk.Label()
+        spacer.set_hexpand(True)
+        box.pack_start(spacer, True, True, 0)
 
         box.show_all()
         return box
