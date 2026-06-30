@@ -543,7 +543,10 @@ class NemoVCSInfoProviderMixin:
         from gi.repository import Gtk
 
         expanded = button.get_active()
-        details.set_visible(expanded)
+        if expanded:
+            details.show_all()
+        else:
+            details.hide()
         button.set_tooltip_text(
             "Hide repository details" if expanded else "Show repository details"
         )
