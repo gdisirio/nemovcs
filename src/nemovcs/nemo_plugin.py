@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from collections import OrderedDict
 from dataclasses import dataclass
+from html import escape
 import json
 import os
 from pathlib import Path
@@ -15,6 +16,7 @@ import subprocess
 import sys
 import time
 from typing import Sequence
+from urllib.parse import unquote, urlparse
 
 from . import status_client
 
@@ -43,6 +45,24 @@ SETTINGS_ICON = "nemovcs-settings"
 STATUS_ICON = "nemovcs-status"
 SVN_ICON = "nemovcs-svn"
 UPDATE_ICON = "nemovcs-update"
+BACKEND_LABELS = {
+    "git": "Git",
+    "svn": "SVN",
+}
+BACKEND_ICONS = {
+    "git": GIT_ICON,
+    "svn": SVN_ICON,
+}
+STATUS_LABELS = {
+    "conflicted": "conflicted",
+    "error": "error",
+    "ignored": "ignored",
+    "loading": "loading",
+    "modified": "modified",
+    "ok": "clean",
+    "stale": "stale",
+    "unversioned": "unversioned",
+}
 
 
 @dataclass(frozen=True)
@@ -62,6 +82,18 @@ class MenuGroupSpec:
     items: tuple[MenuActionSpec, ...]
     tip: str = ""
     icon: str = MENU_ICON
+
+
+@dataclass(frozen=True)
+class LocationWidgetSpec:
+    backend: str
+    backend_label: str
+    head: str
+    status: str
+    status_label: str
+    root: str
+    root_label: str
+    icon: str
 
 
 class NemoVCSInfoProviderCore:
@@ -310,6 +342,29 @@ class NemoVCSInfoProviderCore:
                 return False
         return True
 
+    def location_widget_spec(self, path: str | Path) -> LocationWidgetSpec | None:
+        record = self.update_path(path)
+        if record is None:
+            return None
+
+        backend = str(record.get("backend", ""))
+        root = str(record.get("root", ""))
+        if not backend or not root:
+            return None
+
+        head = str(record.get("head", "")) or "unknown"
+        status = str(record.get("status", ""))
+        return LocationWidgetSpec(
+            backend=backend,
+            backend_label=BACKEND_LABELS.get(backend, backend.upper()),
+            head=head,
+            status=status,
+            status_label=STATUS_LABELS.get(status, status or "unknown"),
+            root=root,
+            root_label=Path(root).name or root,
+            icon=BACKEND_ICONS.get(backend, MENU_ICON),
+        )
+
 
 class PluginDiagnostics:
     def __init__(self, path: str | Path):
@@ -350,6 +405,16 @@ class NemoVCSInfoProviderMixin:
     def get_background_items(self, _window, item):
         path = self.nemovcs_core.item_path(item)
         return self.nemovcs_menu_items([path] if path else [])
+
+    def get_widget(self, uri, _window):
+        path = path_from_uri(uri)
+        if path is None:
+            return None
+
+        spec = self.nemovcs_core.location_widget_spec(path)
+        if spec is None:
+            return None
+        return self.nemovcs_location_widget(spec)
 
     def nemovcs_menu_items(self, paths: Sequence[str]) -> list[object]:
         top_level_specs = self.nemovcs_core.top_level_specs(paths)
@@ -396,6 +461,38 @@ class NemoVCSInfoProviderMixin:
         item.connect("activate", self.on_menu_item_activate, spec.command)
         return item
 
+    def nemovcs_location_widget(self, spec: LocationWidgetSpec):
+        from gi.repository import Gtk
+
+        box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        box.set_border_width(4)
+        box.set_tooltip_text(
+            f"{spec.backend_label} worktree: {spec.root}\n"
+            f"Head: {spec.head}\n"
+            f"Status: {spec.status_label}"
+        )
+
+        image = Gtk.Image.new_from_icon_name(spec.icon, Gtk.IconSize.MENU)
+        box.pack_start(image, False, False, 0)
+
+        backend = Gtk.Label()
+        backend.set_markup(f"<b>{escape(spec.backend_label)}</b>")
+        box.pack_start(backend, False, False, 0)
+
+        head = Gtk.Label(label=spec.head)
+        head.set_selectable(True)
+        box.pack_start(head, False, False, 0)
+
+        status = Gtk.Label(label=f"- {spec.status_label}")
+        box.pack_start(status, False, False, 0)
+
+        root = Gtk.Label(label=f"- {spec.root_label}")
+        root.set_selectable(True)
+        box.pack_start(root, False, False, 0)
+
+        box.show_all()
+        return box
+
     def on_menu_item_activate(self, _item, command: Sequence[str]) -> None:
         launch_command = menu_launch_command(command)
         try:
@@ -423,6 +520,14 @@ def default_seen(paths):
     from . import statusd_dbus
 
     return statusd_dbus.call_seen(paths)
+
+
+def path_from_uri(uri: str) -> str | None:
+    parsed = urlparse(uri)
+    if parsed.scheme and parsed.scheme != "file":
+        return None
+    path = unquote(parsed.path if parsed.scheme else uri)
+    return str(Path(path).resolve(strict=False)) if path else None
 
 
 def default_get_status(paths):

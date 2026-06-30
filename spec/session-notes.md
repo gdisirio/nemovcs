@@ -42,11 +42,16 @@ sessions. Update this file before pushing changes.
   `tools/chibiscope/.gitignore`, so it should not receive the clean/green
   emblem; the parent directory remains unversioned when it has no tracked
   descendants.
+- Experimental `Nemo.LocationWidgetProvider` support adds a compact repository
+  context bar above the current directory listing with backend, active
+  branch/head, aggregate status, and repository root name.
 
 ## Next Likely Tasks
 
 - Continue manual testing from Nemo on real Git and SVN working trees after
   reinstalling the extension and restarting Nemo.
+- Decide whether the repository context bar is useful enough to keep, and tune
+  its visual density/placement if it feels intrusive.
 - Watch for stale status daemon cache behavior after file changes, VCS
   operations, and daemon restarts.
 - Validate `Rename...` behavior for both Git and SVN files/directories.

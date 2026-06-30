@@ -135,6 +135,57 @@ class NemoVCSInfoProviderCoreTest(unittest.TestCase):
         self.assertIsNone(nemo_plugin.primary_emblem("stale"))
         self.assertIsNone(nemo_plugin.primary_emblem("error"))
 
+    def test_path_from_uri_accepts_file_uri(self):
+        self.assertEqual(
+            nemo_plugin.path_from_uri("file:///tmp/repo/src%20dir"),
+            "/tmp/repo/src dir",
+        )
+
+    def test_path_from_uri_rejects_non_file_uri(self):
+        self.assertIsNone(nemo_plugin.path_from_uri("network:///server/share"))
+
+    def test_location_widget_spec_uses_status_record(self):
+        core = nemo_plugin.NemoVCSInfoProviderCore(
+            seen=lambda paths: ["git:/tmp/repo"],
+            get_status=lambda paths: [
+                {
+                    "path": "/tmp/repo/src",
+                    "backend": "git",
+                    "worktree_id": "git:/tmp/repo",
+                    "root": "/tmp/repo",
+                    "head": "feature/test",
+                    "status": "modified",
+                }
+            ],
+        )
+
+        spec = core.location_widget_spec("/tmp/repo/src")
+
+        self.assertIsNotNone(spec)
+        assert spec is not None
+        self.assertEqual(spec.backend_label, "Git")
+        self.assertEqual(spec.head, "feature/test")
+        self.assertEqual(spec.status_label, "modified")
+        self.assertEqual(spec.root_label, "repo")
+        self.assertEqual(spec.icon, "nemovcs-git")
+
+    def test_location_widget_spec_hides_non_worktree_path(self):
+        core = nemo_plugin.NemoVCSInfoProviderCore(
+            seen=lambda paths: [],
+            get_status=lambda paths: [
+                {
+                    "path": "/tmp/outside",
+                    "backend": "",
+                    "worktree_id": "",
+                    "root": "",
+                    "head": "",
+                    "status": "error",
+                }
+            ],
+        )
+
+        self.assertIsNone(core.location_widget_spec("/tmp/outside"))
+
     def test_daemon_error_is_recorded_and_does_not_escape(self):
         def seen(_paths):
             raise RuntimeError("no daemon")

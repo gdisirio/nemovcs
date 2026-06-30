@@ -13,6 +13,7 @@ manual testing and hardening before unattended daily use.
 - GTK dialogs for stage/add, commit, rename, revert, status, update, push, log,
   settings, and about.
 - Meld integration for selected-path diffs and two-path comparisons.
+- Repository context bar showing backend, active branch/head, status, and root.
 - Live status emblems in Nemo:
   - clean paths,
   - modified paths and folders,

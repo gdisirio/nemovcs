@@ -106,6 +106,7 @@ class NemoVCS(
     NemoVCSInfoProviderMixin,
     GObject.GObject,
     Nemo.InfoProvider,
+    Nemo.LocationWidgetProvider,
     Nemo.MenuProvider,
     Nemo.NameAndDescProvider,
 ):

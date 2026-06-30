@@ -20,6 +20,7 @@ class InstallNemoExtensionTest(unittest.TestCase):
 
         self.assertIn("gi.require_version(\"Nemo\", \"3.0\")", source)
         self.assertIn("NemoVCSInfoProviderMixin", source)
+        self.assertIn("Nemo.LocationWidgetProvider", source)
         self.assertIn("Nemo.MenuProvider", source)
         self.assertIn("Nemo.NameAndDescProvider", source)
         self.assertIn(
