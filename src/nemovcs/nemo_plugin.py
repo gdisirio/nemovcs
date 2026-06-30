@@ -521,6 +521,9 @@ class NemoVCSInfoProviderMixin:
         )
         box.pack_start(toggle, False, False, 0)
 
+        separator = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
+        outer.pack_start(separator, False, False, 0)
+
         outer.show_all()
         details.hide()
         return outer
