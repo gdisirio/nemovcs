@@ -22,6 +22,7 @@ from . import status_client
 
 
 DEFAULT_MAX_VISIBLE_ITEMS = 2048
+LOCATION_BAR_MAX_CHARS = 32
 
 PRIMARY_EMBLEMS = {
     "conflicted": "nemovcs-conflicted",
@@ -462,10 +463,11 @@ class NemoVCSInfoProviderMixin:
         return item
 
     def nemovcs_location_widget(self, spec: LocationWidgetSpec):
-        from gi.repository import Gtk
+        from gi.repository import Gtk, Pango
 
         box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         box.set_border_width(4)
+        box.set_hexpand(True)
         box.set_tooltip_text(
             f"{spec.backend_label} worktree: {spec.root}\n"
             f"Head: {spec.head}\n"
@@ -479,14 +481,19 @@ class NemoVCSInfoProviderMixin:
         backend.set_markup(f"<b>{escape(spec.backend_label)}</b>")
         box.pack_start(backend, False, False, 0)
 
-        head = Gtk.Label(label=spec.head)
+        head = Gtk.Label(label=compact_text(spec.head))
+        head.set_ellipsize(Pango.EllipsizeMode.END)
+        head.set_max_width_chars(LOCATION_BAR_MAX_CHARS)
+        head.set_hexpand(True)
         head.set_selectable(True)
-        box.pack_start(head, False, False, 0)
+        box.pack_start(head, True, True, 0)
 
         status = Gtk.Label(label=f"- {spec.status_label}")
         box.pack_start(status, False, False, 0)
 
-        root = Gtk.Label(label=f"- {spec.root_label}")
+        root = Gtk.Label(label=f"- {compact_text(spec.root_label)}")
+        root.set_ellipsize(Pango.EllipsizeMode.END)
+        root.set_max_width_chars(LOCATION_BAR_MAX_CHARS)
         root.set_selectable(True)
         box.pack_start(root, False, False, 0)
 
@@ -528,6 +535,14 @@ def path_from_uri(uri: str) -> str | None:
         return None
     path = unquote(parsed.path if parsed.scheme else uri)
     return str(Path(path).resolve(strict=False)) if path else None
+
+
+def compact_text(text: str, *, max_chars: int = LOCATION_BAR_MAX_CHARS) -> str:
+    if len(text) <= max_chars:
+        return text
+    if max_chars <= 1:
+        return text[:max_chars]
+    return text[: max_chars - 1] + "..."
 
 
 def default_get_status(paths):

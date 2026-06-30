@@ -144,6 +144,13 @@ class NemoVCSInfoProviderCoreTest(unittest.TestCase):
     def test_path_from_uri_rejects_non_file_uri(self):
         self.assertIsNone(nemo_plugin.path_from_uri("network:///server/share"))
 
+    def test_compact_text_shortens_long_values(self):
+        self.assertEqual(
+            nemo_plugin.compact_text("feature/very-long-branch", max_chars=12),
+            "feature/ver...",
+        )
+        self.assertEqual(nemo_plugin.compact_text("main", max_chars=12), "main")
+
     def test_location_widget_spec_uses_status_record(self):
         core = nemo_plugin.NemoVCSInfoProviderCore(
             seen=lambda paths: ["git:/tmp/repo"],
