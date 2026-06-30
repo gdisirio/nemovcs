@@ -45,6 +45,11 @@ sessions. Update this file before pushing changes.
 - Experimental `Nemo.LocationWidgetProvider` support adds a compact repository
   context bar above the current directory listing with backend, active
   branch/head, aggregate status, and repository root name.
+- Future repository context bar refinement: for Git expanded view, prefer a
+  remote URL over the local worktree path. Rule: use the current branch
+  upstream remote URL when available, otherwise `origin` remote URL when
+  available, otherwise fall back to the local worktree path. Compact view can
+  remain branch/status/root-name oriented.
 
 ## Next Likely Tasks
 
@@ -52,6 +57,8 @@ sessions. Update this file before pushing changes.
   reinstalling the extension and restarting Nemo.
 - Decide whether the repository context bar is useful enough to keep, and tune
   its visual density/placement if it feels intrusive.
+- Add Git upstream/origin remote URL data to status records for the expanded
+  repository context bar.
 - Watch for stale status daemon cache behavior after file changes, VCS
   operations, and daemon restarts.
 - Validate `Rename...` behavior for both Git and SVN files/directories.
