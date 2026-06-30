@@ -493,19 +493,15 @@ class NemoVCSInfoProviderMixin:
         status.set_xalign(0)
         box.pack_start(status, False, False, 0)
 
-        root = Gtk.Label(label=f"- {compact_text(spec.root_label)}")
+        root = Gtk.Label(label=location_widget_root_label(spec, expanded=False))
         root.set_ellipsize(Pango.EllipsizeMode.END)
         root.set_max_width_chars(LOCATION_BAR_MAX_CHARS)
+        root.set_hexpand(True)
         root.set_xalign(0)
         root.set_selectable(True)
-        box.pack_start(root, False, False, 0)
-
-        spacer = Gtk.Label()
-        spacer.set_hexpand(True)
-        box.pack_start(spacer, True, True, 0)
+        box.pack_start(root, True, True, 0)
 
         details = self.nemovcs_location_details_widget(Gtk, spec)
-        details.set_no_show_all(True)
         outer.pack_start(details, False, False, 0)
 
         toggle = Gtk.ToggleButton()
@@ -514,7 +510,15 @@ class NemoVCSInfoProviderMixin:
         toggle.set_image(
             Gtk.Image.new_from_icon_name("pan-down-symbolic", Gtk.IconSize.MENU)
         )
-        toggle.connect("toggled", self.on_location_details_toggled, details)
+        toggle.connect(
+            "toggled",
+            self.on_location_details_toggled,
+            details,
+            head,
+            status,
+            root,
+            spec,
+        )
         box.pack_start(toggle, False, False, 0)
 
         outer.show_all()
@@ -539,14 +543,31 @@ class NemoVCSInfoProviderMixin:
 
         return grid
 
-    def on_location_details_toggled(self, button, details) -> None:
+    def on_location_details_toggled(
+        self,
+        button,
+        details,
+        head,
+        status,
+        root,
+        spec,
+    ) -> None:
         from gi.repository import Gtk
 
         expanded = button.get_active()
         if expanded:
             details.show_all()
+            head.hide()
+            status.hide()
+            root.set_text(location_widget_root_label(spec, expanded=True))
+            root.set_max_width_chars(80)
         else:
             details.hide()
+            head.show()
+            status.show()
+            root.set_text(location_widget_root_label(spec, expanded=False))
+            root.set_max_width_chars(LOCATION_BAR_MAX_CHARS)
+        details.get_parent().queue_resize()
         button.set_tooltip_text(
             "Hide repository details" if expanded else "Show repository details"
         )
@@ -611,6 +632,14 @@ def location_widget_tooltip(spec: LocationWidgetSpec) -> str:
     return "\n".join(
         f"{label}: {value}" for label, value in location_widget_details(spec)
     )
+
+
+def location_widget_root_label(
+    spec: LocationWidgetSpec,
+    *,
+    expanded: bool,
+) -> str:
+    return spec.root if expanded else f"- {compact_text(spec.root_label)}"
 
 
 def default_get_status(paths):

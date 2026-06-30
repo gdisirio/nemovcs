@@ -202,6 +202,27 @@ class NemoVCSInfoProviderCoreTest(unittest.TestCase):
             "Worktree: /tmp/repo\nHead: main\nStatus: modified\nBackend: Git",
         )
 
+    def test_location_widget_root_label_uses_full_path_when_expanded(self):
+        spec = nemo_plugin.LocationWidgetSpec(
+            backend="git",
+            backend_label="Git",
+            head="main",
+            status="modified",
+            status_label="modified",
+            root="/tmp/repo",
+            root_label="repo",
+            icon="nemovcs-git",
+        )
+
+        self.assertEqual(
+            nemo_plugin.location_widget_root_label(spec, expanded=False),
+            "- repo",
+        )
+        self.assertEqual(
+            nemo_plugin.location_widget_root_label(spec, expanded=True),
+            "/tmp/repo",
+        )
+
     def test_location_widget_spec_hides_non_worktree_path(self):
         core = nemo_plugin.NemoVCSInfoProviderCore(
             seen=lambda paths: [],
