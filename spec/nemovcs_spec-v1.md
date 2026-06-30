@@ -478,6 +478,26 @@ Expected plugin responsibilities:
 
 The plugin should not run expensive Git commands directly on the UI path.
 
+### Future Context Bar Actions
+
+The repository context bar can evolve into a lightweight action strip without
+becoming a floating toolbar or modifying Nemo's native toolbar.
+
+Design direction:
+
+- Keep the compact first line short and left-aligned: backend, branch/head,
+  status, and root or remote shorthand.
+- Allow selected context-menu actions to be marked pinnable.
+- Render pinned actions as icon-only buttons aligned to the right, before the
+  expand button.
+- Use tooltips for button labels.
+- Reuse the same action specifications for context-menu items and context-bar
+  buttons so enablement and command behavior stay consistent.
+- Keep selection-dependent actions in the context menu until Nemo selection
+  tracking is available for the location widget.
+- Collapse lower-priority pinned buttons or move them behind an overflow
+  affordance on narrow windows.
+
 ## Future Property Page
 
 A Nemo property page is not part of v1, but it is a required feature for the

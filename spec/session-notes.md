@@ -53,6 +53,11 @@ sessions. Update this file before pushing changes.
   upstream remote URL when available, otherwise `origin` remote URL when
   available, otherwise fall back to the local worktree path. Compact view can
   remain branch/status/root-name oriented.
+- Future context bar action refinement: allow selected/pinnable context-menu
+  actions to appear as icon-only buttons on the right side of the compact bar,
+  before the expand button. Keep the first-line repository summary short and
+  left-aligned. Selection-dependent actions should remain in the context menu
+  until Nemo selection tracking is available.
 
 ## Next Likely Tasks
 
