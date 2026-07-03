@@ -1,5 +1,6 @@
 from pathlib import Path
 import subprocess
+import tempfile
 import unittest
 from unittest import mock
 
@@ -12,7 +13,7 @@ from nemovcs.backends.base import (
     BackendWorktreeIdentity,
 )
 from nemovcs.backends.git import GitBackend
-from nemovcs.backends.svn import SvnBackend, SvnResult
+from nemovcs.backends.svn import SvnBackend, SvnResult, has_svn_metadata_ancestor
 
 
 class BackendRegistryTest(unittest.TestCase):
@@ -722,6 +723,47 @@ class BackendRegistryTest(unittest.TestCase):
         self.assertEqual(result.returncode, 124)
         self.assertEqual(result.stdout, "")
         self.assertEqual(result.stderr, "svn command timed out\n")
+
+    def test_svn_root_skips_subprocess_without_svn_metadata(self):
+        backend = SvnBackend()
+        with tempfile.TemporaryDirectory() as tmp:
+            with mock.patch.object(backend, "run") as run:
+                self.assertIsNone(backend.root(tmp))
+                self.assertFalse(backend.is_worktree(tmp))
+            run.assert_not_called()
+
+    def test_svn_root_probes_when_svn_metadata_present(self):
+        backend = SvnBackend()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve(strict=False)
+            (root / ".svn").mkdir()
+            with mock.patch.object(
+                backend,
+                "run",
+                return_value=SvnResult(
+                    ("svn", "info"), root, 0, f"{root}\n", ""
+                ),
+            ) as run:
+                self.assertEqual(backend.root(tmp), root)
+            run.assert_called_once()
+
+    def test_has_svn_metadata_ancestor_walks_up_to_working_copy_root(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve(strict=False)
+            (root / ".svn").mkdir()
+            nested = root / "src" / "pkg"
+            nested.mkdir(parents=True)
+            leaf = nested / "module.py"
+            leaf.write_text("", encoding="utf-8")
+
+            self.assertTrue(has_svn_metadata_ancestor(nested))
+            self.assertTrue(has_svn_metadata_ancestor(leaf))
+
+    def test_has_svn_metadata_ancestor_false_without_metadata(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            nested = Path(tmp) / "a" / "b"
+            nested.mkdir(parents=True)
+            self.assertFalse(has_svn_metadata_ancestor(nested))
 
     def test_svn_backend_builds_meld_diff_commands(self):
         backend = SvnBackend()

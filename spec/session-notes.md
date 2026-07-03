@@ -103,6 +103,12 @@ sessions. Update this file before pushing changes.
   synchronous default unless a scheduler is injected. Async scan results are
   copied back to the cached worktree entry only if that entry is still present
   in the cache.
+- `SvnBackend.root()` now short-circuits via a filesystem `.svn` ancestor check
+  (`has_svn_metadata_ancestor`) before running `svn info`. Backend detection
+  runs on Nemo's UI thread during context-menu construction, so this avoids one
+  `svn` subprocess per selected path for the common case of Git trees and plain
+  folders. Genuine SVN working copies always have a `.svn` root, so detection is
+  unchanged for them.
 
 ## Next Likely Tasks
 
@@ -131,8 +137,9 @@ sessions. Update this file before pushing changes.
 - CLI help text was refreshed so backend-routed commands describe VCS status,
   diff, log, update, and push instead of Git-only behavior. The branch switch
   command remains Git-specific.
-- Continue stress testing SVN navigation in Nemo. Watch for remaining
-  synchronous paths in context-menu construction, especially backend detection
-  for uncached SVN roots.
+- Continue stress testing SVN navigation in Nemo. The `.svn` ancestor
+  pre-check removes the `svn info` subprocess from context-menu construction in
+  non-SVN trees; watch for remaining synchronous paths, including Git's
+  `git rev-parse`-based detection, if menus still feel slow.
 - Validate `Rename...` behavior for both Git and SVN files/directories.
 - Validate the settings panel against a live DBus-activated status daemon.

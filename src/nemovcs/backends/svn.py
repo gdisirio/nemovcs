@@ -35,6 +35,28 @@ class SvnResult:
         return self.returncode == 0
 
 
+def has_svn_metadata_ancestor(path: str | Path) -> bool:
+    """Return True if `path` or one of its ancestors holds a `.svn` directory.
+
+    An SVN working copy always keeps a `.svn` directory at its root (1.7+ keeps
+    a single one there; older layouts keep one per directory), so a versioned
+    path always has such an ancestor. This lets `root()` skip the `svn info`
+    subprocess for the common case of non-SVN paths -- Git trees or plain
+    folders -- which matters because backend detection runs on Nemo's UI thread
+    while building the context menu.
+    """
+    candidate = Path(path).expanduser()
+    if not candidate.is_absolute():
+        candidate = Path.cwd() / candidate
+    candidate = candidate.resolve(strict=False)
+    if not candidate.is_dir():
+        candidate = candidate.parent
+    for directory in (candidate, *candidate.parents):
+        if (directory / ".svn").is_dir():
+            return True
+    return False
+
+
 class SvnBackend:
     id = "svn"
     label = "Subversion"
@@ -54,6 +76,8 @@ class SvnBackend:
         )
 
     def root(self, path: str | Path) -> Path | None:
+        if not has_svn_metadata_ancestor(path):
+            return None
         result = self.run(path, ["info", "--show-item", "wc-root"])
         if not result.ok:
             return None
