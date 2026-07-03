@@ -1,4 +1,5 @@
 from pathlib import Path
+import subprocess
 import unittest
 from unittest import mock
 
@@ -708,6 +709,19 @@ class BackendRegistryTest(unittest.TestCase):
         self.assertEqual(result.returncode, 127)
         self.assertEqual(result.stdout, "")
         self.assertEqual(result.stderr, "svn executable not found\n")
+
+    def test_svn_backend_reports_timeout_as_failed_result(self):
+        backend = SvnBackend()
+
+        with mock.patch(
+            "nemovcs.backends.svn.subprocess.run",
+            side_effect=subprocess.TimeoutExpired(["svn", "status"], 15),
+        ):
+            result = backend.run("/tmp", ["status"])
+
+        self.assertEqual(result.returncode, 124)
+        self.assertEqual(result.stdout, "")
+        self.assertEqual(result.stderr, "svn command timed out\n")
 
     def test_svn_backend_builds_meld_diff_commands(self):
         backend = SvnBackend()

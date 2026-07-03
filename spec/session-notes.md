@@ -41,6 +41,15 @@ sessions. Update this file before pushing changes.
   now describes Git and SVN integration and alpha status, README documents
   cache TTL/async scan behavior, and `AGENTS.md` no longer describes SVN or the
   daemon as future work.
+- After moving around SVN repositories, Nemo became unresponsive while a live
+  `svn status --xml` process was visible. The likely cause was not the async
+  scan worker itself, but repeated synchronous SVN worktree identification:
+  `Seen()` and `GetStatus()` still called `identify_worktree()` for every child
+  path, which runs `svn info --show-item wc-root` for SVN paths.
+- Statusd now reuses cached worktree identities for child paths already under a
+  known cached root, while still forcing a fresh probe when a nested `.git` or
+  `.svn` marker is present. `SvnBackend.run()` also converts command timeouts
+  into failed results instead of raising `TimeoutExpired`.
 
 ## Recent Changes To Keep In Mind
 
@@ -119,5 +128,8 @@ sessions. Update this file before pushing changes.
   before more performance tuning.
 - Review CLI command help text for remaining Git-specific wording where commands
   now route through backend abstractions.
+- Continue stress testing SVN navigation in Nemo. Watch for remaining
+  synchronous paths in context-menu construction, especially backend detection
+  for uncached SVN roots.
 - Validate `Rename...` behavior for both Git and SVN files/directories.
 - Validate the settings panel against a live DBus-activated status daemon.

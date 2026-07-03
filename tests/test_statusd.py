@@ -160,6 +160,44 @@ class WorktreeCacheTest(unittest.TestCase):
 
         self.assertEqual(cache.identities(), [first, third, second])
 
+    def test_seen_child_path_reuses_cached_identity(self):
+        cache = statusd.WorktreeCache()
+        first = identity("one")
+        cache.touch(first)
+
+        with mock.patch("nemovcs.statusd.identify_worktree") as identify:
+            self.assertEqual(cache.seen([first.root / "src" / "file.txt"]), [first])
+
+        identify.assert_not_called()
+
+    def test_seen_nested_vcs_marker_forces_identity_probe(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "root"
+            nested = root / "nested"
+            (nested / ".git").mkdir(parents=True)
+            first = statusd.WorktreeIdentity(
+                root=root,
+                gitdir=root / ".git",
+                common_gitdir=root / ".git",
+                head_label="main",
+            )
+            nested_identity = statusd.WorktreeIdentity(
+                root=nested,
+                gitdir=nested / ".git",
+                common_gitdir=nested / ".git",
+                head_label="main",
+            )
+            cache = statusd.WorktreeCache()
+            cache.touch(first)
+
+            with mock.patch(
+                "nemovcs.statusd.identify_worktree",
+                return_value=nested_identity,
+            ) as identify:
+                self.assertEqual(cache.seen([nested / "file.txt"]), [nested_identity])
+
+        identify.assert_called_once_with(nested / "file.txt")
+
     def test_default_limit_evicts_oldest_thirteenth_worktree(self):
         evicted: list[statusd.WorktreeIdentity] = []
 
@@ -539,6 +577,21 @@ class StatusDaemonSchedulerTest(unittest.TestCase):
             record = core.status_record(first.root / "dir")
 
         self.assertEqual(record["backend"], "git")
+        self.assertEqual(record["worktree_id"], first.cache_key)
+        self.assertEqual(record["status"], statusd.EmblemStatus.MODIFIED)
+
+    def test_status_record_reuses_cached_identity_for_child_path(self):
+        first = identity("one")
+        cache = statusd.WorktreeCache()
+        entry = cache.touch(first)
+        entry.scanned = True
+        entry.statuses["src/file.txt"] = statusd.EmblemStatus.MODIFIED
+        core = statusd.StatusDaemonCore(cache)
+
+        with mock.patch("nemovcs.statusd.identify_worktree") as identify:
+            record = core.status_record(first.root / "src" / "file.txt")
+
+        identify.assert_not_called()
         self.assertEqual(record["worktree_id"], first.cache_key)
         self.assertEqual(record["status"], statusd.EmblemStatus.MODIFIED)
 

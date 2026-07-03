@@ -106,9 +106,13 @@ class WorktreeCache:
     def seen(self, paths: list[str | Path]) -> list[WorktreeIdentity]:
         seen_identities: list[WorktreeIdentity] = []
         for path in paths:
-            identity = identify_worktree(path)
-            if identity is None:
-                continue
+            entry = self.entry_for_cached_path(path)
+            if entry is None:
+                identity = identify_worktree(path)
+                if identity is None:
+                    continue
+            else:
+                identity = entry.identity
             self.touch(identity)
             seen_identities.append(identity)
         return seen_identities
@@ -131,6 +135,22 @@ class WorktreeCache:
 
     def entry_by_key(self, worktree_id: str) -> WorktreeEntry | None:
         return self._entries.get(worktree_id)
+
+    def entry_for_cached_path(self, path: str | Path) -> WorktreeEntry | None:
+        candidate = normalized_path(path)
+        matches = [
+            entry
+            for entry in self._entries.values()
+            if relative_path_in_worktree(entry.identity, candidate) is not None
+        ]
+        if not matches:
+            return None
+
+        matches.sort(key=lambda entry: len(str(entry.identity.root)), reverse=True)
+        entry = matches[0]
+        if has_nested_vcs_marker(entry.identity, candidate):
+            return None
+        return entry
 
     def scan(self, identity: WorktreeIdentity) -> WorktreeEntry:
         entry = self.touch(identity)
@@ -385,7 +405,12 @@ class StatusDaemonCore:
         return self.settings_record()
 
     def status_record(self, path: str | Path) -> dict[str, str]:
-        identity = identify_worktree(path)
+        entry = self.cache.entry_for_cached_path(path)
+        if entry is None:
+            identity = identify_worktree(path)
+        else:
+            identity = entry.identity
+
         if identity is None:
             return {
                 "path": str(path),
@@ -399,7 +424,8 @@ class StatusDaemonCore:
                 "error": "not inside a versioned working tree",
             }
 
-        entry = self.cache.get(identity)
+        if entry is None:
+            entry = self.cache.get(identity)
         if entry is None:
             return {
                 "path": str(path),
@@ -604,10 +630,7 @@ def relative_path_in_worktree(
     identity: WorktreeIdentity,
     path: str | Path,
 ) -> str | None:
-    candidate = Path(path).expanduser()
-    if not candidate.is_absolute():
-        candidate = Path.cwd() / candidate
-    candidate = candidate.resolve(strict=False)
+    candidate = normalized_path(path)
 
     try:
         relpath = candidate.relative_to(identity.root)
@@ -615,6 +638,33 @@ def relative_path_in_worktree(
         return None
 
     return "." if str(relpath) == "." else relpath.as_posix()
+
+
+def normalized_path(path: str | Path) -> Path:
+    candidate = Path(path).expanduser()
+    if not candidate.is_absolute():
+        candidate = Path.cwd() / candidate
+    return candidate.resolve(strict=False)
+
+
+def has_nested_vcs_marker(identity: WorktreeIdentity, path: str | Path) -> bool:
+    candidate = normalized_path(path)
+    if not candidate.is_dir():
+        candidate = candidate.parent
+
+    try:
+        relative = candidate.relative_to(identity.root)
+    except ValueError:
+        return False
+
+    current = identity.root
+    for part in relative.parts:
+        current = current / part
+        if current == identity.root:
+            continue
+        if (current / ".git").exists() or (current / ".svn").exists():
+            return True
+    return False
 
 
 def status_changed_paths(entry: WorktreeEntry) -> list[str]:

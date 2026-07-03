@@ -308,6 +308,8 @@ class SvnBackend:
             )
         except FileNotFoundError:
             return SvnResult(command, resolved_cwd, 127, "", "svn executable not found\n")
+        except subprocess.TimeoutExpired:
+            return SvnResult(command, resolved_cwd, 124, "", "svn command timed out\n")
         return SvnResult(command, resolved_cwd, proc.returncode, proc.stdout, proc.stderr)
 
     def phase(
