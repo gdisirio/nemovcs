@@ -181,13 +181,9 @@ def log_phases(paths: Sequence[str], limit: int):
 
 
 def cmd_log_dialog(args: argparse.Namespace) -> int:
-    from .ui import logger
+    from .ui import log_dialog
 
-    phases = log_phases(args.paths, args.limit)
-    if not phases:
-        print("not inside a versioned working tree", file=sys.stderr)
-        return 1
-    return logger.run("Log", phases)
+    return log_dialog.run(args.paths or ["."], args.limit)
 
 
 def cmd_update(args: argparse.Namespace) -> int:

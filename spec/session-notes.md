@@ -119,8 +119,16 @@ sessions. Update this file before pushing changes.
   pretty format (`parse_git_log`, `parse_git_name_status` in `backends/git.py`);
   SVN parses `svn log --xml --verbose` (`parse_svn_log` in `backends/svn.py`).
   Parsers are pure and unit-tested; the Git format was verified live against
-  this repo. The old text-based `log`/`log_phases` paths are untouched, so the
-  current Log dialog still works until the new one is built.
+  this repo.
+- The Log dialog (`ui/log_dialog.py`) is now a revision browser: a revision
+  `TreeView` (revision/author/date/summary) over a vertical split, with the
+  selected revision's message on the left and its changed paths on the right.
+  `cmd_log_dialog` uses it instead of the text `logger`. Double-click a revision
+  for a whole-commit Meld diff, or a changed path for a per-file diff (Git only
+  for now). "Show more" grows the limit and reloads; real backend paging is a
+  follow-up. Row/label/date/diff logic is factored into pure module functions
+  and unit-tested; the window itself was smoke-tested live against this repo.
+  `update`/`push` still use the text `logger`.
 - `SvnBackend.root()` now short-circuits via a filesystem `.svn` ancestor check
   (`has_svn_metadata_ancestor`) before running `svn info`. Backend detection
   runs on Nemo's UI thread during context-menu construction, so this avoids one
@@ -133,12 +141,11 @@ sessions. Update this file before pushing changes.
 
 ## Next Likely Tasks
 
-- Build the structured Log dialog on top of `backends.scan_log`: a revision
-  `TreeView` (revision/author/date/summary), a changed-paths pane for the
-  selected revision, a message box, and "Show more" paging. Reuse the existing
-  Meld path for per-revision diffs. This replaces the current text dump in
-  `logger.py` for `log-dialog` (update/push can keep their text output). Backend
-  paging (`--skip` for Git, revision-range for SVN) is not implemented yet.
+- Log dialog follow-ups: implement real backend paging for "Show more"
+  (`--skip` for Git, revision-range for SVN) instead of re-fetching a larger
+  limit; add per-revision diff for SVN (currently Git-only, others show an
+  info message); optionally add status icons to the changed-paths column and
+  author/date sorting niceties.
 
 - Continue manual testing from Nemo on real Git and SVN working trees after
   reinstalling the extension and restarting Nemo.
