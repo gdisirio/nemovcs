@@ -384,20 +384,6 @@ def worktree_branch_locations(root: str | Path) -> dict[str, Path]:
     return parse_worktree_branch_locations(result.stdout)
 
 
-def commit_paths(root: str | Path, relpaths: Sequence[str], message: str) -> list[GitResult]:
-    if not relpaths:
-        return []
-
-    results: list[GitResult] = []
-    add_result = run_git(root, ["add", "--", *relpaths])
-    results.append(add_result)
-    if not add_result.ok:
-        return results
-
-    results.append(run_git(root, ["commit", "-m", message, "--", *relpaths], timeout=3600))
-    return results
-
-
 def log(paths: Sequence[str | Path], limit: int = 50) -> list[GitResult]:
     grouped = group_by_repo(paths or [Path.cwd()])
     results: list[GitResult] = []

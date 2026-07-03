@@ -280,31 +280,6 @@ class GitHelpersTest(unittest.TestCase):
         self.assertEqual(results[0].returncode, 127)
         self.assertIn(git.MELD_MISSING_MESSAGE, results[0].stderr)
 
-    def test_commit_paths_commits_explicit_paths(self):
-        path = self.root / "tracked.txt"
-        path.write_text("old\n", encoding="utf-8")
-        subprocess.run(["git", "add", "tracked.txt"], cwd=self.root, check=True)
-        subprocess.run(
-            ["git", "commit", "-m", "initial"],
-            cwd=self.root,
-            check=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
-        path.write_text("new\n", encoding="utf-8")
-
-        results = git.commit_paths(self.root, ["tracked.txt"], "update tracked")
-
-        self.assertTrue(all(result.ok for result in results))
-        log = subprocess.run(
-            ["git", "log", "-1", "--format=%s"],
-            cwd=self.root,
-            check=True,
-            stdout=subprocess.PIPE,
-            text=True,
-        )
-        self.assertEqual(log.stdout.strip(), "update tracked")
-
     def test_push_runs_once_per_repository(self):
         fake_result = git.GitResult(("git",), self.root, 0, "", "")
         with mock.patch("nemovcs.git.group_by_repo") as group_by_repo:

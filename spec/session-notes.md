@@ -109,6 +109,9 @@ sessions. Update this file before pushing changes.
   `svn` subprocess per selected path for the common case of Git trees and plain
   folders. Genuine SVN working copies always have a `.svn` root, so detection is
   unchanged for them.
+- Removed the dead `git.commit_paths()` helper and its test. Commits route
+  through the backend commit path (`GitBackend.commit`/`commit_phases`); the
+  helper had no production callers.
 
 ## Next Likely Tasks
 
