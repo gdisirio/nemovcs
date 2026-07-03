@@ -5,7 +5,8 @@ sessions. Update this file before pushing changes.
 
 ## Current Focus
 
-- Source-tree testing of NemoVCS 0.3.0 after milestone 3.
+- Source-tree testing and performance hardening of NemoVCS 0.3.0 after
+  milestone 3.
 - Nemo Action installer removal: current context menus are provided by the
   nemo-python extension; legacy action cleanup remains in install/uninstall.
 
@@ -18,6 +19,9 @@ sessions. Update this file before pushing changes.
 - Tests passed with:
   `PYTHONPATH=src python3 -m unittest discover -s tests`
   and `python3 -m compileall -q src tests scripts`.
+- Opening large directories is more responsive after changing statusd `Seen()`
+  handling so fresh, already-scanned worktrees are not rescanned for every
+  visible file.
 
 ## Recent Changes To Keep In Mind
 
@@ -58,6 +62,12 @@ sessions. Update this file before pushing changes.
   before the expand button. Keep the first-line repository summary short and
   left-aligned. Selection-dependent actions should remain in the context menu
   until Nemo selection tracking is available.
+- Status daemon `Seen()` now scans only when a worktree is unscanned, stale, or
+  in error. This removes repeated full `git status --porcelain=v2 -z -uall` and
+  `git ls-files -z` scans while Nemo enumerates many files in the same
+  worktree. The known tradeoff is that freshness now depends more directly on
+  filesystem monitor invalidation, explicit refresh, daemon restart, or cache
+  eviction.
 
 ## Next Likely Tasks
 
@@ -73,6 +83,7 @@ sessions. Update this file before pushing changes.
   local tracking branch explicitly. The full dialog is also the right place for
   branch management actions such as create-and-switch, rename, and delete.
 - Watch for stale status daemon cache behavior after file changes, VCS
-  operations, and daemon restarts.
+  operations, daemon restarts, and missed filesystem monitor events. Consider a
+  bounded scan TTL as a fallback if needed.
 - Validate `Rename...` behavior for both Git and SVN files/directories.
 - Validate the settings panel against a live DBus-activated status daemon.

@@ -191,12 +191,16 @@ class StatusDaemonCore:
             if identity.cache_key in scanned_keys:
                 continue
             entry = self.cache.touch(identity)
-            self.scan_entry(entry, notify=False)
+            if self.should_scan_seen_entry(entry):
+                self.scan_entry(entry, notify=False)
             if self.monitor_manager is not None:
                 self.monitor_manager.ensure(entry)
             scanned_keys.add(identity.cache_key)
             changed_worktrees.append(identity.cache_key)
         return changed_worktrees
+
+    def should_scan_seen_entry(self, entry: WorktreeEntry) -> bool:
+        return not entry.scanned or entry.stale or bool(entry.error)
 
     def mark_stale(
         self,
