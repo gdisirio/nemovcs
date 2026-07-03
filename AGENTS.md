@@ -8,11 +8,13 @@ NemoVCS is a new project, not a continuation of RabbitVCS internals.
 
 General direction:
 
-- Git-only initially.
+- Git and SVN support are both present; keep backend behavior uniform where
+  practical.
 - Nemo-first because Cinnamon/Nemo is underserved compared with KDE/GNOME.
 - Use the nemo-python extension for context-menu operations and live
   integration such as emblems, columns, dynamic menus, or panels.
-- Add a status daemon later only when cached live status is needed.
+- Live status is served by a DBus-activated status daemon with cached worktree
+  scans, filesystem-monitor invalidation, TTL fallback, and async scan workers.
 
 RabbitVCS can be used as reference material, but do not copy its architecture blindly.
 
@@ -31,7 +33,7 @@ The machine may also have a `gh` account named `chibios-sheriff`. That account i
 The local repository is:
 
 ```text
-/home/giovanni/Projects/personal/nemovcs
+/home/giovanni/Projects/personal-github/nemovcs
 ```
 
 Current branch convention:
@@ -49,16 +51,20 @@ Keep runtime dependencies minimal:
 Avoid adding Python runtime dependencies unless there is a clear, practical reason.
 
 Prefer shelling out to `git` over using a Git library. Git owns the edge cases.
+Prefer shelling out to `svn` for Subversion behavior for the same reason.
 
-Do not block Nemo's UI thread. Future Nemo plugin code should render cached state and delegate expensive work to the CLI or a daemon.
+Do not block Nemo's UI thread. Nemo plugin code should render cached state and
+delegate expensive work to the CLI or status daemon.
 
-Future status design:
+Status design:
 
 - Discover repositories from Nemo on-visit callbacks.
-- Run an initial Git status scan per repository root.
+- Run an initial VCS status scan per repository root.
 - Cache per repository root and path.
 - Use filesystem monitoring to invalidate caches.
 - Debounce refreshes.
+- Use a bounded scan TTL as a fallback for missed filesystem events.
+- Run daemon scans off the GLib/DBus main loop.
 - Return cached, stale, loading, or error status quickly.
 
 ## Development Commands
@@ -111,6 +117,6 @@ rule, not optional housekeeping.
   - project: `NemoVCS`
   - command: `nemovcs`
   - package: `nemovcs`
-  - future daemon: `nemovcs-statusd`
+  - daemon: `nemovcs-statusd`
   - config dir: `~/.config/nemovcs`
   - cache dir: `~/.cache/nemovcs`

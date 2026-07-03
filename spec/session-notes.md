@@ -5,8 +5,8 @@ sessions. Update this file before pushing changes.
 
 ## Current Focus
 
-- Source-tree testing and performance hardening of NemoVCS 0.3.0 after
-  milestone 3.
+- Source-tree testing, performance hardening, and metadata cleanup for NemoVCS
+  0.3.0 after milestone 3.
 - Nemo Action installer removal: current context menus are provided by the
   nemo-python extension; legacy action cleanup remains in install/uninstall.
 
@@ -37,6 +37,10 @@ sessions. Update this file before pushing changes.
   request, then `modified` after the worker completed). Live settings were
   restored to `max_worktrees=16`, `debounce_seconds=0.75`,
   `scan_ttl_seconds=15`.
+- Metadata/docs were refreshed after the status daemon hardening: `pyproject`
+  now describes Git and SVN integration and alpha status, README documents
+  cache TTL/async scan behavior, and `AGENTS.md` no longer describes SVN or the
+  daemon as future work.
 
 ## Recent Changes To Keep In Mind
 
@@ -113,5 +117,7 @@ sessions. Update this file before pushing changes.
   invalidated and re-read after completion.
 - Consider adding a lightweight visible diagnostic for scan reason and duration
   before more performance tuning.
+- Review CLI command help text for remaining Git-specific wording where commands
+  now route through backend abstractions.
 - Validate `Rename...` behavior for both Git and SVN files/directories.
 - Validate the settings panel against a live DBus-activated status daemon.

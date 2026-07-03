@@ -19,7 +19,8 @@ manual testing and hardening before unattended daily use.
   - modified paths and folders,
   - conflicted paths and folders,
   - unversioned paths and folders.
-- DBus-activated status daemon with cached status and filesystem monitoring.
+- DBus-activated status daemon with cached status, filesystem monitoring, TTL
+  revalidation, and async scans.
 - Linked Git worktrees are treated as independent worktrees.
 
 ## Dependencies
@@ -112,6 +113,12 @@ Backend submenu actions:
 The status daemon is started automatically through session DBus activation when
 Nemo asks for status.
 
+Status results are cached per worktree. Filesystem monitor events mark cached
+worktrees stale, and a bounded scan TTL is used as a fallback for missed nested
+changes. Scans run outside the daemon's DBus/GLib main loop, so the first query
+for an unscanned worktree can briefly report `loading` before Nemo receives a
+status-changed signal and refreshes the visible items.
+
 The same operations are available from the source tree through the CLI:
 
 ```sh
@@ -133,6 +140,14 @@ Check whether the daemon can answer:
 
 ```sh
 PYTHONPATH=src python3 -m nemovcs status-cache --dbus .
+```
+
+Open the settings panel to inspect cached worktrees, refresh the cache view, or
+change status daemon settings such as cache size, refresh debounce, and scan
+TTL:
+
+```sh
+PYTHONPATH=src python3 -m nemovcs settings
 ```
 
 Run the daemon manually while debugging:
