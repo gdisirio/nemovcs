@@ -25,6 +25,7 @@ DEFAULT_SCAN_TTL_SECONDS = config.DEFAULT_SCAN_TTL_SECONDS
 DBUS_BUS_NAME = "io.github.gdisirio.NemoVCS.Statusd"
 DBUS_OBJECT_PATH = "/io/github/gdisirio/NemoVCS/Statusd"
 DBUS_INTERFACE = "io.github.gdisirio.NemoVCS.Statusd"
+NEMO_BUS_NAME = "org.Nemo"
 
 
 class EmblemStatus(StrEnum):

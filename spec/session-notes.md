@@ -105,6 +105,13 @@ sessions. Update this file before pushing changes.
   synchronous default unless a scheduler is injected. Async scan results are
   copied back to the cached worktree entry only if that entry is still present
   in the cache.
+- The daemon self-terminates when the Nemo file manager exits. `run_foreground`
+  watches `NameOwnerChanged` for `org.Nemo`; when that name loses its owner
+  (`nemo_name_lost`), it quits. DBus re-activates a fresh daemon (from source)
+  on the next status request, so a Nemo restart transparently picks up code
+  changes with no manual daemon kill. `nemo-desktop` owns `org.NemoDesktop`,
+  not `org.Nemo`, so it does not keep a stale daemon alive. Verified live: a
+  `nemo --quit` shuts the daemon down on its own.
 - `SvnBackend.root()` now short-circuits via a filesystem `.svn` ancestor check
   (`has_svn_metadata_ancestor`) before running `svn info`. Backend detection
   runs on Nemo's UI thread during context-menu construction, so this avoids one

@@ -40,6 +40,22 @@ INTROSPECTION_XML = f"""<!DOCTYPE node PUBLIC
 """
 
 
+def nemo_name_lost(name: str, old_owner: str, new_owner: str) -> bool:
+    """Return True when the Nemo file-manager bus name lost its owner.
+
+    NameOwnerChanged reports (name, old_owner, new_owner). An empty new_owner
+    after a non-empty old_owner means the `org.Nemo` instance exited or is
+    restarting, so the daemon should shut down and let DBus re-activate a fresh
+    one on the next status request. `nemo-desktop` owns a different name and is
+    unaffected.
+    """
+    return (
+        name == statusd.NEMO_BUS_NAME
+        and new_owner == ""
+        and old_owner != ""
+    )
+
+
 def run_foreground() -> int:
     import dbus
     import dbus.mainloop.glib
@@ -56,11 +72,26 @@ def run_foreground() -> int:
     monitor_manager = statusd_monitor.WorktreeMonitorManager(core)
     core.set_monitor_manager(monitor_manager)
     StatusDaemonDBusService(bus, core)
+
+    loop = GLib.MainLoop()
+
+    def on_name_owner_changed(name, old_owner, new_owner):
+        if nemo_name_lost(str(name), str(old_owner), str(new_owner)):
+            print("nemovcs-statusd: Nemo exited, shutting down.")
+            loop.quit()
+
+    bus.add_signal_receiver(
+        on_name_owner_changed,
+        signal_name="NameOwnerChanged",
+        dbus_interface="org.freedesktop.DBus",
+        bus_name="org.freedesktop.DBus",
+        arg0=statusd.NEMO_BUS_NAME,
+    )
+
     print(
         f"nemovcs-statusd prototype running on {statusd.DBUS_BUS_NAME}. "
-        "Press Ctrl+C to stop."
+        f"Exits when {statusd.NEMO_BUS_NAME} goes away or on Ctrl+C."
     )
-    loop = GLib.MainLoop()
     try:
         loop.run()
     except KeyboardInterrupt:
