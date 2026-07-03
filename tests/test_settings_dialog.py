@@ -126,12 +126,14 @@ class SettingsDialogTest(unittest.TestCase):
         class FakePage:
             cache_size_spin = FakeSpin(24)
             debounce_spin = FakeSpin(1.5)
+            scan_ttl_spin = FakeSpin(30)
 
         self.assertEqual(
             settings_dialog.StatusdSettingsPage.settings_payload(FakePage()),
             {
                 "max_worktrees": "24",
                 "debounce_seconds": "1.5",
+                "scan_ttl_seconds": "30",
             },
         )
 
@@ -149,7 +151,11 @@ class SettingsDialogTest(unittest.TestCase):
                 self.applied = None
 
             def settings_payload(self):
-                return {"max_worktrees": "24", "debounce_seconds": "1.5"}
+                return {
+                    "max_worktrees": "24",
+                    "debounce_seconds": "1.5",
+                    "scan_ttl_seconds": "30",
+                }
 
             def save_settings(self, settings):
                 self.saved = settings
@@ -164,7 +170,11 @@ class SettingsDialogTest(unittest.TestCase):
 
         self.assertEqual(
             page.saved,
-            {"max_worktrees": "24", "debounce_seconds": "1.5"},
+            {
+                "max_worktrees": "24",
+                "debounce_seconds": "1.5",
+                "scan_ttl_seconds": "30",
+            },
         )
         self.assertEqual(page.applied["config_path"], "/tmp/nemovcs/settings.json")
         self.assertEqual(

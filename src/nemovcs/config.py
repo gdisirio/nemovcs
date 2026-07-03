@@ -13,18 +13,22 @@ CONFIG_DIR_NAME = "nemovcs"
 SETTINGS_FILE_NAME = "settings.json"
 DEFAULT_MAX_WORKTREES = 12
 DEFAULT_DEBOUNCE_SECONDS = 0.75
+DEFAULT_SCAN_TTL_SECONDS = 15.0
 
 
 @dataclass(frozen=True)
 class StatusdSettings:
     max_worktrees: int = DEFAULT_MAX_WORKTREES
     debounce_seconds: float = DEFAULT_DEBOUNCE_SECONDS
+    scan_ttl_seconds: float = DEFAULT_SCAN_TTL_SECONDS
 
     def __post_init__(self) -> None:
         if self.max_worktrees < 1:
             raise ValueError("cache size must be at least 1")
         if self.debounce_seconds < 0:
             raise ValueError("status refresh delay must not be negative")
+        if self.scan_ttl_seconds < 0:
+            raise ValueError("scan TTL must not be negative")
 
     @classmethod
     def from_mapping(cls, values: Mapping[str, object]) -> "StatusdSettings":
@@ -37,12 +41,17 @@ class StatusdSettings:
                 values.get("debounce_seconds", DEFAULT_DEBOUNCE_SECONDS),
                 "status refresh delay",
             ),
+            scan_ttl_seconds=parse_float(
+                values.get("scan_ttl_seconds", DEFAULT_SCAN_TTL_SECONDS),
+                "scan TTL",
+            ),
         )
 
     def to_mapping(self) -> dict[str, str]:
         return {
             "max_worktrees": str(self.max_worktrees),
             "debounce_seconds": f"{self.debounce_seconds:g}",
+            "scan_ttl_seconds": f"{self.scan_ttl_seconds:g}",
         }
 
 

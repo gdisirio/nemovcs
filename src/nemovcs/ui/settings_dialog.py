@@ -266,8 +266,12 @@ class StatusdSettingsPage(Gtk.Box):
         self.debounce_spin = Gtk.SpinButton.new_with_range(0, 60, 0.05)
         self.debounce_spin.set_numeric(True)
         self.debounce_spin.set_digits(2)
+        self.scan_ttl_spin = Gtk.SpinButton.new_with_range(0, 3600, 1)
+        self.scan_ttl_spin.set_numeric(True)
+        self.scan_ttl_spin.set_digits(0)
         self.cache_size_spin.set_size_request(120, -1)
         self.debounce_spin.set_size_request(120, -1)
+        self.scan_ttl_spin.set_size_request(120, -1)
         self.status_label = Gtk.Label(label="", xalign=0)
         self.status_label.set_selectable(True)
         self.status_label.set_line_wrap(True)
@@ -277,7 +281,9 @@ class StatusdSettingsPage(Gtk.Box):
         grid.attach(self.cache_size_spin, 1, 0, 1, 1)
         grid.attach(Gtk.Label(label="Status Refresh Delay", xalign=0), 0, 1, 1, 1)
         grid.attach(self.debounce_spin, 1, 1, 1, 1)
-        grid.attach(self.status_label, 0, 2, 2, 1)
+        grid.attach(Gtk.Label(label="Scan TTL", xalign=0), 0, 2, 1, 1)
+        grid.attach(self.scan_ttl_spin, 1, 2, 1, 1)
+        grid.attach(self.status_label, 0, 3, 2, 1)
 
         self.load_status_settings()
 
@@ -298,11 +304,15 @@ class StatusdSettingsPage(Gtk.Box):
         self.debounce_spin.set_value(
             parse_float(settings.get("debounce_seconds", "0.75"), fallback=0.75)
         )
+        self.scan_ttl_spin.set_value(
+            parse_float(settings.get("scan_ttl_seconds", "15"), fallback=15)
+        )
 
     def settings_payload(self) -> SettingsRecord:
         return {
             "max_worktrees": str(self.cache_size_spin.get_value_as_int()),
             "debounce_seconds": f"{self.debounce_spin.get_value():g}",
+            "scan_ttl_seconds": f"{self.scan_ttl_spin.get_value():g}",
         }
 
     def on_save_clicked(self, _button: Gtk.Button) -> None:

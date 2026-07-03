@@ -12,6 +12,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
+import time
 
 from . import backends
 from . import config
@@ -20,6 +21,7 @@ from .backends.base import BackendStatusItem
 
 DEFAULT_MAX_WORKTREES = config.DEFAULT_MAX_WORKTREES
 DEFAULT_DEBOUNCE_SECONDS = config.DEFAULT_DEBOUNCE_SECONDS
+DEFAULT_SCAN_TTL_SECONDS = config.DEFAULT_SCAN_TTL_SECONDS
 DBUS_BUS_NAME = "io.github.gdisirio.NemoVCS.Statusd"
 DBUS_OBJECT_PATH = "/io/github/gdisirio/NemoVCS/Statusd"
 DBUS_INTERFACE = "io.github.gdisirio.NemoVCS.Statusd"
@@ -73,6 +75,7 @@ class WorktreeEntry:
     scan_scheduled: bool = False
     scan_in_flight: bool = False
     rescan_needed: bool = False
+    last_scanned_at: float | None = None
 
 
 class WorktreeCache:
@@ -152,7 +155,9 @@ class StatusDaemonCore:
         cache: WorktreeCache | None = None,
         *,
         debounce_seconds: float | None = None,
+        scan_ttl_seconds: float | None = None,
         timer: Callable[[float, Callable[[], None]], object] | None = None,
+        clock: Callable[[], float] | None = None,
         scan_func: Callable[[WorktreeEntry], None] | None = None,
         status_changed_callback: Callable[[str, list[str]], None] | None = None,
     ):
@@ -160,7 +165,13 @@ class StatusDaemonCore:
         self.debounce_seconds = (
             debounce_seconds if debounce_seconds is not None else DEFAULT_DEBOUNCE_SECONDS
         )
+        self.scan_ttl_seconds = (
+            scan_ttl_seconds
+            if scan_ttl_seconds is not None
+            else DEFAULT_SCAN_TTL_SECONDS
+        )
         self.timer = timer if timer is not None else immediate_timer
+        self.clock = clock if clock is not None else time.monotonic
         self.scan_func = scan_func if scan_func is not None else scan_worktree
         self.status_changed_callback = status_changed_callback
         self.changed_worktrees: list[str] = []
@@ -173,6 +184,7 @@ class StatusDaemonCore:
         return cls(
             cache=WorktreeCache(max_worktrees=settings.max_worktrees),
             debounce_seconds=settings.debounce_seconds,
+            scan_ttl_seconds=settings.scan_ttl_seconds,
             **kwargs,
         )
 
@@ -200,7 +212,19 @@ class StatusDaemonCore:
         return changed_worktrees
 
     def should_scan_seen_entry(self, entry: WorktreeEntry) -> bool:
-        return not entry.scanned or entry.stale or bool(entry.error)
+        return (
+            not entry.scanned
+            or entry.stale
+            or bool(entry.error)
+            or self.scan_ttl_expired(entry)
+        )
+
+    def scan_ttl_expired(self, entry: WorktreeEntry) -> bool:
+        if self.scan_ttl_seconds <= 0:
+            return False
+        if entry.last_scanned_at is None:
+            return True
+        return self.clock() - entry.last_scanned_at >= self.scan_ttl_seconds
 
     def mark_stale(
         self,
@@ -248,6 +272,7 @@ class StatusDaemonCore:
             self.scan_func(entry)
         finally:
             entry.scan_in_flight = False
+        entry.last_scanned_at = self.clock()
         entry.stale = False
         entry.stale_paths.clear()
         self.changed_worktrees.append(entry.identity.cache_key)
@@ -275,6 +300,7 @@ class StatusDaemonCore:
         return {
             "max_worktrees": str(self.cache.max_worktrees),
             "debounce_seconds": f"{self.debounce_seconds:g}",
+            "scan_ttl_seconds": f"{self.scan_ttl_seconds:g}",
             "config_path": str(config.settings_path()),
         }
 
@@ -283,6 +309,7 @@ class StatusDaemonCore:
         config.save_statusd_settings(settings)
         self.cache.resize(settings.max_worktrees)
         self.debounce_seconds = settings.debounce_seconds
+        self.scan_ttl_seconds = settings.scan_ttl_seconds
         return self.settings_record()
 
     def status_record(self, path: str | Path) -> dict[str, str]:

@@ -22,6 +22,13 @@ sessions. Update this file before pushing changes.
 - Opening large directories is more responsive after changing statusd `Seen()`
   handling so fresh, already-scanned worktrees are not rescanned for every
   visible file.
+- Statusd now has a persisted `scan_ttl_seconds` setting, defaulting to 15
+  seconds, so missed filesystem monitor invalidations become bounded staleness
+  instead of permanent staleness.
+- Live DBus validation with `scan_ttl_seconds=1` confirmed a nested tracked file
+  edit remains cached immediately after save and reports `modified` after TTL
+  expiry. The user's previous live settings were restored afterward:
+  `max_worktrees=16`, `debounce_seconds=0.75`, `scan_ttl_seconds=15`.
 
 ## Recent Changes To Keep In Mind
 
@@ -68,6 +75,9 @@ sessions. Update this file before pushing changes.
   worktree. The known tradeoff is that freshness now depends more directly on
   filesystem monitor invalidation, explicit refresh, daemon restart, or cache
   eviction.
+- TTL-based revalidation extends that rule: `Seen()` also rescans when the
+  cached worktree scan age reaches `scan_ttl_seconds`. Setting the value to `0`
+  disables age-based rescans.
 
 ## Next Likely Tasks
 
@@ -83,7 +93,10 @@ sessions. Update this file before pushing changes.
   local tracking branch explicitly. The full dialog is also the right place for
   branch management actions such as create-and-switch, rename, and delete.
 - Watch for stale status daemon cache behavior after file changes, VCS
-  operations, daemon restarts, and missed filesystem monitor events. Consider a
-  bounded scan TTL as a fallback if needed.
+  operations, daemon restarts, and missed filesystem monitor events. TTL now
+  bounds missed invalidations, but scans still run synchronously in the daemon
+  GLib main loop.
+- Move status scans off the GLib main loop so TTL-triggered rescans do not block
+  DBus handlers, monitor callbacks, or the settings UI.
 - Validate `Rename...` behavior for both Git and SVN files/directories.
 - Validate the settings panel against a live DBus-activated status daemon.

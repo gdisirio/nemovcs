@@ -14,12 +14,20 @@ class ConfigTest(unittest.TestCase):
 
             self.assertEqual(settings.max_worktrees, config.DEFAULT_MAX_WORKTREES)
             self.assertEqual(settings.debounce_seconds, config.DEFAULT_DEBOUNCE_SECONDS)
+            self.assertEqual(
+                settings.scan_ttl_seconds,
+                config.DEFAULT_SCAN_TTL_SECONDS,
+            )
             self.assertTrue(path.exists())
 
     def test_save_and_load_statusd_settings(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "settings.json"
-            saved = config.StatusdSettings(max_worktrees=24, debounce_seconds=1.5)
+            saved = config.StatusdSettings(
+                max_worktrees=24,
+                debounce_seconds=1.5,
+                scan_ttl_seconds=30.0,
+            )
 
             config.save_statusd_settings(saved, path)
 
