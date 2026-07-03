@@ -29,6 +29,7 @@ class BackendStatusScan:
     items: tuple[BackendStatusItem, ...] = ()
     tracked_paths: tuple[str, ...] = ()
     error: str = ""
+    remote_url: str = ""
 
 
 @dataclass(frozen=True)

@@ -223,6 +223,59 @@ class NemoVCSInfoProviderCoreTest(unittest.TestCase):
             "/tmp/repo",
         )
 
+    def test_location_widget_prefers_remote_url_when_present(self):
+        spec = nemo_plugin.LocationWidgetSpec(
+            backend="git",
+            backend_label="Git",
+            head="main",
+            status="modified",
+            status_label="modified",
+            root="/tmp/repo",
+            root_label="repo",
+            icon="nemovcs-git",
+            remote="git@example.com:me/repo.git",
+        )
+
+        self.assertEqual(
+            nemo_plugin.location_widget_details(spec),
+            [
+                ("Remote", "git@example.com:me/repo.git"),
+                ("Worktree", "/tmp/repo"),
+                ("Head", "main"),
+                ("Status", "modified"),
+                ("Backend", "Git"),
+            ],
+        )
+        self.assertEqual(
+            nemo_plugin.location_widget_root_label(spec, expanded=True),
+            "git@example.com:me/repo.git",
+        )
+        self.assertEqual(
+            nemo_plugin.location_widget_root_label(spec, expanded=False),
+            "- repo",
+        )
+
+    def test_location_widget_spec_reads_remote_from_record(self):
+        core = nemo_plugin.NemoVCSInfoProviderCore(
+            seen=lambda paths: ["git:/tmp/repo"],
+            get_status=lambda paths: [
+                {
+                    "path": "/tmp/repo/src",
+                    "backend": "git",
+                    "worktree_id": "git:/tmp/repo",
+                    "root": "/tmp/repo",
+                    "head": "main",
+                    "remote": "git@example.com:me/repo.git",
+                    "status": "modified",
+                }
+            ],
+        )
+
+        spec = core.location_widget_spec("/tmp/repo/src")
+
+        assert spec is not None
+        self.assertEqual(spec.remote, "git@example.com:me/repo.git")
+
     def test_location_widget_spec_hides_non_worktree_path(self):
         core = nemo_plugin.NemoVCSInfoProviderCore(
             seen=lambda paths: [],

@@ -125,6 +125,37 @@ class GitHelpersTest(unittest.TestCase):
         self.assertTrue(git.is_inside_worktree(self.root))
         self.assertFalse(git.is_inside_worktree(self.root.parent))
 
+    def test_remote_url_none_without_remotes(self):
+        self.assertIsNone(git.remote_url(self.root))
+
+    def test_remote_url_falls_back_to_origin(self):
+        subprocess.run(
+            ["git", "remote", "add", "origin", "https://example.com/origin.git"],
+            cwd=self.root,
+            check=True,
+        )
+
+        self.assertEqual(
+            git.remote_url(self.root), "https://example.com/origin.git"
+        )
+
+    def test_remote_url_prefers_current_branch_upstream(self):
+        for name in ("origin", "upstream"):
+            subprocess.run(
+                ["git", "remote", "add", name, f"https://example.com/{name}.git"],
+                cwd=self.root,
+                check=True,
+            )
+        subprocess.run(
+            ["git", "config", "branch.main.remote", "upstream"],
+            cwd=self.root,
+            check=True,
+        )
+
+        self.assertEqual(
+            git.remote_url(self.root), "https://example.com/upstream.git"
+        )
+
     def test_repo_root_from_child(self):
         child = self.root / "src"
         child.mkdir()

@@ -123,6 +123,7 @@ class GitBackend:
                 for item in items
             ),
             tracked_paths=tuple(parse_ls_files_z(tracked.stdout)),
+            remote_url=git.remote_url(root) or "",
         )
 
     def commit_items(

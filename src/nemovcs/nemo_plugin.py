@@ -98,6 +98,7 @@ class LocationWidgetSpec:
     root: str
     root_label: str
     icon: str
+    remote: str = ""
 
 
 class NemoVCSInfoProviderCore:
@@ -367,6 +368,7 @@ class NemoVCSInfoProviderCore:
             root=root,
             root_label=Path(root).name or root,
             icon=BACKEND_ICONS.get(backend, MENU_ICON),
+            remote=str(record.get("remote", "")),
         )
 
 
@@ -640,12 +642,18 @@ def compact_text(text: str, *, max_chars: int = LOCATION_BAR_MAX_CHARS) -> str:
 
 
 def location_widget_details(spec: LocationWidgetSpec) -> list[tuple[str, str]]:
-    return [
-        ("Worktree", spec.root),
-        ("Head", spec.head),
-        ("Status", spec.status_label),
-        ("Backend", spec.backend_label),
-    ]
+    details: list[tuple[str, str]] = []
+    if spec.remote:
+        details.append(("Remote", spec.remote))
+    details.append(("Worktree", spec.root))
+    details.extend(
+        [
+            ("Head", spec.head),
+            ("Status", spec.status_label),
+            ("Backend", spec.backend_label),
+        ]
+    )
+    return details
 
 
 def location_widget_tooltip(spec: LocationWidgetSpec) -> str:
@@ -659,7 +667,9 @@ def location_widget_root_label(
     *,
     expanded: bool,
 ) -> str:
-    return spec.root if expanded else f"- {compact_text(spec.root_label)}"
+    if expanded:
+        return spec.remote or spec.root
+    return f"- {compact_text(spec.root_label)}"
 
 
 def default_get_status(paths):

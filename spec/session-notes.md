@@ -80,11 +80,13 @@ sessions. Update this file before pushing changes.
 - The repository context bar now supports a compact/expanded toggle and uses a
   thin bottom separator to keep it visually distinct from Nemo's file list
   headers.
-- Future repository context bar refinement: for Git expanded view, prefer a
-  remote URL over the local worktree path. Rule: use the current branch
-  upstream remote URL when available, otherwise `origin` remote URL when
-  available, otherwise fall back to the local worktree path. Compact view can
-  remain branch/status/root-name oriented.
+- Implemented: the Git expanded context bar prefers a remote URL over the local
+  worktree path. `git.remote_url()` uses the current branch upstream remote URL
+  when available, otherwise `origin`, otherwise None so the view falls back to
+  the worktree path. The URL is computed once per worktree scan (carried on
+  `BackendStatusScan.remote_url`, cached on the worktree entry) and surfaced in
+  status/cache records as `remote`. Compact view still shows
+  branch/status/root-name. SVN scans leave `remote` empty for now.
 - Future context bar action refinement: allow selected/pinnable context-menu
   actions to appear as icon-only buttons on the right side of the compact bar,
   before the expand button. Keep the first-line repository summary short and
@@ -119,8 +121,9 @@ sessions. Update this file before pushing changes.
   reinstalling the extension and restarting Nemo.
 - Decide whether the repository context bar is useful enough to keep, and tune
   its visual density/placement if it feels intrusive.
-- Add Git upstream/origin remote URL data to status records for the expanded
-  repository context bar.
+- Validate the expanded context bar remote URL against live Git worktrees:
+  upstream-configured branch, origin-only, and no-remote repositories, plus SVN
+  (which should still show the worktree path).
 - Future branch switch dialog refinement: differentiate local and remote
   branches. Keep the fast context submenu local-only; make `Others...` show
   local and remote sections/tabs, with remote branches creating or selecting a

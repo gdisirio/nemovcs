@@ -326,6 +326,34 @@ def current_branch_name(root: str | Path) -> str | None:
     return None
 
 
+def remote_url(root: str | Path) -> str | None:
+    """Return a display remote URL for a worktree, or None when none is set.
+
+    Follows the repository context bar rule: prefer the current branch's
+    upstream remote URL, fall back to `origin`, and give up otherwise so the
+    caller can show the local worktree path instead.
+    """
+    remote_names: list[str] = []
+
+    branch = current_branch_name(root)
+    if branch is not None:
+        result = run_git(root, ["config", "--get", f"branch.{branch}.remote"])
+        upstream = result.stdout.strip()
+        if result.ok and upstream:
+            remote_names.append(upstream)
+
+    if "origin" not in remote_names:
+        remote_names.append("origin")
+
+    for name in remote_names:
+        result = run_git(root, ["config", "--get", f"remote.{name}.url"])
+        url = result.stdout.strip()
+        if result.ok and url:
+            return url
+
+    return None
+
+
 def recent_branches(
     root: str | Path,
     *,

@@ -76,6 +76,7 @@ class WorktreeEntry:
     scan_in_flight: bool = False
     rescan_needed: bool = False
     last_scanned_at: float | None = None
+    remote_url: str = ""
 
 
 ScanWork = Callable[[], WorktreeEntry]
@@ -361,6 +362,7 @@ class StatusDaemonCore:
 
         entry.statuses = dict(scanned.statuses)
         entry.tracked_paths = set(scanned.tracked_paths)
+        entry.remote_url = scanned.remote_url
         entry.scanned = scanned.scanned
         entry.error = scanned.error
         entry.scan_in_flight = False
@@ -420,6 +422,7 @@ class StatusDaemonCore:
                 "gitdir": "",
                 "common_gitdir": "",
                 "head": "",
+                "remote": "",
                 "status": EmblemStatus.ERROR,
                 "error": "not inside a versioned working tree",
             }
@@ -435,6 +438,7 @@ class StatusDaemonCore:
                 "gitdir": str(identity.gitdir),
                 "common_gitdir": str(identity.common_gitdir),
                 "head": identity.head_label,
+                "remote": "",
                 "status": EmblemStatus.LOADING,
                 "error": "",
             }
@@ -447,6 +451,7 @@ class StatusDaemonCore:
             "gitdir": str(identity.gitdir),
             "common_gitdir": str(identity.common_gitdir),
             "head": identity.head_label,
+            "remote": entry.remote_url,
             "status": aggregate_status(entry, path),
             "error": entry.error,
         }
@@ -468,6 +473,7 @@ def cache_record(entry: WorktreeEntry) -> dict[str, str]:
         "gitdir": str(entry.identity.gitdir),
         "common_gitdir": str(entry.identity.common_gitdir),
         "head": entry.identity.head_label,
+        "remote": entry.remote_url,
         "status": str(status),
         "error": entry.error,
     }
@@ -494,6 +500,7 @@ def scan_worktree(entry: WorktreeEntry) -> None:
     backend = backends.backend_by_id(entry.identity.backend_id)
     if backend is None:
         entry.statuses.clear()
+        entry.remote_url = ""
         entry.scanned = True
         entry.error = f"unknown backend: {entry.identity.backend_id}"
         return
@@ -502,6 +509,7 @@ def scan_worktree(entry: WorktreeEntry) -> None:
     if not result.ok:
         entry.statuses.clear()
         entry.tracked_paths.clear()
+        entry.remote_url = ""
         entry.scanned = True
         entry.error = result.error
         return
@@ -515,6 +523,7 @@ def scan_worktree(entry: WorktreeEntry) -> None:
 
     entry.statuses = statuses
     entry.tracked_paths = set(result.tracked_paths)
+    entry.remote_url = result.remote_url
     entry.scanned = True
     entry.error = ""
 

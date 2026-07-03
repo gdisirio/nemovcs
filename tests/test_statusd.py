@@ -330,6 +330,22 @@ class StatusDaemonSchedulerTest(unittest.TestCase):
         self.assertEqual(entry.statuses["file.txt"], statusd.EmblemStatus.MODIFIED)
         self.assertEqual(changed, [(first.cache_key, [str(first.root)])])
 
+    def test_status_record_includes_scanned_remote_url(self):
+        first = identity("one")
+        cache = statusd.WorktreeCache()
+
+        def scan(entry: statusd.WorktreeEntry) -> None:
+            entry.scanned = True
+            entry.remote_url = "git@example.com:me/repo.git"
+
+        core = statusd.StatusDaemonCore(cache, scan_func=scan)
+
+        with mock.patch("nemovcs.statusd.identify_worktree", return_value=first):
+            core.seen([first.root])
+            record = core.status_record(first.root)
+
+        self.assertEqual(record["remote"], "git@example.com:me/repo.git")
+
     def test_seen_does_not_rescan_fresh_worktree(self):
         first = identity("one")
         cache = statusd.WorktreeCache()

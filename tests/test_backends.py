@@ -513,7 +513,9 @@ class BackendRegistryTest(unittest.TestCase):
 
         with mock.patch("nemovcs.git.run_git") as run_git, mock.patch(
             "nemovcs.git.parse_status_porcelain_v2_z"
-        ) as parse_status:
+        ) as parse_status, mock.patch(
+            "nemovcs.git.remote_url", return_value="git@example.com:me/repo.git"
+        ):
             run_git.side_effect = [
                 git.GitResult(("git",), root, 0, "raw", ""),
                 git.GitResult(("git",), root, 0, "tracked.txt\0renamed.txt\0", ""),
@@ -567,6 +569,7 @@ class BackendRegistryTest(unittest.TestCase):
         )
         self.assertTrue(result.ok)
         self.assertEqual(result.tracked_paths, ("tracked.txt", "renamed.txt"))
+        self.assertEqual(result.remote_url, "git@example.com:me/repo.git")
         self.assertEqual(
             result.items,
             (
