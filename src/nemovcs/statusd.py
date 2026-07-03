@@ -78,6 +78,11 @@ class WorktreeEntry:
     last_scanned_at: float | None = None
 
 
+ScanWork = Callable[[], WorktreeEntry]
+ScanComplete = Callable[[WorktreeEntry], None]
+ScanScheduler = Callable[[ScanWork, ScanComplete], object]
+
+
 class WorktreeCache:
     def __init__(self, max_worktrees: int = DEFAULT_MAX_WORKTREES):
         if max_worktrees < 1:
@@ -158,6 +163,7 @@ class StatusDaemonCore:
         scan_ttl_seconds: float | None = None,
         timer: Callable[[float, Callable[[], None]], object] | None = None,
         clock: Callable[[], float] | None = None,
+        scan_scheduler: ScanScheduler | None = None,
         scan_func: Callable[[WorktreeEntry], None] | None = None,
         status_changed_callback: Callable[[str, list[str]], None] | None = None,
     ):
@@ -172,6 +178,7 @@ class StatusDaemonCore:
         )
         self.timer = timer if timer is not None else immediate_timer
         self.clock = clock if clock is not None else time.monotonic
+        self.scan_scheduler = scan_scheduler
         self.scan_func = scan_func if scan_func is not None else scan_worktree
         self.status_changed_callback = status_changed_callback
         self.changed_worktrees: list[str] = []
@@ -204,7 +211,10 @@ class StatusDaemonCore:
                 continue
             entry = self.cache.touch(identity)
             if self.should_scan_seen_entry(entry):
-                self.scan_entry(entry, notify=False)
+                self.request_scan_entry(
+                    entry,
+                    notify=self.scan_scheduler is not None,
+                )
             if self.monitor_manager is not None:
                 self.monitor_manager.ensure(entry)
             scanned_keys.add(identity.cache_key)
@@ -258,20 +268,82 @@ class StatusDaemonCore:
         entry = self.cache.entry_by_key(worktree_id)
         if entry is None:
             return
+        if not entry.scan_scheduled:
+            return
         if entry.scan_in_flight:
             entry.rescan_needed = True
             return
 
         entry.scan_scheduled = False
-        self.scan_entry(entry)
+        self.request_scan_entry(entry)
+
+    def request_scan_entry(self, entry: WorktreeEntry, *, notify: bool = True) -> None:
+        if entry.scan_in_flight:
+            entry.rescan_needed = True
+            return
+
+        entry.scan_scheduled = False
+        if self.scan_scheduler is None:
+            self.scan_entry(entry, notify=notify)
+            return
+
+        self.start_async_scan_entry(entry, notify=notify)
 
     def scan_entry(self, entry: WorktreeEntry, *, notify: bool = True) -> None:
+        if entry.scan_in_flight:
+            entry.rescan_needed = True
+            return
+
         changed_paths = status_changed_paths(entry)
         entry.scan_in_flight = True
         try:
             self.scan_func(entry)
         finally:
             entry.scan_in_flight = False
+        self.finish_scan_entry(entry, entry, changed_paths, notify=notify)
+
+    def start_async_scan_entry(
+        self,
+        entry: WorktreeEntry,
+        *,
+        notify: bool = True,
+    ) -> None:
+        changed_paths = status_changed_paths(entry)
+        entry.scan_in_flight = True
+
+        def work() -> WorktreeEntry:
+            scanned = WorktreeEntry(entry.identity)
+            try:
+                self.scan_func(scanned)
+            except Exception as exc:
+                scanned.statuses.clear()
+                scanned.tracked_paths.clear()
+                scanned.scanned = True
+                scanned.error = str(exc)
+            return scanned
+
+        def complete(scanned: WorktreeEntry) -> None:
+            self.finish_scan_entry(entry, scanned, changed_paths, notify=notify)
+
+        assert self.scan_scheduler is not None
+        self.scan_scheduler(work, complete)
+
+    def finish_scan_entry(
+        self,
+        entry: WorktreeEntry,
+        scanned: WorktreeEntry,
+        changed_paths: list[str],
+        *,
+        notify: bool = True,
+    ) -> None:
+        if self.cache.entry_by_key(entry.identity.cache_key) is not entry:
+            return
+
+        entry.statuses = dict(scanned.statuses)
+        entry.tracked_paths = set(scanned.tracked_paths)
+        entry.scanned = scanned.scanned
+        entry.error = scanned.error
+        entry.scan_in_flight = False
         entry.last_scanned_at = self.clock()
         entry.stale = False
         entry.stale_paths.clear()

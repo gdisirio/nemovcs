@@ -29,6 +29,14 @@ sessions. Update this file before pushing changes.
   edit remains cached immediately after save and reports `modified` after TTL
   expiry. The user's previous live settings were restored afterward:
   `max_worktrees=16`, `debounce_seconds=0.75`, `scan_ttl_seconds=15`.
+- Status scans now run off the DBus/GLib main loop in the live daemon. Initial
+  DBus status for an unscanned worktree can return `loading`; completion is
+  applied back on the GLib main loop and emits `StatusChanged`.
+- Live DBus validation confirmed initial async scan behavior (`loading` then
+  `ok`) and TTL-triggered async behavior (`ok` cached immediately after TTL
+  request, then `modified` after the worker completed). Live settings were
+  restored to `max_worktrees=16`, `debounce_seconds=0.75`,
+  `scan_ttl_seconds=15`.
 
 ## Recent Changes To Keep In Mind
 
@@ -78,6 +86,10 @@ sessions. Update this file before pushing changes.
 - TTL-based revalidation extends that rule: `Seen()` also rescans when the
   cached worktree scan age reaches `scan_ttl_seconds`. Setting the value to `0`
   disables age-based rescans.
+- The DBus daemon uses a thread-backed scan scheduler. Core tests still use the
+  synchronous default unless a scheduler is injected. Async scan results are
+  copied back to the cached worktree entry only if that entry is still present
+  in the cache.
 
 ## Next Likely Tasks
 
@@ -96,7 +108,10 @@ sessions. Update this file before pushing changes.
   operations, daemon restarts, and missed filesystem monitor events. TTL now
   bounds missed invalidations, but scans still run synchronously in the daemon
   GLib main loop.
-- Move status scans off the GLib main loop so TTL-triggered rescans do not block
-  DBus handlers, monitor callbacks, or the settings UI.
+- Watch Nemo behavior around first-time `loading` status. Async scans now emit
+  `StatusChanged` after `Seen()`-triggered scans so visible items should be
+  invalidated and re-read after completion.
+- Consider adding a lightweight visible diagnostic for scan reason and duration
+  before more performance tuning.
 - Validate `Rename...` behavior for both Git and SVN files/directories.
 - Validate the settings panel against a live DBus-activated status daemon.

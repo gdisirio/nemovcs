@@ -36,6 +36,19 @@ class FakeTimer:
         callback()
 
 
+class FakeScanScheduler:
+    def __init__(self):
+        self.pending: list[tuple[statusd.ScanWork, statusd.ScanComplete]] = []
+
+    def __call__(self, work, complete):
+        self.pending.append((work, complete))
+        return work
+
+    def run_next(self):
+        work, complete = self.pending.pop(0)
+        complete(work())
+
+
 @unittest.skipUnless(have_git(), "git executable is required")
 class WorktreeIdentityTest(unittest.TestCase):
     def setUp(self):
@@ -242,6 +255,43 @@ class StatusDaemonSchedulerTest(unittest.TestCase):
 
         self.assertEqual(changed, [])
 
+    def test_async_seen_returns_before_scan_completes(self):
+        changed: list[tuple[str, list[str]]] = []
+        scheduler = FakeScanScheduler()
+        first = identity("one")
+        cache = statusd.WorktreeCache()
+
+        def scan(_entry: statusd.WorktreeEntry) -> None:
+            _entry.scanned = True
+            _entry.statuses["file.txt"] = statusd.EmblemStatus.MODIFIED
+
+        core = statusd.StatusDaemonCore(
+            cache,
+            scan_scheduler=scheduler,
+            scan_func=scan,
+            status_changed_callback=lambda worktree_id, paths: changed.append(
+                (worktree_id, paths)
+            ),
+        )
+
+        with mock.patch("nemovcs.statusd.identify_worktree", return_value=first):
+            self.assertEqual(core.seen([first.root / "file.txt"]), [first.cache_key])
+            record = core.status_record(first.root / "file.txt")
+
+        entry = cache.entry_by_key(first.cache_key)
+        assert entry is not None
+        self.assertTrue(entry.scan_in_flight)
+        self.assertFalse(entry.scanned)
+        self.assertEqual(record["status"], statusd.EmblemStatus.LOADING)
+        self.assertEqual(changed, [])
+
+        scheduler.run_next()
+
+        self.assertFalse(entry.scan_in_flight)
+        self.assertTrue(entry.scanned)
+        self.assertEqual(entry.statuses["file.txt"], statusd.EmblemStatus.MODIFIED)
+        self.assertEqual(changed, [(first.cache_key, [str(first.root)])])
+
     def test_seen_does_not_rescan_fresh_worktree(self):
         first = identity("one")
         cache = statusd.WorktreeCache()
@@ -355,6 +405,81 @@ class StatusDaemonSchedulerTest(unittest.TestCase):
 
         self.assertEqual(scans, [first])
         self.assertFalse(entry.stale)
+
+    def test_async_scheduled_scan_updates_after_timer_and_completion(self):
+        changed: list[tuple[str, list[str]]] = []
+        timer = FakeTimer()
+        scheduler = FakeScanScheduler()
+        first = identity("one")
+        cache = statusd.WorktreeCache()
+        entry = cache.touch(first)
+        entry.scanned = True
+
+        def scan(_entry: statusd.WorktreeEntry) -> None:
+            _entry.scanned = True
+            _entry.statuses["changed.txt"] = statusd.EmblemStatus.MODIFIED
+
+        core = statusd.StatusDaemonCore(
+            cache,
+            timer=timer,
+            scan_scheduler=scheduler,
+            scan_func=scan,
+            status_changed_callback=lambda worktree_id, paths: changed.append(
+                (worktree_id, paths)
+            ),
+        )
+
+        self.assertTrue(core.mark_stale(first.cache_key, [first.root / "changed.txt"]))
+        timer.fire_next()
+
+        self.assertTrue(entry.scan_in_flight)
+        self.assertTrue(entry.stale)
+        self.assertEqual(changed, [])
+
+        scheduler.run_next()
+
+        self.assertFalse(entry.scan_in_flight)
+        self.assertFalse(entry.stale)
+        self.assertEqual(
+            entry.statuses["changed.txt"],
+            statusd.EmblemStatus.MODIFIED,
+        )
+        self.assertEqual(
+            changed,
+            [(first.cache_key, [str(first.root / "changed.txt")])],
+        )
+
+    def test_async_in_flight_stale_request_schedules_rescan_after_completion(self):
+        timer = FakeTimer()
+        scheduler = FakeScanScheduler()
+        first = identity("one")
+        cache = statusd.WorktreeCache()
+
+        def scan(_entry: statusd.WorktreeEntry) -> None:
+            _entry.scanned = True
+
+        core = statusd.StatusDaemonCore(
+            cache,
+            timer=timer,
+            scan_scheduler=scheduler,
+            scan_func=scan,
+        )
+
+        with mock.patch("nemovcs.statusd.identify_worktree", return_value=first):
+            self.assertEqual(core.seen([first.root]), [first.cache_key])
+
+        entry = cache.entry_by_key(first.cache_key)
+        assert entry is not None
+        self.assertTrue(entry.scan_in_flight)
+
+        self.assertTrue(core.mark_stale(first.cache_key, [first.root / "changed.txt"]))
+        self.assertTrue(entry.rescan_needed)
+
+        scheduler.run_next()
+
+        self.assertFalse(entry.rescan_needed)
+        self.assertTrue(entry.scan_scheduled)
+        self.assertEqual(len(timer.scheduled), 1)
 
     def test_mark_stale_for_unknown_worktree_returns_false(self):
         core = statusd.StatusDaemonCore(timer=FakeTimer())

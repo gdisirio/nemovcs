@@ -49,7 +49,10 @@ def run_foreground() -> int:
     dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
     bus = dbus.SessionBus()
     bus_name = dbus.service.BusName(statusd.DBUS_BUS_NAME, bus=bus)
-    core = statusd.StatusDaemonCore.from_config(timer=glib_timer)
+    core = statusd.StatusDaemonCore.from_config(
+        timer=glib_timer,
+        scan_scheduler=threaded_glib_scan_scheduler,
+    )
     monitor_manager = statusd_monitor.WorktreeMonitorManager(core)
     core.set_monitor_manager(monitor_manager)
     StatusDaemonDBusService(bus, core)
@@ -77,6 +80,24 @@ def glib_timer(delay_seconds, callback):
         return False
 
     return GLib.timeout_add(int(delay_seconds * 1000), on_timeout)
+
+
+def threaded_glib_scan_scheduler(work, complete):
+    import threading
+    from gi.repository import GLib
+
+    def run():
+        result = work()
+
+        def on_complete():
+            complete(result)
+            return False
+
+        GLib.idle_add(on_complete)
+
+    thread = threading.Thread(target=run, daemon=True)
+    thread.start()
+    return thread
 
 
 def call_seen(paths: Sequence[str]) -> list[str]:
