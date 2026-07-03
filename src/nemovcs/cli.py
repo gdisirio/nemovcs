@@ -600,18 +600,18 @@ def build_parser() -> argparse.ArgumentParser:
     action_visible.add_argument("paths", nargs="*")
     action_visible.set_defaults(func=cmd_action_visible)
 
-    status = subparsers.add_parser("status", help="show Git status")
+    status = subparsers.add_parser("status", help="show VCS status")
     status.add_argument("paths", nargs="*")
     status.set_defaults(func=cmd_status)
 
     status_dialog = subparsers.add_parser(
         "status-dialog",
-        help="show Git status in a GTK dialog",
+        help="show VCS status in a GTK dialog",
     )
     status_dialog.add_argument("paths", nargs="*")
     status_dialog.set_defaults(func=cmd_status_dialog)
 
-    diff = subparsers.add_parser("diff", help="show Git diff")
+    diff = subparsers.add_parser("diff", help="show VCS diff")
     diff.add_argument("paths", nargs="*")
     diff.set_defaults(func=cmd_diff)
 
@@ -626,34 +626,37 @@ def build_parser() -> argparse.ArgumentParser:
     svn_meld_diff.add_argument("path")
     svn_meld_diff.set_defaults(func=cmd_svn_meld_diff)
 
-    log = subparsers.add_parser("log", help="show Git log")
+    log = subparsers.add_parser("log", help="show VCS log")
     log.add_argument("-n", "--limit", type=int, default=50)
     log.add_argument("paths", nargs="*")
     log.set_defaults(func=cmd_log)
 
-    log_dialog = subparsers.add_parser("log-dialog", help="show Git log in a GTK logger")
+    log_dialog = subparsers.add_parser(
+        "log-dialog",
+        help="show VCS log in a GTK logger",
+    )
     log_dialog.add_argument("-n", "--limit", type=int, default=50)
     log_dialog.add_argument("paths", nargs="*")
     log_dialog.set_defaults(func=cmd_log_dialog)
 
-    update = subparsers.add_parser("update", help="update the current Git repository")
+    update = subparsers.add_parser("update", help="update the current VCS worktree")
     update.add_argument("paths", nargs="*")
     update.set_defaults(func=cmd_update)
 
     update_dialog = subparsers.add_parser(
         "update-dialog",
-        help="update the current Git repository in a GTK logger",
+        help="update the current VCS worktree in a GTK logger",
     )
     update_dialog.add_argument("paths", nargs="*")
     update_dialog.set_defaults(func=cmd_update_dialog)
 
-    push = subparsers.add_parser("push", help="push the current Git repository")
+    push = subparsers.add_parser("push", help="push the current VCS worktree")
     push.add_argument("paths", nargs="*")
     push.set_defaults(func=cmd_push)
 
     push_dialog = subparsers.add_parser(
         "push-dialog",
-        help="push the current Git repository in a GTK logger",
+        help="push the current VCS worktree in a GTK logger",
     )
     push_dialog.add_argument("paths", nargs="*")
     push_dialog.set_defaults(func=cmd_push_dialog)
@@ -747,7 +750,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     statusd_parser = subparsers.add_parser(
         "statusd",
-        help="run the foreground status daemon prototype",
+        help="run the foreground status daemon",
     )
     statusd_parser.set_defaults(func=cmd_statusd)
 
@@ -768,7 +771,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         return handler(args)
     except subprocess.TimeoutExpired as exc:
-        print(f"git command timed out: {exc}", file=sys.stderr)
+        print(f"VCS command timed out: {exc}", file=sys.stderr)
         return 124
 
 

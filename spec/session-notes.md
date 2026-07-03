@@ -128,6 +128,9 @@ sessions. Update this file before pushing changes.
   before more performance tuning.
 - Review CLI command help text for remaining Git-specific wording where commands
   now route through backend abstractions.
+- CLI help text was refreshed so backend-routed commands describe VCS status,
+  diff, log, update, and push instead of Git-only behavior. The branch switch
+  command remains Git-specific.
 - Continue stress testing SVN navigation in Nemo. Watch for remaining
   synchronous paths in context-menu construction, especially backend detection
   for uncached SVN roots.
