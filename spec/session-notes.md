@@ -119,8 +119,8 @@ sessions. Update this file before pushing changes.
   branch management actions such as create-and-switch, rename, and delete.
 - Watch for stale status daemon cache behavior after file changes, VCS
   operations, daemon restarts, and missed filesystem monitor events. TTL now
-  bounds missed invalidations, but scans still run synchronously in the daemon
-  GLib main loop.
+  bounds missed invalidations, and scans run off the GLib main loop so they no
+  longer block DBus handlers, monitor callbacks, or the settings UI.
 - Watch Nemo behavior around first-time `loading` status. Async scans now emit
   `StatusChanged` after `Seen()`-triggered scans so visible items should be
   invalidated and re-read after completion.
