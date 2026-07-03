@@ -12,10 +12,55 @@ from typing import Iterable, Sequence
 from nemovcs.backends.base import (
     BackendChangeItem,
     BackendCommandPhase,
+    BackendLog,
     BackendStatusItem,
     BackendStatusScan,
     BackendWorktreeIdentity,
+    LogChange,
+    LogEntry,
 )
+
+
+SVN_LOG_ACTIONS = {
+    "A": "added",
+    "M": "modified",
+    "D": "deleted",
+    "R": "replaced",
+}
+
+
+def parse_svn_log(data: str) -> list[LogEntry]:
+    try:
+        document = ET.fromstring(data)
+    except ET.ParseError:
+        return []
+
+    entries: list[LogEntry] = []
+    for logentry in document.findall("logentry"):
+        message = logentry.findtext("msg") or ""
+        summary, _, body = message.partition("\n")
+        changes: list[LogChange] = []
+        for path in logentry.findall("paths/path"):
+            action = SVN_LOG_ACTIONS.get(path.get("action", ""), "modified")
+            copyfrom = path.get("copyfrom-path")
+            changes.append(
+                LogChange(
+                    action=action,
+                    path=path.text or "",
+                    old_path=copyfrom or None,
+                )
+            )
+        entries.append(
+            LogEntry(
+                revision=logentry.get("revision", ""),
+                author=logentry.findtext("author") or "",
+                date=logentry.findtext("date") or "",
+                summary=summary,
+                body=body,
+                changes=tuple(changes),
+            )
+        )
+    return entries
 
 
 DEFAULT_TIMEOUT_SECONDS = 15
@@ -160,6 +205,22 @@ class SvnBackend:
                 for item in items
             ),
         )
+
+    def scan_log(
+        self,
+        root: str | Path,
+        *,
+        limit: int,
+        paths: Sequence[str] = (),
+    ) -> BackendLog:
+        args = ["log", "--xml", "--verbose", f"--limit={limit}", *paths]
+        result = self.run(root, args)
+        if not result.ok:
+            return BackendLog(
+                ok=False,
+                error=result.stderr.strip() or result.stdout.strip(),
+            )
+        return BackendLog(ok=True, entries=tuple(parse_svn_log(result.stdout)))
 
     def commit_items(
         self,

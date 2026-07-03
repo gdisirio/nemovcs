@@ -14,10 +14,73 @@ from nemovcs import git
 from nemovcs.backends.base import (
     BackendChangeItem,
     BackendCommandPhase,
+    BackendLog,
     BackendStatusItem,
     BackendStatusScan,
     BackendWorktreeIdentity,
+    LogChange,
+    LogEntry,
 )
+
+
+# Control characters chosen because they never appear in commit metadata:
+#   RS (0x1e) starts each commit, US (0x1f) separates header fields, and
+#   GS (0x1d) ends the header just before the --name-status block.
+LOG_RECORD_SEP = "\x1e"
+LOG_FIELD_SEP = "\x1f"
+LOG_HEADER_END = "\x1d"
+LOG_PRETTY_FORMAT = (
+    f"{LOG_RECORD_SEP}%H{LOG_FIELD_SEP}%an{LOG_FIELD_SEP}%aI"
+    f"{LOG_FIELD_SEP}%s{LOG_FIELD_SEP}%b{LOG_HEADER_END}"
+)
+GIT_LOG_ACTIONS = {
+    "A": "added",
+    "M": "modified",
+    "D": "deleted",
+    "T": "modified",
+}
+
+
+def parse_git_name_status(block: str) -> tuple[LogChange, ...]:
+    changes: list[LogChange] = []
+    for raw_line in block.split("\n"):
+        line = raw_line.strip("\r")
+        if not line:
+            continue
+        parts = line.split("\t")
+        code = parts[0]
+        if code[:1] in {"R", "C"} and len(parts) >= 3:
+            action = "renamed" if code[0] == "R" else "copied"
+            changes.append(
+                LogChange(action=action, path=parts[2], old_path=parts[1])
+            )
+        elif len(parts) >= 2:
+            action = GIT_LOG_ACTIONS.get(code[:1], "modified")
+            changes.append(LogChange(action=action, path=parts[1]))
+    return tuple(changes)
+
+
+def parse_git_log(text: str) -> list[LogEntry]:
+    entries: list[LogEntry] = []
+    for chunk in text.split(LOG_RECORD_SEP):
+        if not chunk.strip("\n"):
+            continue
+        header, _, rest = chunk.partition(LOG_HEADER_END)
+        fields = header.split(LOG_FIELD_SEP, 4)
+        if len(fields) < 5:
+            continue
+        revision, author, date, summary, body = fields
+        entries.append(
+            LogEntry(
+                revision=revision,
+                author=author,
+                date=date,
+                summary=summary,
+                body=body,
+                changes=parse_git_name_status(rest),
+            )
+        )
+    return entries
 
 
 class GitBackend:
@@ -125,6 +188,30 @@ class GitBackend:
             tracked_paths=tuple(parse_ls_files_z(tracked.stdout)),
             remote_url=git.remote_url(root) or "",
         )
+
+    def scan_log(
+        self,
+        root: str | Path,
+        *,
+        limit: int,
+        paths: Sequence[str] = (),
+    ) -> BackendLog:
+        args = [
+            "log",
+            f"-n{limit}",
+            "--no-color",
+            f"--pretty=format:{LOG_PRETTY_FORMAT}",
+            "--name-status",
+        ]
+        if paths:
+            args.extend(["--", *paths])
+        result = git.run_git(root, args, env={"GIT_OPTIONAL_LOCKS": "0"})
+        if not result.ok:
+            return BackendLog(
+                ok=False,
+                error=result.stderr.strip() or result.stdout.strip(),
+            )
+        return BackendLog(ok=True, entries=tuple(parse_git_log(result.stdout)))
 
     def commit_items(
         self,

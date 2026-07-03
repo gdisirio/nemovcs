@@ -112,6 +112,15 @@ sessions. Update this file before pushing changes.
   changes with no manual daemon kill. `nemo-desktop` owns `org.NemoDesktop`,
   not `org.Nemo`, so it does not keep a stale daemon alive. Verified live: a
   `nemo --quit` shuts the daemon down on its own.
+- Structured revision log backend (first step toward a proper Log dialog to
+  replace the text dump). `LogEntry`/`LogChange`/`BackendLog` live in
+  `backends/base.py`; `backends.scan_log(path, limit)` detects the backend/root
+  and returns entries. Git parses `git log --name-status` with a control-char
+  pretty format (`parse_git_log`, `parse_git_name_status` in `backends/git.py`);
+  SVN parses `svn log --xml --verbose` (`parse_svn_log` in `backends/svn.py`).
+  Parsers are pure and unit-tested; the Git format was verified live against
+  this repo. The old text-based `log`/`log_phases` paths are untouched, so the
+  current Log dialog still works until the new one is built.
 - `SvnBackend.root()` now short-circuits via a filesystem `.svn` ancestor check
   (`has_svn_metadata_ancestor`) before running `svn info`. Backend detection
   runs on Nemo's UI thread during context-menu construction, so this avoids one
@@ -123,6 +132,13 @@ sessions. Update this file before pushing changes.
   helper had no production callers.
 
 ## Next Likely Tasks
+
+- Build the structured Log dialog on top of `backends.scan_log`: a revision
+  `TreeView` (revision/author/date/summary), a changed-paths pane for the
+  selected revision, a message box, and "Show more" paging. Reuse the existing
+  Meld path for per-revision diffs. This replaces the current text dump in
+  `logger.py` for `log-dialog` (update/push can keep their text output). Backend
+  paging (`--skip` for Git, revision-range for SVN) is not implemented yet.
 
 - Continue manual testing from Nemo on real Git and SVN working trees after
   reinstalling the extension and restarting Nemo.

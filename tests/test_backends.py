@@ -9,11 +9,26 @@ from nemovcs import git
 from nemovcs.backends.base import (
     BackendChangeItem,
     BackendCommandPhase,
+    BackendLog,
     BackendStatusItem,
     BackendWorktreeIdentity,
+    LogChange,
+    LogEntry,
 )
-from nemovcs.backends.git import GitBackend
-from nemovcs.backends.svn import SvnBackend, SvnResult, has_svn_metadata_ancestor
+from nemovcs.backends.git import (
+    GitBackend,
+    LOG_FIELD_SEP,
+    LOG_HEADER_END,
+    LOG_RECORD_SEP,
+    parse_git_log,
+    parse_git_name_status,
+)
+from nemovcs.backends.svn import (
+    SvnBackend,
+    SvnResult,
+    has_svn_metadata_ancestor,
+    parse_svn_log,
+)
 
 
 class BackendRegistryTest(unittest.TestCase):
@@ -596,6 +611,214 @@ class BackendRegistryTest(unittest.TestCase):
         self.assertFalse(result.ok)
         self.assertEqual(result.error, "fatal")
         self.assertEqual(result.items, ())
+
+    def test_parse_git_name_status_handles_renames_and_plain_changes(self):
+        block = "\n".join(
+            [
+                "M\tsrc/a.py",
+                "A\tsrc/b.py",
+                "D\told.py",
+                "R100\tone.py\ttwo.py",
+                "C075\tbase.py\tcopy.py",
+                "T\tsrc/link",
+            ]
+        )
+
+        self.assertEqual(
+            parse_git_name_status(block),
+            (
+                LogChange(action="modified", path="src/a.py"),
+                LogChange(action="added", path="src/b.py"),
+                LogChange(action="deleted", path="old.py"),
+                LogChange(action="renamed", path="two.py", old_path="one.py"),
+                LogChange(action="copied", path="copy.py", old_path="base.py"),
+                LogChange(action="modified", path="src/link"),
+            ),
+        )
+
+    def test_parse_git_log_parses_commits_and_changes(self):
+        def commit(fields, name_status_lines):
+            header = LOG_RECORD_SEP + LOG_FIELD_SEP.join(fields) + LOG_HEADER_END
+            block = "\n" + "".join(f"{line}\n" for line in name_status_lines)
+            return header + block
+
+        text = "".join(
+            [
+                commit(
+                    [
+                        "abc123",
+                        "Alice",
+                        "2024-01-02T03:04:05+00:00",
+                        "Add feature",
+                        "Detailed\nmulti-line body",
+                    ],
+                    ["M\tsrc/a.py", "R100\told.py\tnew.py"],
+                ),
+                commit(
+                    ["def456", "Bob", "2024-01-01T00:00:00+00:00", "Initial", ""],
+                    ["A\tREADME.md"],
+                ),
+                # A merge with no file changes: empty name-status block.
+                commit(
+                    ["9990000", "Carol", "2024-01-03T00:00:00+00:00", "Merge", ""],
+                    [],
+                ),
+            ]
+        )
+
+        entries = parse_git_log(text)
+
+        self.assertEqual(
+            entries,
+            [
+                LogEntry(
+                    revision="abc123",
+                    author="Alice",
+                    date="2024-01-02T03:04:05+00:00",
+                    summary="Add feature",
+                    body="Detailed\nmulti-line body",
+                    changes=(
+                        LogChange(action="modified", path="src/a.py"),
+                        LogChange(action="renamed", path="new.py", old_path="old.py"),
+                    ),
+                ),
+                LogEntry(
+                    revision="def456",
+                    author="Bob",
+                    date="2024-01-01T00:00:00+00:00",
+                    summary="Initial",
+                    body="",
+                    changes=(LogChange(action="added", path="README.md"),),
+                ),
+                LogEntry(
+                    revision="9990000",
+                    author="Carol",
+                    date="2024-01-03T00:00:00+00:00",
+                    summary="Merge",
+                    body="",
+                    changes=(),
+                ),
+            ],
+        )
+
+    def test_git_backend_scan_log_returns_entries(self):
+        backend = GitBackend()
+        root = Path("/tmp/repo")
+        text = (
+            LOG_RECORD_SEP
+            + LOG_FIELD_SEP.join(
+                ["abc123", "Alice", "2024-01-02T03:04:05+00:00", "Only", ""]
+            )
+            + LOG_HEADER_END
+            + "\nA\tfile.txt\n"
+        )
+
+        with mock.patch("nemovcs.git.run_git") as run_git:
+            run_git.return_value = git.GitResult(("git",), root, 0, text, "")
+
+            result = backend.scan_log(root, limit=5)
+
+        self.assertTrue(result.ok)
+        self.assertEqual(len(result.entries), 1)
+        self.assertEqual(result.entries[0].revision, "abc123")
+        self.assertEqual(
+            result.entries[0].changes,
+            (LogChange(action="added", path="file.txt"),),
+        )
+
+    def test_git_backend_scan_log_reports_command_error(self):
+        backend = GitBackend()
+        root = Path("/tmp/repo")
+
+        with mock.patch("nemovcs.git.run_git") as run_git:
+            run_git.return_value = git.GitResult(("git",), root, 128, "", "fatal\n")
+
+            result = backend.scan_log(root, limit=5)
+
+        self.assertFalse(result.ok)
+        self.assertEqual(result.error, "fatal")
+        self.assertEqual(result.entries, ())
+
+    def test_parse_svn_log_parses_revisions_paths_and_copyfrom(self):
+        xml = """<?xml version="1.0"?>
+<log>
+<logentry revision="42">
+<author>alice</author>
+<date>2024-01-02T03:04:05.000000Z</date>
+<paths>
+<path action="M" kind="file">/trunk/a.py</path>
+<path action="A" kind="file" copyfrom-path="/trunk/old.py" copyfrom-rev="40">/trunk/new.py</path>
+<path action="D" kind="file">/trunk/gone.py</path>
+</paths>
+<msg>Summary line
+body paragraph</msg>
+</logentry>
+<logentry revision="41">
+<author>bob</author>
+<date>2024-01-01T00:00:00.000000Z</date>
+<paths>
+<path action="A" kind="dir">/trunk</path>
+</paths>
+<msg>Initial import</msg>
+</logentry>
+</log>
+"""
+
+        self.assertEqual(
+            parse_svn_log(xml),
+            [
+                LogEntry(
+                    revision="42",
+                    author="alice",
+                    date="2024-01-02T03:04:05.000000Z",
+                    summary="Summary line",
+                    body="body paragraph",
+                    changes=(
+                        LogChange(action="modified", path="/trunk/a.py"),
+                        LogChange(
+                            action="added",
+                            path="/trunk/new.py",
+                            old_path="/trunk/old.py",
+                        ),
+                        LogChange(action="deleted", path="/trunk/gone.py"),
+                    ),
+                ),
+                LogEntry(
+                    revision="41",
+                    author="bob",
+                    date="2024-01-01T00:00:00.000000Z",
+                    summary="Initial import",
+                    body="",
+                    changes=(LogChange(action="added", path="/trunk"),),
+                ),
+            ],
+        )
+
+    def test_parse_svn_log_returns_empty_on_malformed_xml(self):
+        self.assertEqual(parse_svn_log("not xml <"), [])
+
+    def test_svn_backend_scan_log_returns_entries(self):
+        backend = SvnBackend()
+        root = Path("/tmp/wc")
+        xml = (
+            '<?xml version="1.0"?>\n<log>\n'
+            '<logentry revision="7">\n<author>al</author>\n'
+            "<date>2024-05-05T00:00:00.0Z</date>\n"
+            '<paths>\n<path action="M">/trunk/x</path>\n</paths>\n'
+            "<msg>tweak</msg>\n</logentry>\n</log>\n"
+        )
+
+        with mock.patch.object(
+            backend,
+            "run",
+            return_value=SvnResult(("svn", "log"), root, 0, xml, ""),
+        ):
+            result = backend.scan_log(root, limit=5)
+
+        self.assertTrue(result.ok)
+        self.assertEqual(len(result.entries), 1)
+        self.assertEqual(result.entries[0].revision, "7")
+        self.assertEqual(result.entries[0].summary, "tweak")
 
     def test_git_backend_builds_identity_from_rev_parse(self):
         backend = GitBackend()

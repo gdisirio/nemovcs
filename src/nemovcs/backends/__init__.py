@@ -9,6 +9,7 @@ from .base import (
     Backend,
     BackendChangeItem,
     BackendCommandPhase,
+    BackendLog,
     BackendWorktreeIdentity,
 )
 from .git import GitBackend
@@ -92,6 +93,15 @@ def raw_log(paths: Sequence[str | Path], limit: int) -> list[Any]:
     for backend in group_by_backend(selected_paths):
         results.extend(backend.log(selected_paths, limit))
     return results
+
+
+def scan_log(path: str | Path, *, limit: int) -> BackendLog | None:
+    """Return a structured revision log for the worktree containing `path`."""
+    detected = detect_root(path)
+    if detected is None:
+        return None
+    backend, root = detected
+    return backend.scan_log(root, limit=limit)
 
 
 def raw_diff(paths: Sequence[str | Path]) -> list[Any]:

@@ -33,6 +33,34 @@ class BackendStatusScan:
 
 
 @dataclass(frozen=True)
+class LogChange:
+    """A single path touched by a revision."""
+
+    action: str
+    path: str
+    old_path: str | None = None
+
+
+@dataclass(frozen=True)
+class LogEntry:
+    """One revision in a structured history view."""
+
+    revision: str
+    author: str
+    date: str
+    summary: str
+    body: str = ""
+    changes: tuple[LogChange, ...] = ()
+
+
+@dataclass(frozen=True)
+class BackendLog:
+    ok: bool
+    entries: tuple[LogEntry, ...] = ()
+    error: str = ""
+
+
+@dataclass(frozen=True)
 class BackendChangeItem:
     backend_id: str
     root: Path
@@ -87,6 +115,14 @@ class Backend(Protocol):
     ) -> list[Any]: ...
 
     def scan_status(self, root: str | Path) -> BackendStatusScan: ...
+
+    def scan_log(
+        self,
+        root: str | Path,
+        *,
+        limit: int,
+        paths: Sequence[str] = (),
+    ) -> BackendLog: ...
 
     def commit_items(
         self,
