@@ -19,10 +19,13 @@ class ConfigTest(unittest.TestCase):
                 config.DEFAULT_SCAN_TTL_SECONDS,
             )
             self.assertTrue(path.exists())
+            data = path.read_text(encoding="utf-8")
+            self.assertIn('"dbus_timeout_seconds": "1"', data)
 
     def test_save_and_load_statusd_settings(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "settings.json"
+            path.write_text('{"dbus_timeout_seconds": "2.5"}\n', encoding="utf-8")
             saved = config.StatusdSettings(
                 max_worktrees=24,
                 debounce_seconds=1.5,
@@ -32,6 +35,32 @@ class ConfigTest(unittest.TestCase):
             config.save_statusd_settings(saved, path)
 
             self.assertEqual(config.load_statusd_settings(path), saved)
+            self.assertEqual(config.load_dbus_timeout_seconds(path), 2.5)
+
+    def test_load_dbus_timeout_uses_default_for_missing_or_invalid_values(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "settings.json"
+
+            self.assertEqual(
+                config.load_dbus_timeout_seconds(path),
+                config.DEFAULT_DBUS_TIMEOUT_SECONDS,
+            )
+
+            path.write_text('{"dbus_timeout_seconds": "0"}\n', encoding="utf-8")
+
+            self.assertEqual(
+                config.load_dbus_timeout_seconds(path),
+                config.DEFAULT_DBUS_TIMEOUT_SECONDS,
+            )
+
+    def test_save_statusd_settings_preserves_hidden_dbus_timeout(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "settings.json"
+            path.write_text('{"dbus_timeout_seconds": "0.25"}\n', encoding="utf-8")
+
+            config.save_statusd_settings(config.StatusdSettings(max_worktrees=4), path)
+
+            self.assertEqual(config.load_dbus_timeout_seconds(path), 0.25)
 
     def test_invalid_statusd_settings_fall_back_to_defaults(self):
         with tempfile.TemporaryDirectory() as tmp:

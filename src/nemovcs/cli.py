@@ -473,8 +473,7 @@ def cmd_status_cache(args: argparse.Namespace) -> int:
 
         paths = absolute_paths(args.paths or [Path.cwd()])
         try:
-            statusd_dbus.call_seen(paths)
-            records = statusd_dbus.call_get_status(paths)
+            records = statusd_dbus.call_query_status(paths)
         except Exception as exc:
             print(f"status daemon DBus call failed: {exc}", file=sys.stderr)
             return 1

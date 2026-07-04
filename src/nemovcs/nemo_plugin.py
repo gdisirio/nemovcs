@@ -26,6 +26,7 @@ LOCATION_BAR_MAX_CHARS = 32
 
 PRIMARY_EMBLEMS = {
     "conflicted": "nemovcs-conflicted",
+    "error": "nemovcs-problems",
     "modified": "nemovcs-modified",
     "unversioned": "nemovcs-unversioned",
     "ok": "nemovcs-normal",
@@ -57,7 +58,7 @@ BACKEND_ICONS = {
 }
 STATUS_LABELS = {
     "conflicted": "conflicted",
-    "error": "error",
+    "error": "problem",
     "ignored": "ignored",
     "loading": "loading",
     "modified": "modified",
@@ -99,6 +100,7 @@ class LocationWidgetSpec:
     root_label: str
     icon: str
     remote: str = ""
+    error: str = ""
 
 
 class NemoVCSInfoProviderCore:
@@ -108,6 +110,7 @@ class NemoVCSInfoProviderCore:
         cache: status_client.StatusClientCache | None = None,
         seen=None,
         get_status=None,
+        query_status=None,
         diagnostics=None,
         max_visible_items: int = DEFAULT_MAX_VISIBLE_ITEMS,
     ):
@@ -116,6 +119,7 @@ class NemoVCSInfoProviderCore:
         self.cache = cache if cache is not None else status_client.StatusClientCache()
         self.seen = seen
         self.get_status = get_status
+        self.query_status = query_status
         self.diagnostics = (
             diagnostics
             if diagnostics is not None
@@ -165,11 +169,15 @@ class NemoVCSInfoProviderCore:
             )
             return cached
 
-        seen = self.seen or default_seen
-        get_status = self.get_status or default_get_status
+        records: list[dict[str, str]] = []
         for attempt in range(1, 3):
             try:
-                records = self.cache.refresh([path], seen, get_status)
+                path_strings = [str(path)]
+                records = validate_status_records(
+                    path_strings,
+                    self.query_status_records(path_strings),
+                )
+                self.cache.update(records)
                 break
             except Exception as exc:
                 self.last_error = str(exc)
@@ -180,7 +188,10 @@ class NemoVCSInfoProviderCore:
                     error=self.last_error,
                 )
                 if attempt == 2:
-                    return None
+                    record = local_problem_record(path, self.last_error)
+                    if record is not None:
+                        self.cache.update([record])
+                    return record
 
         self.last_error = ""
         record = records[0] if records else None
@@ -192,8 +203,22 @@ class NemoVCSInfoProviderCore:
         )
         return record
 
+    def query_status_records(self, paths: Sequence[str]) -> Sequence[dict[str, str]]:
+        if self.query_status is not None:
+            return self.query_status(paths)
+
+        if self.seen is not None or self.get_status is not None:
+            seen = self.seen or default_seen
+            get_status = self.get_status or default_get_status
+            seen(paths)
+            return get_status(paths)
+
+        return default_query_status(paths)
+
     def apply_emblem(self, item, record: dict[str, str] | None) -> str | None:
         if not record:
+            return None
+        if record.get("status", "") == "error" and not record_is_problem(record):
             return None
 
         emblem = primary_emblem(record.get("status", ""))
@@ -379,6 +404,7 @@ class NemoVCSInfoProviderCore:
             root_label=Path(root).name or root,
             icon=BACKEND_ICONS.get(backend, MENU_ICON),
             remote=str(record.get("remote", "")),
+            error=str(record.get("error", "")),
         )
 
 
@@ -635,6 +661,12 @@ def default_seen(paths):
     return statusd_dbus.call_seen(paths)
 
 
+def default_query_status(paths):
+    from . import statusd_dbus
+
+    return statusd_dbus.call_query_status(paths)
+
+
 def path_from_uri(uri: str) -> str | None:
     parsed = urlparse(uri)
     if parsed.scheme and parsed.scheme != "file":
@@ -663,6 +695,8 @@ def location_widget_details(spec: LocationWidgetSpec) -> list[tuple[str, str]]:
             ("Backend", spec.backend_label),
         ]
     )
+    if spec.status == "error" and spec.error:
+        details.append(("Problem", spec.error))
     return details
 
 
@@ -716,6 +750,97 @@ def menu_launch_env(command: Sequence[str]) -> dict[str, str] | None:
 
 def primary_emblem(status: str) -> str | None:
     return PRIMARY_EMBLEMS.get(status)
+
+
+def record_is_problem(record: dict[str, str]) -> bool:
+    return bool(record.get("backend") or record.get("root") or record.get("worktree_id"))
+
+
+def validate_status_records(
+    paths: Sequence[str | Path],
+    records,
+) -> list[dict[str, str]]:
+    path_count = len(list(paths))
+    validated = [validate_status_record(record) for record in records]
+    if len(validated) != path_count:
+        raise ValueError("status daemon returned an unexpected record count")
+    return validated
+
+
+def validate_status_record(record) -> dict[str, str]:
+    try:
+        result = {str(key): str(value) for key, value in dict(record).items()}
+    except (TypeError, ValueError) as exc:
+        raise ValueError("status daemon returned a malformed record") from exc
+
+    if not result.get("path"):
+        raise ValueError("status daemon record is missing path")
+
+    status = result.get("status", "")
+    if status not in STATUS_LABELS:
+        raise ValueError(f"status daemon returned unknown status: {status}")
+
+    backend = result.get("backend", "")
+    if backend and backend not in BACKEND_LABELS:
+        raise ValueError(f"status daemon returned unknown backend: {backend}")
+
+    return result
+
+
+def local_problem_record(path: str | Path, error: str) -> dict[str, str] | None:
+    marker = local_vcs_marker(path)
+    if marker is None:
+        return None
+
+    backend, root, vcs_dir = marker
+    return {
+        "path": str(Path(path).resolve(strict=False)),
+        "backend": backend,
+        "worktree_id": f"{backend}:{root}",
+        "root": str(root),
+        "gitdir": str(vcs_dir),
+        "common_gitdir": str(vcs_dir),
+        "head": "unknown",
+        "remote": "",
+        "status": "error",
+        "error": error,
+    }
+
+
+def local_vcs_marker(path: str | Path) -> tuple[str, Path, Path] | None:
+    candidate = Path(path).expanduser()
+    if not candidate.is_absolute():
+        candidate = Path.cwd() / candidate
+    candidate = candidate.resolve(strict=False)
+    current = candidate if candidate.is_dir() else candidate.parent
+
+    while True:
+        git_marker = current / ".git"
+        if is_git_marker(git_marker):
+            return ("git", current, git_marker)
+
+        svn_marker = current / ".svn"
+        if is_svn_marker(svn_marker):
+            return ("svn", current, svn_marker)
+
+        if current.parent == current:
+            return None
+        current = current.parent
+
+
+def is_git_marker(path: Path) -> bool:
+    if path.is_dir():
+        return (path / "HEAD").exists() or (path / "commondir").exists()
+    if not path.is_file():
+        return False
+    try:
+        return path.read_text(encoding="utf-8", errors="replace").startswith("gitdir:")
+    except OSError:
+        return False
+
+
+def is_svn_marker(path: Path) -> bool:
+    return path.is_dir() and (path / "wc.db").exists()
 
 
 def matching_backend_ids(paths: Sequence[str | Path]) -> list[str]:

@@ -10,7 +10,8 @@ sessions. Update this file before pushing changes.
 - Nemo Action installer removal: current context menus are provided by the
   nemo-python extension; legacy action cleanup remains in install/uninstall.
 - Current performance focus: keep Nemo extension callbacks from triggering
-  repeated synchronous status work during directory enumeration.
+  repeated synchronous status work during directory enumeration and keep DBus
+  failures visible instead of silently masking unexpected problems.
 
 ## Last Known State
 
@@ -61,6 +62,19 @@ sessions. Update this file before pushing changes.
   enumeration from turning the initial async scan into a rescan/invalidate/query
   loop. Live testing after reinstall showed Nemo and `statusd` settling at 0%
   CPU, and the user confirmed the immediate hang was gone.
+- Status lookup protocol was hardened after the hang fix. Nemo now uses one
+  DBus `QueryStatus(paths)` call instead of separate `Seen()` and `GetStatus()`
+  calls; the old methods remain for compatibility/debugging. DBus client calls
+  use a hidden persisted `dbus_timeout_seconds` setting in
+  `~/.config/nemovcs/settings.json` (currently `1` second, not exposed in the
+  settings UI yet). A live `status-cache --dbus` probe against the restarted
+  daemon returned the repo status successfully, and Nemo/statusd settled at 0%
+  CPU afterward.
+- Unexpected status/protocol failures now surface as a dedicated "problems"
+  visual state. Internally this remains `status="error"`; visually it maps to
+  the new `nemovcs-problems` emblem. Non-worktree "not versioned" errors remain
+  quiet. The client validates daemon status records and synthesizes a problem
+  record only when local marker detection indicates a real Git/SVN worktree.
 
 ## Recent Changes To Keep In Mind
 
@@ -156,6 +170,9 @@ sessions. Update this file before pushing changes.
 - The Log dialog can filter revision history by the selected paths, so opening
   it on a file or subdirectory shows relevant history instead of always showing
   whole-repository history.
+- New icon resources: `emblem-nemovcs-problems.svg` and
+  `emblem-nemovcs-problems-small.svg`. Installer/uninstaller and the statusd
+  settings cache view know about the new problem emblem.
 
 ## Next Likely Tasks
 
@@ -187,6 +204,10 @@ sessions. Update this file before pushing changes.
 - Continue stress testing repeated enter/leave navigation in versioned
   directories. The first-visit hang fix passed one live check, but more manual
   testing on real Git and SVN trees is still useful.
+- Keep an eye on DBus timeout behavior. The current policy intentionally shows
+  the problem emblem for unexpected DBus/protocol failures instead of falling
+  back to cached status, because cached fallback could hide real integration
+  problems.
 - Consider adding a lightweight visible diagnostic for scan reason and duration
   before more performance tuning.
 - Review CLI command help text for remaining Git-specific wording where commands

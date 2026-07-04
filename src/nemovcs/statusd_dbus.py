@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Sequence
 
+from . import config
 from . import statusd
 from . import statusd_monitor
 
@@ -13,6 +14,10 @@ INTROSPECTION_XML = f"""<!DOCTYPE node PUBLIC
 "http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd">
 <node>
   <interface name="{statusd.DBUS_INTERFACE}">
+    <method name="QueryStatus">
+      <arg name="paths" type="as" direction="in"/>
+      <arg name="records" type="aa{{ss}}" direction="out"/>
+    </method>
     <method name="Seen">
       <arg name="paths" type="as" direction="in"/>
       <arg name="worktree_ids" type="as" direction="out"/>
@@ -135,14 +140,36 @@ def call_seen(paths: Sequence[str]) -> list[str]:
     import dbus
 
     proxy = _statusd_proxy()
-    return list(proxy.Seen(list(paths), dbus_interface=statusd.DBUS_INTERFACE))
+    return list(
+        proxy.Seen(
+            list(paths),
+            dbus_interface=statusd.DBUS_INTERFACE,
+            timeout=dbus_timeout_seconds(),
+        )
+    )
 
 
 def call_get_status(paths: Sequence[str]) -> list[dict[str, str]]:
     proxy = _statusd_proxy()
     return [
         {str(key): str(value) for key, value in dict(record).items()}
-        for record in proxy.GetStatus(list(paths), dbus_interface=statusd.DBUS_INTERFACE)
+        for record in proxy.GetStatus(
+            list(paths),
+            dbus_interface=statusd.DBUS_INTERFACE,
+            timeout=dbus_timeout_seconds(),
+        )
+    ]
+
+
+def call_query_status(paths: Sequence[str]) -> list[dict[str, str]]:
+    proxy = _statusd_proxy()
+    return [
+        {str(key): str(value) for key, value in dict(record).items()}
+        for record in proxy.QueryStatus(
+            list(paths),
+            dbus_interface=statusd.DBUS_INTERFACE,
+            timeout=dbus_timeout_seconds(),
+        )
     ]
 
 
@@ -150,7 +177,10 @@ def call_cache_entries() -> list[dict[str, str]]:
     proxy = _statusd_proxy()
     return [
         {str(key): str(value) for key, value in dict(record).items()}
-        for record in proxy.GetCacheEntries(dbus_interface=statusd.DBUS_INTERFACE)
+        for record in proxy.GetCacheEntries(
+            dbus_interface=statusd.DBUS_INTERFACE,
+            timeout=dbus_timeout_seconds(),
+        )
     ]
 
 
@@ -159,7 +189,10 @@ def call_settings() -> dict[str, str]:
     return {
         str(key): str(value)
         for key, value in dict(
-            proxy.GetSettings(dbus_interface=statusd.DBUS_INTERFACE)
+            proxy.GetSettings(
+                dbus_interface=statusd.DBUS_INTERFACE,
+                timeout=dbus_timeout_seconds(),
+            )
         ).items()
     }
 
@@ -174,6 +207,7 @@ def call_set_settings(settings: dict[str, str]) -> dict[str, str]:
             proxy.SetSettings(
                 dbus.Dictionary(settings, signature="ss"),
                 dbus_interface=statusd.DBUS_INTERFACE,
+                timeout=dbus_timeout_seconds(),
             )
         ).items()
     }
@@ -199,6 +233,10 @@ def _statusd_proxy():
     return bus.get_object(statusd.DBUS_BUS_NAME, statusd.DBUS_OBJECT_PATH)
 
 
+def dbus_timeout_seconds() -> float:
+    return config.load_dbus_timeout_seconds()
+
+
 def make_service_class():
     import dbus
     import dbus.service
@@ -221,6 +259,18 @@ def make_service_class():
         def Seen(self, paths):
             worktree_ids = self.core.seen([str(path) for path in paths])
             return worktree_ids
+
+        @dbus.service.method(
+            statusd.DBUS_INTERFACE,
+            in_signature="as",
+            out_signature="aa{ss}",
+        )
+        def QueryStatus(self, paths):
+            records = self.core.query_status([str(path) for path in paths])
+            return [
+                dbus.Dictionary(record, signature="ss")
+                for record in records
+            ]
 
         @dbus.service.method(
             statusd.DBUS_INTERFACE,

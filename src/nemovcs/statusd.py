@@ -390,6 +390,10 @@ class StatusDaemonCore:
             records.append(self.status_record(path))
         return records
 
+    def query_status(self, paths: list[str | Path]) -> list[dict[str, str]]:
+        self.seen(paths)
+        return self.get_status(paths)
+
     def cache_records(self) -> list[dict[str, str]]:
         return [cache_record(entry) for entry in self.cache.entries()]
 

@@ -27,7 +27,7 @@ ICON_SIZE = 20
 RESOURCE_ROOT = Path(__file__).resolve().parents[3] / "rsc" / "icons" / "nemovcs"
 STATUS_ICON_NAMES = {
     "conflicted": "emblem-nemovcs-conflicted-small.svg",
-    "error": "emblem-nemovcs-conflicted-small.svg",
+    "error": "emblem-nemovcs-problems-small.svg",
     "loading": "emblem-nemovcs-normal-small.svg",
     "modified": "emblem-nemovcs-modified-small.svg",
     "ok": "emblem-nemovcs-normal-small.svg",

@@ -49,6 +49,8 @@ EMBLEM_ICONS = {
     "emblem-nemovcs-conflicted.svg",
     "emblem-nemovcs-modified.svg",
     "emblem-nemovcs-normal.svg",
+    "emblem-nemovcs-problems.svg",
+    "emblem-nemovcs-unversioned.svg",
 }
 
 

@@ -330,6 +330,38 @@ class StatusDaemonSchedulerTest(unittest.TestCase):
         self.assertEqual(entry.statuses["file.txt"], statusd.EmblemStatus.MODIFIED)
         self.assertEqual(changed, [(first.cache_key, [str(first.root)])])
 
+    def test_async_query_status_starts_scan_and_returns_loading(self):
+        scheduler = FakeScanScheduler()
+        first = identity("one")
+        cache = statusd.WorktreeCache()
+
+        def scan(_entry: statusd.WorktreeEntry) -> None:
+            _entry.scanned = True
+            _entry.statuses["file.txt"] = statusd.EmblemStatus.MODIFIED
+
+        core = statusd.StatusDaemonCore(
+            cache,
+            scan_scheduler=scheduler,
+            scan_func=scan,
+        )
+
+        with mock.patch("nemovcs.statusd.identify_worktree", return_value=first):
+            records = core.query_status([first.root / "file.txt"])
+
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0]["status"], statusd.EmblemStatus.LOADING)
+        entry = cache.entry_by_key(first.cache_key)
+        assert entry is not None
+        self.assertTrue(entry.scan_in_flight)
+        self.assertEqual(len(scheduler.pending), 1)
+
+        scheduler.run_next()
+
+        self.assertEqual(
+            core.get_status([first.root / "file.txt"])[0]["status"],
+            statusd.EmblemStatus.MODIFIED,
+        )
+
     def test_seen_during_initial_scan_does_not_request_rescan(self):
         scheduler = FakeScanScheduler()
         first = identity("one")

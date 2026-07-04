@@ -85,6 +85,28 @@ class NemoVCSInfoProviderCoreTest(unittest.TestCase):
         )
         self.assertIn("/tmp/repo/tracked.txt", core.visible_items)
 
+    def test_update_item_uses_single_query_status_call(self):
+        query_calls = []
+
+        def query_status(paths):
+            query_calls.append(list(paths))
+            return [
+                {
+                    "path": "/tmp/repo/tracked.txt",
+                    "worktree_id": "git:/tmp/repo",
+                    "status": "modified",
+                }
+            ]
+
+        core = nemo_plugin.NemoVCSInfoProviderCore(query_status=query_status)
+        item = FakeItem("/tmp/repo/tracked.txt")
+
+        record = core.update_item(item)
+
+        self.assertEqual(record["status"], "modified")
+        self.assertEqual(query_calls, [["/tmp/repo/tracked.txt"]])
+        self.assertEqual(item.emblems, ["nemovcs-modified"])
+
     def test_update_item_reuses_client_cache(self):
         seen_calls = []
         get_status_calls = []
@@ -161,10 +183,10 @@ class NemoVCSInfoProviderCoreTest(unittest.TestCase):
             "nemovcs-unversioned",
         )
         self.assertEqual(nemo_plugin.primary_emblem("ok"), "nemovcs-normal")
+        self.assertEqual(nemo_plugin.primary_emblem("error"), "nemovcs-problems")
         self.assertIsNone(nemo_plugin.primary_emblem("ignored"))
         self.assertIsNone(nemo_plugin.primary_emblem("loading"))
         self.assertIsNone(nemo_plugin.primary_emblem("stale"))
-        self.assertIsNone(nemo_plugin.primary_emblem("error"))
 
     def test_path_from_uri_accepts_file_uri(self):
         self.assertEqual(
@@ -286,6 +308,22 @@ class NemoVCSInfoProviderCoreTest(unittest.TestCase):
             "- repo",
         )
 
+    def test_location_widget_details_include_problem_text(self):
+        spec = nemo_plugin.LocationWidgetSpec(
+            backend="git",
+            backend_label="Git",
+            head="unknown",
+            status="error",
+            status_label="problem",
+            root="/tmp/repo",
+            root_label="repo",
+            icon="nemovcs-git",
+            error="daemon timeout",
+        )
+
+        self.assertIn(("Problem", "daemon timeout"), nemo_plugin.location_widget_details(spec))
+        self.assertIn("Problem: daemon timeout", nemo_plugin.location_widget_tooltip(spec))
+
     def test_location_widget_spec_reads_remote_from_record(self):
         core = nemo_plugin.NemoVCSInfoProviderCore(
             seen=lambda paths: ["git:/tmp/repo"],
@@ -332,6 +370,82 @@ class NemoVCSInfoProviderCoreTest(unittest.TestCase):
 
         self.assertIsNone(core.update_path("/tmp/repo/tracked.txt"))
         self.assertEqual(core.last_error, "no daemon")
+
+    def test_daemon_error_on_local_worktree_returns_problem_record(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "repo"
+            root.mkdir()
+            (root / ".git").mkdir()
+            (root / ".git" / "HEAD").write_text("ref: refs/heads/main\n", encoding="utf-8")
+            path = root / "tracked.txt"
+            path.write_text("content\n", encoding="utf-8")
+
+            def seen(_paths):
+                raise RuntimeError("no daemon")
+
+            core = nemo_plugin.NemoVCSInfoProviderCore(seen=seen, get_status=lambda _: [])
+            item = FakeItem(path)
+
+            record = core.update_item(item)
+
+            assert record is not None
+            self.assertEqual(record["status"], "error")
+            self.assertEqual(record["backend"], "git")
+            self.assertEqual(record["root"], str(root))
+            self.assertEqual(item.emblems, ["nemovcs-problems"])
+
+    def test_non_worktree_daemon_error_does_not_show_problem_emblem(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "plain.txt"
+            path.write_text("content\n", encoding="utf-8")
+
+            def seen(_paths):
+                raise RuntimeError("no daemon")
+
+            core = nemo_plugin.NemoVCSInfoProviderCore(seen=seen, get_status=lambda _: [])
+            item = FakeItem(path)
+
+            self.assertIsNone(core.update_item(item))
+            self.assertEqual(item.emblems, [])
+
+    def test_malformed_status_response_on_local_worktree_returns_problem_record(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "repo"
+            root.mkdir()
+            (root / ".svn").mkdir()
+            (root / ".svn" / "wc.db").write_text("", encoding="utf-8")
+            path = root / "tracked.txt"
+            path.write_text("content\n", encoding="utf-8")
+
+            core = nemo_plugin.NemoVCSInfoProviderCore(
+                seen=lambda paths: [f"svn:{root}"],
+                get_status=lambda paths: [{"path": str(path), "status": "surprise"}],
+            )
+
+            record = core.update_path(path)
+
+            assert record is not None
+            self.assertEqual(record["status"], "error")
+            self.assertEqual(record["backend"], "svn")
+            self.assertIn("unknown status", record["error"])
+
+    def test_non_worktree_error_record_does_not_apply_problem_emblem(self):
+        core = nemo_plugin.NemoVCSInfoProviderCore()
+        item = FakeItem("/tmp/plain.txt")
+
+        core.apply_emblem(
+            item,
+            {
+                "path": "/tmp/plain.txt",
+                "backend": "",
+                "root": "",
+                "worktree_id": "",
+                "status": "error",
+                "error": "not inside a versioned working tree",
+            },
+        )
+
+        self.assertEqual(item.emblems, [])
 
     def test_update_path_retries_once_after_daemon_error(self):
         seen_calls = []

@@ -14,6 +14,8 @@ SETTINGS_FILE_NAME = "settings.json"
 DEFAULT_MAX_WORKTREES = 12
 DEFAULT_DEBOUNCE_SECONDS = 0.75
 DEFAULT_SCAN_TTL_SECONDS = 15.0
+DEFAULT_DBUS_TIMEOUT_SECONDS = 1.0
+DBUS_TIMEOUT_KEY = "dbus_timeout_seconds"
 
 
 @dataclass(frozen=True)
@@ -91,17 +93,54 @@ def load_statusd_settings(path: Path | None = None) -> StatusdSettings:
         return StatusdSettings()
 
 
+def load_dbus_timeout_seconds(path: Path | None = None) -> float:
+    target = settings_path(path)
+    try:
+        data = json.loads(target.read_text(encoding="utf-8"))
+    except (FileNotFoundError, OSError, json.JSONDecodeError):
+        return DEFAULT_DBUS_TIMEOUT_SECONDS
+
+    if not isinstance(data, dict):
+        return DEFAULT_DBUS_TIMEOUT_SECONDS
+
+    try:
+        timeout = parse_float(
+            data.get(DBUS_TIMEOUT_KEY, DEFAULT_DBUS_TIMEOUT_SECONDS),
+            "DBus timeout",
+        )
+    except ValueError:
+        return DEFAULT_DBUS_TIMEOUT_SECONDS
+
+    if timeout <= 0:
+        return DEFAULT_DBUS_TIMEOUT_SECONDS
+    return timeout
+
+
 def save_statusd_settings(
     settings: StatusdSettings,
     path: Path | None = None,
 ) -> Path:
     target = settings_path(path)
     target.parent.mkdir(parents=True, exist_ok=True)
+    data = existing_settings_mapping(target)
+    data.update(settings.to_mapping())
+    if DBUS_TIMEOUT_KEY not in data:
+        data[DBUS_TIMEOUT_KEY] = f"{DEFAULT_DBUS_TIMEOUT_SECONDS:g}"
     target.write_text(
-        json.dumps(settings.to_mapping(), indent=2, sort_keys=True) + "\n",
+        json.dumps(data, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
     return target
+
+
+def existing_settings_mapping(path: Path) -> dict[str, str]:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (FileNotFoundError, OSError, json.JSONDecodeError):
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    return {str(key): str(value) for key, value in data.items()}
 
 
 def parse_int(value: object, label: str) -> int:

@@ -7,7 +7,7 @@ EMBLEM_DIR = Path(__file__).resolve().parents[1] / "rsc" / "icons" / "nemovcs" /
 
 class IconResourcesTest(unittest.TestCase):
     def test_live_emblems_are_cropped_for_larger_nemo_overlay(self):
-        for status in ("normal", "modified", "conflicted"):
+        for status in ("normal", "modified", "conflicted", "problems"):
             with self.subTest(status=status):
                 path = EMBLEM_DIR / f"emblem-nemovcs-{status}.svg"
 
@@ -20,6 +20,7 @@ class IconResourcesTest(unittest.TestCase):
             "conflicted",
             "added",
             "deleted",
+            "problems",
             "unversioned",
         ):
             with self.subTest(status=status):
