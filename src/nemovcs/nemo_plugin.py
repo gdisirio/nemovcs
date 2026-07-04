@@ -23,6 +23,8 @@ from . import status_client
 
 DEFAULT_MAX_VISIBLE_ITEMS = 2048
 LOCATION_BAR_MAX_CHARS = 32
+LOCATION_WIDGET_REFRESH_RETRY_MS = 250
+LOCATION_WIDGET_MAX_REFRESH_RETRIES = 12
 
 PRIMARY_EMBLEMS = {
     "conflicted": "nemovcs-conflicted",
@@ -101,6 +103,17 @@ class LocationWidgetSpec:
     icon: str
     remote: str = ""
     error: str = ""
+    worktree_id: str = ""
+
+
+@dataclass
+class LocationWidgetHandle:
+    path: str
+    worktree_id: str
+    outer: object
+    source: object
+    details: object
+    refresh_attempts: int = 0
 
 
 class NemoVCSInfoProviderCore:
@@ -158,8 +171,13 @@ class NemoVCSInfoProviderCore:
         )
         return record
 
-    def update_path(self, path: str | Path) -> dict[str, str] | None:
-        cached = self.cache.get(path)
+    def update_path(
+        self,
+        path: str | Path,
+        *,
+        use_cache: bool = True,
+    ) -> dict[str, str] | None:
+        cached = self.cache.get(path) if use_cache else None
         if cached is not None:
             self.log(
                 "status-cache-hit",
@@ -382,8 +400,13 @@ class NemoVCSInfoProviderCore:
                 return False
         return True
 
-    def location_widget_spec(self, path: str | Path) -> LocationWidgetSpec | None:
-        record = self.update_path(path)
+    def location_widget_spec(
+        self,
+        path: str | Path,
+        *,
+        use_cache: bool = True,
+    ) -> LocationWidgetSpec | None:
+        record = self.update_path(path, use_cache=use_cache)
         if record is None:
             return None
 
@@ -397,6 +420,7 @@ class NemoVCSInfoProviderCore:
         return LocationWidgetSpec(
             backend=backend,
             backend_label=BACKEND_LABELS.get(backend, backend.upper()),
+            worktree_id=str(record.get("worktree_id", "")),
             head=head,
             status=status,
             status_label=STATUS_LABELS.get(status, status or "unknown"),
@@ -432,6 +456,7 @@ class NemoVCSInfoProviderMixin:
         self.nemovcs_core = NemoVCSInfoProviderCore()
         self.nemovcs_signal_subscription = None
         self.nemovcs_location_details_expanded = False
+        self.nemovcs_location_widgets: list[LocationWidgetHandle] = []
         self.subscribe_status_changed()
         self.nemovcs_core.log("provider-init")
 
@@ -457,7 +482,7 @@ class NemoVCSInfoProviderMixin:
         spec = self.nemovcs_core.location_widget_spec(path)
         if spec is None:
             return None
-        return self.nemovcs_location_widget(spec)
+        return self.nemovcs_location_widget(path, spec)
 
     def nemovcs_menu_items(self, paths: Sequence[str]) -> list[object]:
         top_level_specs = self.nemovcs_core.top_level_specs(paths)
@@ -518,7 +543,7 @@ class NemoVCSInfoProviderMixin:
                 item.set_property("sensitive", False)
         return item
 
-    def nemovcs_location_widget(self, spec: LocationWidgetSpec):
+    def nemovcs_location_widget(self, path: str, spec: LocationWidgetSpec):
         from gi.repository import Gtk, Pango
 
         outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
@@ -567,43 +592,58 @@ class NemoVCSInfoProviderMixin:
             "toggled",
             self.on_location_details_toggled,
             details,
-            source,
-            spec,
         )
         box.pack_start(toggle, False, False, 0)
 
         separator = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
         outer.pack_start(separator, False, False, 0)
 
+        self.track_location_widget(path, spec, outer, source, details)
+
         outer.show_all()
         if not expanded:
             details.hide()
         return outer
 
+    def track_location_widget(
+        self,
+        path: str,
+        spec: LocationWidgetSpec,
+        outer,
+        source,
+        details,
+    ) -> LocationWidgetHandle:
+        handle = LocationWidgetHandle(
+            path=status_client.normalize_path(path),
+            worktree_id=spec.worktree_id,
+            outer=outer,
+            source=source,
+            details=details,
+        )
+        self.nemovcs_location_widgets.append(handle)
+        connect = getattr(outer, "connect", None)
+        if connect is not None:
+            connect("destroy", self.on_location_widget_destroy, handle)
+        if spec.status == "loading":
+            self.schedule_location_widget_retry(handle)
+        return handle
+
+    def on_location_widget_destroy(self, _widget, handle: LocationWidgetHandle) -> None:
+        self.nemovcs_location_widgets = [
+            item for item in self.nemovcs_location_widgets if item is not handle
+        ]
+
     def nemovcs_location_details_widget(self, Gtk, spec: LocationWidgetSpec):
         grid = Gtk.Grid(column_spacing=10, row_spacing=2)
         grid.set_margin_start(24)
 
-        for row, (label_text, value_text) in enumerate(location_widget_details(spec)):
-            label = Gtk.Label()
-            label.set_markup(f"<b>{escape(label_text)}</b>")
-            label.set_xalign(0)
-            grid.attach(label, 0, row, 1, 1)
-
-            value = Gtk.Label(label=value_text)
-            value.set_xalign(0)
-            value.set_selectable(True)
-            value.set_line_wrap(True)
-            grid.attach(value, 1, row, 1, 1)
-
+        populate_location_details_widget(Gtk, grid, spec)
         return grid
 
     def on_location_details_toggled(
         self,
         button,
         details,
-        source,
-        spec,
     ) -> None:
         from gi.repository import Gtk
 
@@ -612,8 +652,6 @@ class NemoVCSInfoProviderMixin:
             button.get_active(),
             button,
             details,
-            source,
-            spec,
             lambda icon: Gtk.Image.new_from_icon_name(icon, Gtk.IconSize.MENU),
         )
 
@@ -632,12 +670,96 @@ class NemoVCSInfoProviderMixin:
     def subscribe_status_changed(self) -> bool:
         try:
             self.nemovcs_signal_subscription = subscribe_daemon_status_changed(
-                self.nemovcs_core.on_status_changed
+                self.on_daemon_status_changed
             )
         except Exception as exc:
             self.nemovcs_core.last_error = str(exc)
             return False
         return True
+
+    def on_daemon_status_changed(self, worktree_id, changed_paths) -> list[str]:
+        changed = [str(path) for path in changed_paths]
+        invalidated = self.nemovcs_core.on_status_changed(str(worktree_id), changed)
+        self.schedule_location_widget_refresh(str(worktree_id), changed)
+        return invalidated
+
+    def schedule_location_widget_refresh(
+        self,
+        worktree_id: str,
+        changed_paths: Sequence[str],
+    ) -> None:
+        try:
+            from gi.repository import GLib
+        except Exception:
+            self.refresh_location_widgets(worktree_id, changed_paths)
+            return
+
+        def refresh():
+            self.refresh_location_widgets(worktree_id, changed_paths)
+            return False
+
+        GLib.idle_add(refresh)
+
+    def refresh_location_widgets(
+        self,
+        worktree_id: str,
+        changed_paths: Sequence[str],
+    ) -> None:
+        for handle in list(self.nemovcs_location_widgets):
+            if not location_widget_handle_affected(handle, worktree_id, changed_paths):
+                continue
+            self.refresh_location_widget_handle(handle)
+
+    def schedule_location_widget_retry(self, handle: LocationWidgetHandle) -> None:
+        if handle.refresh_attempts >= LOCATION_WIDGET_MAX_REFRESH_RETRIES:
+            return
+        handle.refresh_attempts += 1
+        try:
+            from gi.repository import GLib
+        except Exception:
+            self.refresh_location_widget_retry(handle)
+            return
+
+        def refresh():
+            self.refresh_location_widget_retry(handle)
+            return False
+
+        GLib.timeout_add(LOCATION_WIDGET_REFRESH_RETRY_MS, refresh)
+
+    def refresh_location_widget_retry(self, handle: LocationWidgetHandle) -> None:
+        if handle not in self.nemovcs_location_widgets:
+            return
+        spec = self.refresh_location_widget_handle(handle)
+        if spec is not None and spec.status == "loading":
+            self.schedule_location_widget_retry(handle)
+
+    def refresh_location_widget_handle(
+        self,
+        handle: LocationWidgetHandle,
+    ) -> LocationWidgetSpec | None:
+        spec = self.nemovcs_core.location_widget_spec(handle.path, use_cache=False)
+        if spec is None:
+            return None
+        self.apply_location_widget_spec(handle, spec)
+        return spec
+
+    def apply_location_widget_spec(
+        self,
+        handle: LocationWidgetHandle,
+        spec: LocationWidgetSpec,
+    ) -> None:
+        from gi.repository import Gtk
+
+        handle.worktree_id = spec.worktree_id
+        if spec.status != "loading":
+            handle.refresh_attempts = 0
+        handle.source.set_text(location_widget_summary_label(spec))
+        handle.outer.set_tooltip_text(location_widget_tooltip(spec))
+        clear_container(handle.details)
+        populate_location_details_widget(Gtk, handle.details, spec)
+        if self.nemovcs_location_details_expanded:
+            handle.details.show_all()
+        handle.details.queue_resize()
 
 
 def default_seen(paths):
@@ -680,6 +802,29 @@ def location_widget_details(spec: LocationWidgetSpec) -> list[tuple[str, str]]:
     return details
 
 
+def populate_location_details_widget(Gtk, grid, spec: LocationWidgetSpec) -> None:
+    for row, (label_text, value_text) in enumerate(location_widget_details(spec)):
+        label = Gtk.Label()
+        label.set_markup(f"<b>{escape(label_text)}</b>")
+        label.set_xalign(0)
+        grid.attach(label, 0, row, 1, 1)
+
+        value = Gtk.Label(label=value_text)
+        value.set_xalign(0)
+        value.set_selectable(True)
+        value.set_line_wrap(True)
+        grid.attach(value, 1, row, 1, 1)
+
+
+def clear_container(container) -> None:
+    get_children = getattr(container, "get_children", None)
+    remove = getattr(container, "remove", None)
+    if get_children is None or remove is None:
+        return
+    for child in list(get_children()):
+        remove(child)
+
+
 def location_widget_tooltip(spec: LocationWidgetSpec) -> str:
     return "\n".join(
         f"{label}: {value}" for label, value in location_widget_details(spec)
@@ -688,7 +833,7 @@ def location_widget_tooltip(spec: LocationWidgetSpec) -> str:
 
 def location_widget_summary_label(spec: LocationWidgetSpec) -> str:
     source = location_widget_source(spec)
-    if spec.head and spec.head != "unknown":
+    if spec.backend == "git" and spec.head and spec.head != "unknown":
         return f"{source} ({spec.head})"
     return source
 
@@ -706,13 +851,24 @@ def location_widget_identity_label(spec: LocationWidgetSpec) -> str:
     return "Head"
 
 
+def location_widget_handle_affected(
+    handle: LocationWidgetHandle,
+    worktree_id: str,
+    changed_paths: Sequence[str],
+) -> bool:
+    if handle.worktree_id != str(worktree_id):
+        return False
+    return not changed_paths or any(
+        status_client.paths_overlap(handle.path, changed_path)
+        for changed_path in changed_paths
+    )
+
+
 def set_location_details_expanded(
     provider,
     expanded: bool,
     button,
     details,
-    source,
-    spec: LocationWidgetSpec,
     image_factory,
 ) -> None:
     provider.nemovcs_location_details_expanded = expanded
@@ -720,8 +876,6 @@ def set_location_details_expanded(
         details.show_all()
     else:
         details.hide()
-    source.set_text(location_widget_summary_label(spec))
-    source.set_max_width_chars(80)
     details.get_parent().queue_resize()
     button.set_tooltip_text(
         "Hide repository details" if expanded else "Show repository details"

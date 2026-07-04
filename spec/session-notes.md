@@ -105,14 +105,24 @@ sessions. Update this file before pushing changes.
 - The repository context bar now supports a compact/expanded toggle and uses a
   thin bottom separator to keep it visually distinct from Nemo's file list
   headers.
-- Repository context bar top line is unified for collapsed and expanded modes:
-  icon, backend, remote/source, and branch/head in parentheses when known.
-  `git.remote_url()` uses the current branch upstream remote URL when
-  available, otherwise `origin`, otherwise None so the view falls back to the
-  worktree path after scanning. SVN scans now populate `remote_url` from
-  `svn info --show-item url`. While a first async scan is still `loading` and
-  no remote is known yet, the top line shows `loading source...` instead of
-  briefly showing the local worktree as if it were the final source.
+- Repository context bar top line is unified for collapsed and expanded modes.
+  Git shows icon, backend, remote/source, and branch/head in parentheses. SVN
+  shows icon, backend, and remote/source without a head suffix because the
+  branch path is usually encoded in the URL. `git.remote_url()` uses the current
+  branch upstream remote URL when available, otherwise `origin`, otherwise None
+  so the view falls back to the worktree path after scanning. SVN scans now
+  populate `remote_url` from `svn info --show-item url`. While a first async
+  scan is still `loading` and no remote is known yet, the top line shows
+  `loading source...` instead of briefly showing the local worktree as if it
+  were the final source.
+- The context bar now updates the active GTK widget when statusd emits
+  `StatusChanged`; it tracks location widget handles, recomputes the spec, and
+  updates source text, tooltip, and detail rows. It also has a bounded loading
+  retry that bypasses the client cache to cover the race where the initial scan
+  signal arrives before the widget handle is registered. Expand/collapse no
+  longer rewrites source text, preventing stale creation-time `loading` specs
+  from overwriting a refreshed remote URL. Live testing showed the bar now
+  refreshes without changing directories.
 - Future context bar action refinement: allow selected/pinnable context-menu
   actions to appear as icon-only buttons on the right side of the compact bar,
   before the expand button. Keep the first-line repository summary short and
@@ -205,10 +215,10 @@ sessions. Update this file before pushing changes.
 - Continue stress testing repeated enter/leave navigation in versioned
   directories. The first-visit hang fix passed one live check, but more manual
   testing on real Git and SVN trees is still useful.
-- Next context bar experiment: update the active GTK location widget on
-  `StatusChanged` instead of waiting for directory switches. Store weak/current
-  widget references, recompute `location_widget_spec(path)` after statusd
-  signals, and update the top-line source/details via the GTK main loop.
+- Continue watching the context bar live refresh path. Current implementation
+  tracks location widget handles and removes them on widget destroy; if Nemo
+  creates many transient widgets, consider switching the handle list to weak
+  references or adding additional pruning.
 - Keep an eye on DBus timeout behavior. The current policy intentionally shows
   the problem emblem for unexpected DBus/protocol failures instead of falling
   back to cached status, because cached fallback could hide real integration

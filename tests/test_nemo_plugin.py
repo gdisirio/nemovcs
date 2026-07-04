@@ -59,6 +59,7 @@ class FakeWidget:
         self.max_width_chars = None
         self.parent = None
         self.resized = False
+        self.connections = []
 
     def show_all(self):
         self.visible = True
@@ -80,6 +81,18 @@ class FakeWidget:
 
     def queue_resize(self):
         self.resized = True
+
+    def connect(self, signal, callback, *args):
+        self.connections.append((signal, callback, args))
+
+
+class FakeCore:
+    def __init__(self):
+        self.changed_calls = []
+
+    def on_status_changed(self, worktree_id, changed_paths):
+        self.changed_calls.append((worktree_id, list(changed_paths)))
+        return ["invalidated"]
 
 
 class NemoVCSInfoProviderCoreTest(unittest.TestCase):
@@ -183,6 +196,47 @@ class NemoVCSInfoProviderCoreTest(unittest.TestCase):
         self.assertEqual(second["status"], "modified")
         self.assertEqual(seen_calls, [["/tmp/repo/tracked.txt"]])
         self.assertEqual(get_status_calls, [["/tmp/repo/tracked.txt"]])
+
+    def test_location_widget_spec_can_bypass_cached_loading_record(self):
+        records = [
+            {
+                "path": "/tmp/repo",
+                "backend": "git",
+                "worktree_id": "git:/tmp/repo",
+                "root": "/tmp/repo",
+                "head": "main",
+                "status": "loading",
+            },
+            {
+                "path": "/tmp/repo",
+                "backend": "git",
+                "worktree_id": "git:/tmp/repo",
+                "root": "/tmp/repo",
+                "head": "main",
+                "remote": "git@example.com:me/repo.git",
+                "status": "ok",
+            },
+        ]
+        calls = []
+
+        def query_status(paths):
+            calls.append(list(paths))
+            return [records[min(len(calls) - 1, 1)]]
+
+        core = nemo_plugin.NemoVCSInfoProviderCore(query_status=query_status)
+
+        first = core.location_widget_spec("/tmp/repo")
+        second = core.location_widget_spec("/tmp/repo")
+        refreshed = core.location_widget_spec("/tmp/repo", use_cache=False)
+
+        assert first is not None
+        assert second is not None
+        assert refreshed is not None
+        self.assertEqual(first.status, "loading")
+        self.assertEqual(second.status, "loading")
+        self.assertEqual(refreshed.status, "ok")
+        self.assertEqual(refreshed.remote, "git@example.com:me/repo.git")
+        self.assertEqual(calls, [["/tmp/repo"], ["/tmp/repo"]])
 
     def test_conflicted_status_adds_conflict_emblem(self):
         core = nemo_plugin.NemoVCSInfoProviderCore(
@@ -300,7 +354,7 @@ class NemoVCSInfoProviderCoreTest(unittest.TestCase):
             "Worktree: /tmp/repo\nStatus: modified\nBranch: main",
         )
 
-    def test_location_widget_summary_label_uses_source_and_head(self):
+    def test_location_widget_summary_label_uses_git_source_and_head(self):
         spec = nemo_plugin.LocationWidgetSpec(
             backend="git",
             backend_label="Git",
@@ -360,6 +414,24 @@ class NemoVCSInfoProviderCoreTest(unittest.TestCase):
             "loading source... (main)",
         )
 
+    def test_location_widget_summary_label_omits_svn_head(self):
+        spec = nemo_plugin.LocationWidgetSpec(
+            backend="svn",
+            backend_label="SVN",
+            head="https://svn.example.com/project/trunk @ r42",
+            status="ok",
+            status_label="clean",
+            root="/tmp/wc",
+            root_label="wc",
+            icon="nemovcs-svn",
+            remote="https://svn.example.com/project/trunk",
+        )
+
+        self.assertEqual(
+            nemo_plugin.location_widget_summary_label(spec),
+            "https://svn.example.com/project/trunk",
+        )
+
     def test_location_widget_details_include_problem_text(self):
         spec = nemo_plugin.LocationWidgetSpec(
             backend="git",
@@ -382,32 +454,17 @@ class NemoVCSInfoProviderCoreTest(unittest.TestCase):
         parent = FakeWidget()
         details = FakeWidget()
         details.parent = parent
-        source = FakeWidget()
-        spec = nemo_plugin.LocationWidgetSpec(
-            backend="git",
-            backend_label="Git",
-            head="main",
-            status="modified",
-            status_label="modified",
-            root="/tmp/repo",
-            root_label="repo",
-            icon="nemovcs-git",
-        )
 
         nemo_plugin.set_location_details_expanded(
             provider,
             True,
             FakeToggle(True),
             details,
-            source,
-            spec,
             lambda icon: icon,
         )
 
         self.assertTrue(provider.nemovcs_location_details_expanded)
         self.assertTrue(details.visible)
-        self.assertEqual(source.text, "/tmp/repo (main)")
-        self.assertEqual(source.max_width_chars, 80)
         self.assertTrue(parent.resized)
 
         nemo_plugin.set_location_details_expanded(
@@ -415,15 +472,102 @@ class NemoVCSInfoProviderCoreTest(unittest.TestCase):
             False,
             FakeToggle(False),
             details,
-            source,
-            spec,
             lambda icon: icon,
         )
 
         self.assertFalse(provider.nemovcs_location_details_expanded)
         self.assertFalse(details.visible)
-        self.assertEqual(source.text, "/tmp/repo (main)")
-        self.assertEqual(source.max_width_chars, 80)
+
+    def test_location_widget_handle_matches_worktree_and_changed_path(self):
+        handle = nemo_plugin.LocationWidgetHandle(
+            path="/tmp/repo/src",
+            worktree_id="git:/tmp/repo",
+            outer=object(),
+            source=object(),
+            details=object(),
+        )
+
+        self.assertTrue(
+            nemo_plugin.location_widget_handle_affected(
+                handle,
+                "git:/tmp/repo",
+                ["/tmp/repo"],
+            )
+        )
+        self.assertTrue(
+            nemo_plugin.location_widget_handle_affected(
+                handle,
+                "git:/tmp/repo",
+                ["/tmp/repo/src/file.txt"],
+            )
+        )
+        self.assertFalse(
+            nemo_plugin.location_widget_handle_affected(
+                handle,
+                "svn:/tmp/repo",
+                ["/tmp/repo"],
+            )
+        )
+        self.assertFalse(
+            nemo_plugin.location_widget_handle_affected(
+                handle,
+                "git:/tmp/repo",
+                ["/tmp/other"],
+            )
+        )
+
+    def test_tracking_loading_location_widget_schedules_retry(self):
+        provider = object.__new__(nemo_plugin.NemoVCSInfoProviderMixin)
+        provider.nemovcs_location_widgets = []
+        scheduled = []
+        provider.schedule_location_widget_retry = lambda handle: scheduled.append(handle)
+        outer = FakeWidget()
+        source = FakeWidget()
+        details = FakeWidget()
+        spec = nemo_plugin.LocationWidgetSpec(
+            backend="git",
+            backend_label="Git",
+            head="main",
+            status="loading",
+            status_label="loading",
+            root="/tmp/repo",
+            root_label="repo",
+            icon="nemovcs-git",
+            worktree_id="git:/tmp/repo",
+        )
+
+        handle = nemo_plugin.NemoVCSInfoProviderMixin.track_location_widget(
+            provider,
+            "/tmp/repo",
+            spec,
+            outer,
+            source,
+            details,
+        )
+
+        self.assertEqual(scheduled, [handle])
+        self.assertEqual(provider.nemovcs_location_widgets, [handle])
+        self.assertEqual(outer.connections[0][0], "destroy")
+
+    def test_status_changed_wrapper_invalidates_and_schedules_location_refresh(self):
+        provider = object.__new__(nemo_plugin.NemoVCSInfoProviderMixin)
+        provider.nemovcs_core = FakeCore()
+        scheduled = []
+
+        def schedule(worktree_id, changed_paths):
+            scheduled.append((worktree_id, list(changed_paths)))
+
+        provider.schedule_location_widget_refresh = schedule
+
+        invalidated = nemo_plugin.NemoVCSInfoProviderMixin.on_daemon_status_changed(
+            provider,
+            "git:/tmp/repo",
+            ["/tmp/repo"],
+        )
+
+        self.assertEqual(invalidated, ["invalidated"])
+        self.assertEqual(provider.nemovcs_core.changed_calls, [("git:/tmp/repo", ["/tmp/repo"])])
+        self.assertEqual(scheduled, [("git:/tmp/repo", ["/tmp/repo"])])
 
     def test_location_widget_spec_reads_remote_from_record(self):
         core = nemo_plugin.NemoVCSInfoProviderCore(
@@ -693,7 +837,7 @@ class NemoVCSInfoProviderCoreTest(unittest.TestCase):
             provider = nemo_plugin.NemoVCSInfoProviderMixin()
 
         self.assertEqual(provider.nemovcs_signal_subscription, "handle")
-        subscribe.assert_called_once_with(provider.nemovcs_core.on_status_changed)
+        subscribe.assert_called_once_with(provider.on_daemon_status_changed)
 
     def test_mixin_records_subscription_failure(self):
         with mock.patch(
