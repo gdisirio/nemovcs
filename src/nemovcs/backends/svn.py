@@ -193,6 +193,7 @@ class SvnBackend:
             )
 
         items = self.parse_status(root, result.stdout)
+        remote_url = self.remote_url(root)
         return BackendStatusScan(
             ok=True,
             items=tuple(
@@ -204,6 +205,7 @@ class SvnBackend:
                 )
                 for item in items
             ),
+            remote_url=remote_url,
         )
 
     def scan_log(
@@ -247,6 +249,10 @@ class SvnBackend:
         if revision_text:
             return f"r{revision_text}"
         return "unknown"
+
+    def remote_url(self, root: str | Path) -> str:
+        result = self.run(root, ["info", "--show-item", "url"])
+        return result.stdout.strip() if result.ok else ""
 
     def stage_phases(
         self,

@@ -431,6 +431,7 @@ class NemoVCSInfoProviderMixin:
     def __init__(self):
         self.nemovcs_core = NemoVCSInfoProviderCore()
         self.nemovcs_signal_subscription = None
+        self.nemovcs_location_details_expanded = False
         self.subscribe_status_changed()
         self.nemovcs_core.log("provider-init")
 
@@ -537,41 +538,36 @@ class NemoVCSInfoProviderMixin:
         backend.set_xalign(0)
         box.pack_start(backend, False, False, 0)
 
-        head = Gtk.Label(label=compact_text(spec.head))
-        head.set_ellipsize(Pango.EllipsizeMode.END)
-        head.set_max_width_chars(LOCATION_BAR_MAX_CHARS)
-        head.set_xalign(0)
-        head.set_selectable(True)
-        box.pack_start(head, False, False, 0)
+        expanded = self.nemovcs_location_details_expanded
 
-        status = Gtk.Label(label=f"- {spec.status_label}")
-        status.set_xalign(0)
-        box.pack_start(status, False, False, 0)
-
-        root = Gtk.Label(label=location_widget_root_label(spec, expanded=False))
-        root.set_ellipsize(Pango.EllipsizeMode.END)
-        root.set_max_width_chars(LOCATION_BAR_MAX_CHARS)
-        root.set_hexpand(True)
-        root.set_xalign(0)
-        root.set_selectable(True)
-        box.pack_start(root, True, True, 0)
+        source = Gtk.Label(label=location_widget_summary_label(spec))
+        source.set_ellipsize(Pango.EllipsizeMode.END)
+        source.set_max_width_chars(80)
+        source.set_hexpand(True)
+        source.set_xalign(0)
+        source.set_selectable(True)
+        box.pack_start(source, True, True, 0)
 
         details = self.nemovcs_location_details_widget(Gtk, spec)
         outer.pack_start(details, False, False, 0)
 
         toggle = Gtk.ToggleButton()
         toggle.set_relief(Gtk.ReliefStyle.NONE)
-        toggle.set_tooltip_text("Show repository details")
+        toggle.set_active(expanded)
+        toggle.set_tooltip_text(
+            "Hide repository details" if expanded else "Show repository details"
+        )
         toggle.set_image(
-            Gtk.Image.new_from_icon_name("pan-down-symbolic", Gtk.IconSize.MENU)
+            Gtk.Image.new_from_icon_name(
+                "pan-up-symbolic" if expanded else "pan-down-symbolic",
+                Gtk.IconSize.MENU,
+            )
         )
         toggle.connect(
             "toggled",
             self.on_location_details_toggled,
             details,
-            head,
-            status,
-            root,
+            source,
             spec,
         )
         box.pack_start(toggle, False, False, 0)
@@ -580,7 +576,8 @@ class NemoVCSInfoProviderMixin:
         outer.pack_start(separator, False, False, 0)
 
         outer.show_all()
-        details.hide()
+        if not expanded:
+            details.hide()
         return outer
 
     def nemovcs_location_details_widget(self, Gtk, spec: LocationWidgetSpec):
@@ -605,32 +602,20 @@ class NemoVCSInfoProviderMixin:
         self,
         button,
         details,
-        head,
-        status,
-        root,
+        source,
         spec,
     ) -> None:
         from gi.repository import Gtk
 
-        expanded = button.get_active()
-        if expanded:
-            details.show_all()
-            head.hide()
-            status.hide()
-            root.set_text(location_widget_root_label(spec, expanded=True))
-            root.set_max_width_chars(80)
-        else:
-            details.hide()
-            head.show()
-            status.show()
-            root.set_text(location_widget_root_label(spec, expanded=False))
-            root.set_max_width_chars(LOCATION_BAR_MAX_CHARS)
-        details.get_parent().queue_resize()
-        button.set_tooltip_text(
-            "Hide repository details" if expanded else "Show repository details"
+        set_location_details_expanded(
+            self,
+            button.get_active(),
+            button,
+            details,
+            source,
+            spec,
+            lambda icon: Gtk.Image.new_from_icon_name(icon, Gtk.IconSize.MENU),
         )
-        icon = "pan-up-symbolic" if expanded else "pan-down-symbolic"
-        button.set_image(Gtk.Image.new_from_icon_name(icon, Gtk.IconSize.MENU))
 
     def on_menu_item_activate(self, _item, command: Sequence[str]) -> None:
         launch_command = menu_launch_command(command)
@@ -684,17 +669,12 @@ def compact_text(text: str, *, max_chars: int = LOCATION_BAR_MAX_CHARS) -> str:
 
 
 def location_widget_details(spec: LocationWidgetSpec) -> list[tuple[str, str]]:
-    details: list[tuple[str, str]] = []
-    if spec.remote:
-        details.append(("Remote", spec.remote))
-    details.append(("Worktree", spec.root))
-    details.extend(
-        [
-            ("Head", spec.head),
-            ("Status", spec.status_label),
-            ("Backend", spec.backend_label),
-        ]
-    )
+    details: list[tuple[str, str]] = [
+        ("Worktree", spec.root),
+        ("Status", spec.status_label),
+    ]
+    if spec.head:
+        details.append((location_widget_identity_label(spec), spec.head))
     if spec.status == "error" and spec.error:
         details.append(("Problem", spec.error))
     return details
@@ -706,14 +686,48 @@ def location_widget_tooltip(spec: LocationWidgetSpec) -> str:
     )
 
 
-def location_widget_root_label(
-    spec: LocationWidgetSpec,
-    *,
+def location_widget_summary_label(spec: LocationWidgetSpec) -> str:
+    source = location_widget_source(spec)
+    if spec.head and spec.head != "unknown":
+        return f"{source} ({spec.head})"
+    return source
+
+
+def location_widget_source(spec: LocationWidgetSpec) -> str:
+    if spec.status == "loading" and not spec.remote:
+        return "loading source..."
+    return spec.remote or spec.root
+
+
+def location_widget_identity_label(spec: LocationWidgetSpec) -> str:
+    if spec.backend == "git" and spec.head not in {"unknown", ""}:
+        if not spec.head.startswith("detached at "):
+            return "Branch"
+    return "Head"
+
+
+def set_location_details_expanded(
+    provider,
     expanded: bool,
-) -> str:
+    button,
+    details,
+    source,
+    spec: LocationWidgetSpec,
+    image_factory,
+) -> None:
+    provider.nemovcs_location_details_expanded = expanded
     if expanded:
-        return spec.remote or spec.root
-    return f"- {compact_text(spec.root_label)}"
+        details.show_all()
+    else:
+        details.hide()
+    source.set_text(location_widget_summary_label(spec))
+    source.set_max_width_chars(80)
+    details.get_parent().queue_resize()
+    button.set_tooltip_text(
+        "Hide repository details" if expanded else "Show repository details"
+    )
+    icon = "pan-up-symbolic" if expanded else "pan-down-symbolic"
+    button.set_image(image_factory(icon))
 
 
 def default_get_status(paths):

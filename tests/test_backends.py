@@ -910,11 +910,20 @@ body paragraph</msg>
 </status>
 """
 
-        with mock.patch.object(
-            backend,
-            "run",
-            return_value=SvnResult(("svn", "status", "--xml"), root, 0, xml, ""),
-        ):
+        def run(_cwd, args, **_kwargs):
+            if args == ["status", "--xml"]:
+                return SvnResult(("svn", "status", "--xml"), root, 0, xml, "")
+            if args == ["info", "--show-item", "url"]:
+                return SvnResult(
+                    ("svn", "info", "--show-item", "url"),
+                    root,
+                    0,
+                    "https://svn.example.com/project/trunk\n",
+                    "",
+                )
+            raise AssertionError(args)
+
+        with mock.patch.object(backend, "run", side_effect=run):
             result = backend.scan_status(root)
 
         self.assertTrue(result.ok)
@@ -926,6 +935,7 @@ body paragraph</msg>
                 BackendStatusItem(path="conflict.txt", conflicted=True),
             ),
         )
+        self.assertEqual(result.remote_url, "https://svn.example.com/project/trunk")
 
     def test_svn_backend_reports_missing_executable_as_failed_result(self):
         backend = SvnBackend()

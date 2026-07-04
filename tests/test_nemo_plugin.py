@@ -36,6 +36,52 @@ class FakeItem:
         self.invalidated += 1
 
 
+class FakeToggle:
+    def __init__(self, active):
+        self.active = active
+        self.tooltip = ""
+        self.image = None
+
+    def get_active(self):
+        return self.active
+
+    def set_tooltip_text(self, text):
+        self.tooltip = text
+
+    def set_image(self, image):
+        self.image = image
+
+
+class FakeWidget:
+    def __init__(self):
+        self.visible = True
+        self.text = ""
+        self.max_width_chars = None
+        self.parent = None
+        self.resized = False
+
+    def show_all(self):
+        self.visible = True
+
+    def hide(self):
+        self.visible = False
+
+    def show(self):
+        self.visible = True
+
+    def set_text(self, text):
+        self.text = text
+
+    def set_max_width_chars(self, chars):
+        self.max_width_chars = chars
+
+    def get_parent(self):
+        return self.parent
+
+    def queue_resize(self):
+        self.resized = True
+
+
 class NemoVCSInfoProviderCoreTest(unittest.TestCase):
     def test_file_item_path_resolves_absolute_path(self):
         core = nemo_plugin.NemoVCSInfoProviderCore()
@@ -245,17 +291,16 @@ class NemoVCSInfoProviderCoreTest(unittest.TestCase):
             nemo_plugin.location_widget_details(spec),
             [
                 ("Worktree", "/tmp/repo"),
-                ("Head", "main"),
                 ("Status", "modified"),
-                ("Backend", "Git"),
+                ("Branch", "main"),
             ],
         )
         self.assertEqual(
             nemo_plugin.location_widget_tooltip(spec),
-            "Worktree: /tmp/repo\nHead: main\nStatus: modified\nBackend: Git",
+            "Worktree: /tmp/repo\nStatus: modified\nBranch: main",
         )
 
-    def test_location_widget_root_label_uses_full_path_when_expanded(self):
+    def test_location_widget_summary_label_uses_source_and_head(self):
         spec = nemo_plugin.LocationWidgetSpec(
             backend="git",
             backend_label="Git",
@@ -268,12 +313,8 @@ class NemoVCSInfoProviderCoreTest(unittest.TestCase):
         )
 
         self.assertEqual(
-            nemo_plugin.location_widget_root_label(spec, expanded=False),
-            "- repo",
-        )
-        self.assertEqual(
-            nemo_plugin.location_widget_root_label(spec, expanded=True),
-            "/tmp/repo",
+            nemo_plugin.location_widget_summary_label(spec),
+            "/tmp/repo (main)",
         )
 
     def test_location_widget_prefers_remote_url_when_present(self):
@@ -292,20 +333,31 @@ class NemoVCSInfoProviderCoreTest(unittest.TestCase):
         self.assertEqual(
             nemo_plugin.location_widget_details(spec),
             [
-                ("Remote", "git@example.com:me/repo.git"),
                 ("Worktree", "/tmp/repo"),
-                ("Head", "main"),
                 ("Status", "modified"),
-                ("Backend", "Git"),
+                ("Branch", "main"),
             ],
         )
         self.assertEqual(
-            nemo_plugin.location_widget_root_label(spec, expanded=True),
-            "git@example.com:me/repo.git",
+            nemo_plugin.location_widget_summary_label(spec),
+            "git@example.com:me/repo.git (main)",
         )
+
+    def test_location_widget_loading_without_remote_does_not_show_worktree_as_source(self):
+        spec = nemo_plugin.LocationWidgetSpec(
+            backend="git",
+            backend_label="Git",
+            head="main",
+            status="loading",
+            status_label="loading",
+            root="/tmp/repo",
+            root_label="repo",
+            icon="nemovcs-git",
+        )
+
         self.assertEqual(
-            nemo_plugin.location_widget_root_label(spec, expanded=False),
-            "- repo",
+            nemo_plugin.location_widget_summary_label(spec),
+            "loading source... (main)",
         )
 
     def test_location_widget_details_include_problem_text(self):
@@ -323,6 +375,55 @@ class NemoVCSInfoProviderCoreTest(unittest.TestCase):
 
         self.assertIn(("Problem", "daemon timeout"), nemo_plugin.location_widget_details(spec))
         self.assertIn("Problem: daemon timeout", nemo_plugin.location_widget_tooltip(spec))
+
+    def test_location_details_toggle_state_is_remembered_on_provider(self):
+        provider = object.__new__(nemo_plugin.NemoVCSInfoProviderMixin)
+        provider.nemovcs_location_details_expanded = False
+        parent = FakeWidget()
+        details = FakeWidget()
+        details.parent = parent
+        source = FakeWidget()
+        spec = nemo_plugin.LocationWidgetSpec(
+            backend="git",
+            backend_label="Git",
+            head="main",
+            status="modified",
+            status_label="modified",
+            root="/tmp/repo",
+            root_label="repo",
+            icon="nemovcs-git",
+        )
+
+        nemo_plugin.set_location_details_expanded(
+            provider,
+            True,
+            FakeToggle(True),
+            details,
+            source,
+            spec,
+            lambda icon: icon,
+        )
+
+        self.assertTrue(provider.nemovcs_location_details_expanded)
+        self.assertTrue(details.visible)
+        self.assertEqual(source.text, "/tmp/repo (main)")
+        self.assertEqual(source.max_width_chars, 80)
+        self.assertTrue(parent.resized)
+
+        nemo_plugin.set_location_details_expanded(
+            provider,
+            False,
+            FakeToggle(False),
+            details,
+            source,
+            spec,
+            lambda icon: icon,
+        )
+
+        self.assertFalse(provider.nemovcs_location_details_expanded)
+        self.assertFalse(details.visible)
+        self.assertEqual(source.text, "/tmp/repo (main)")
+        self.assertEqual(source.max_width_chars, 80)
 
     def test_location_widget_spec_reads_remote_from_record(self):
         core = nemo_plugin.NemoVCSInfoProviderCore(
