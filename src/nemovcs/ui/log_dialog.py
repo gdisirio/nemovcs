@@ -88,6 +88,32 @@ def changed_row(change: LogChange) -> list[object]:
     return [change.action, changed_path_label(change), change]
 
 
+def log_filter_paths(paths: Sequence[str], root: str | Path) -> tuple[str, ...]:
+    root_path = Path(root).resolve(strict=False)
+    relpaths: list[str] = []
+    seen: set[str] = set()
+
+    for path in paths:
+        candidate = Path(path).expanduser()
+        if not candidate.is_absolute():
+            candidate = Path.cwd() / candidate
+        candidate = candidate.resolve(strict=False)
+
+        try:
+            relpath = candidate.relative_to(root_path)
+        except ValueError:
+            continue
+
+        reltext = "." if str(relpath) == "." else relpath.as_posix()
+        if reltext == ".":
+            return ()
+        if reltext not in seen:
+            seen.add(reltext)
+            relpaths.append(reltext)
+
+    return tuple(relpaths)
+
+
 def git_revision_diff_command(root: Path, revision: str) -> list[str]:
     return [
         "git",
@@ -244,7 +270,11 @@ class LogDialog(Gtk.Window):
         self.backend_id = backend.id
         self.root = root
 
-        result = backend.scan_log(root, limit=self.limit)
+        result = backend.scan_log(
+            root,
+            limit=self.limit,
+            paths=log_filter_paths(self.paths, root),
+        )
         if not result.ok:
             self.header_label.set_text("Failed to read log.")
             self.message_buffer.set_text(result.error)

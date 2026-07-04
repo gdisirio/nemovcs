@@ -9,6 +9,8 @@ sessions. Update this file before pushing changes.
   0.3.0 after milestone 3.
 - Nemo Action installer removal: current context menus are provided by the
   nemo-python extension; legacy action cleanup remains in install/uninstall.
+- Current performance focus: keep Nemo extension callbacks from triggering
+  repeated synchronous status work during directory enumeration.
 
 ## Last Known State
 
@@ -50,6 +52,15 @@ sessions. Update this file before pushing changes.
   known cached root, while still forcing a fresh probe when a nested `.git` or
   `.svn` marker is present. `SvnBackend.run()` also converts command timeouts
   into failed results instead of raising `TimeoutExpired`.
+- First-visit hang investigation with Nemo launched under GDB showed Nemo's
+  main thread blocked in a synchronous DBus call from nemo-python during
+  `extension_info_start`, while `nemovcs statusd` was busy. The live GDB log
+  also showed heavy child process churn during the freeze.
+- Statusd now ignores duplicate `Seen()` scan requests while a worktree scan is
+  already in flight or already scheduled. This prevents visible item
+  enumeration from turning the initial async scan into a rescan/invalidate/query
+  loop. Live testing after reinstall showed Nemo and `statusd` settling at 0%
+  CPU, and the user confirmed the immediate hang was gone.
 
 ## Recent Changes To Keep In Mind
 
@@ -138,6 +149,13 @@ sessions. Update this file before pushing changes.
 - Removed the dead `git.commit_paths()` helper and its test. Commits route
   through the backend commit path (`GitBackend.commit`/`commit_phases`); the
   helper had no production callers.
+- Statusd monitor callbacks suppress scan-induced Git `index*` and SVN
+  `wc.db*` metadata events during a scan and briefly after it completes. Those
+  events are expected side effects of status probes and should not immediately
+  mark the same worktree stale again.
+- The Log dialog can filter revision history by the selected paths, so opening
+  it on a file or subdirectory shows relevant history instead of always showing
+  whole-repository history.
 
 ## Next Likely Tasks
 
@@ -166,6 +184,9 @@ sessions. Update this file before pushing changes.
 - Watch Nemo behavior around first-time `loading` status. Async scans now emit
   `StatusChanged` after `Seen()`-triggered scans so visible items should be
   invalidated and re-read after completion.
+- Continue stress testing repeated enter/leave navigation in versioned
+  directories. The first-visit hang fix passed one live check, but more manual
+  testing on real Git and SVN trees is still useful.
 - Consider adding a lightweight visible diagnostic for scan reason and duration
   before more performance tuning.
 - Review CLI command help text for remaining Git-specific wording where commands

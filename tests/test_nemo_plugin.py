@@ -85,6 +85,37 @@ class NemoVCSInfoProviderCoreTest(unittest.TestCase):
         )
         self.assertIn("/tmp/repo/tracked.txt", core.visible_items)
 
+    def test_update_item_reuses_client_cache(self):
+        seen_calls = []
+        get_status_calls = []
+
+        def seen(paths):
+            seen_calls.append(list(paths))
+            return ["git:/tmp/repo"]
+
+        def get_status(paths):
+            get_status_calls.append(list(paths))
+            return [
+                {
+                    "path": "/tmp/repo/tracked.txt",
+                    "worktree_id": "git:/tmp/repo",
+                    "status": "modified",
+                }
+            ]
+
+        core = nemo_plugin.NemoVCSInfoProviderCore(
+            seen=seen,
+            get_status=get_status,
+        )
+
+        first = core.update_item(FakeItem("/tmp/repo/tracked.txt"))
+        second = core.update_item(FakeItem("/tmp/repo/tracked.txt"))
+
+        self.assertEqual(first["status"], "modified")
+        self.assertEqual(second["status"], "modified")
+        self.assertEqual(seen_calls, [["/tmp/repo/tracked.txt"]])
+        self.assertEqual(get_status_calls, [["/tmp/repo/tracked.txt"]])
+
     def test_conflicted_status_adds_conflict_emblem(self):
         core = nemo_plugin.NemoVCSInfoProviderCore(
             seen=lambda paths: ["/tmp/repo"],

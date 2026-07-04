@@ -155,6 +155,16 @@ class NemoVCSInfoProviderCore:
         return record
 
     def update_path(self, path: str | Path) -> dict[str, str] | None:
+        cached = self.cache.get(path)
+        if cached is not None:
+            self.log(
+                "status-cache-hit",
+                path=str(path),
+                status=cached.get("status", ""),
+                worktree_id=cached.get("worktree_id", ""),
+            )
+            return cached
+
         seen = self.seen or default_seen
         get_status = self.get_status or default_get_status
         for attempt in range(1, 3):

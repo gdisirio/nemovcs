@@ -11,6 +11,7 @@ from nemovcs.ui.log_dialog import (
     format_date,
     git_revision_diff_command,
     git_revision_file_diff_command,
+    log_filter_paths,
     message_text,
     revision_row,
     short_revision,
@@ -63,9 +64,11 @@ class FakeBackend:
     def __init__(self, result):
         self._result = result
         self.limit = None
+        self.paths = None
 
-    def scan_log(self, root, *, limit):
+    def scan_log(self, root, *, limit, paths=()):
         self.limit = limit
+        self.paths = paths
         return self._result
 
 
@@ -174,6 +177,27 @@ class LogDialogHelpersTest(unittest.TestCase):
             ],
         )
 
+    def test_log_filter_paths_returns_relative_selected_paths(self):
+        self.assertEqual(
+            log_filter_paths(
+                ["/tmp/repo/src/a.py", "/tmp/repo/docs"],
+                Path("/tmp/repo"),
+            ),
+            ("src/a.py", "docs"),
+        )
+
+    def test_log_filter_paths_root_selection_means_whole_worktree(self):
+        self.assertEqual(log_filter_paths(["/tmp/repo"], Path("/tmp/repo")), ())
+
+    def test_log_filter_paths_deduplicates_and_skips_other_roots(self):
+        self.assertEqual(
+            log_filter_paths(
+                ["/tmp/repo/src/a.py", "/tmp/repo/src/a.py", "/tmp/other/a.py"],
+                Path("/tmp/repo"),
+            ),
+            ("src/a.py",),
+        )
+
 
 class LogDialogLoadTest(unittest.TestCase):
     def test_load_log_populates_revisions(self):
@@ -201,6 +225,22 @@ class LogDialogLoadTest(unittest.TestCase):
         self.assertIn("1 revision", dialog.header_label.text)
         self.assertFalse(dialog.show_more_button.sensitive)
         self.assertEqual(backend.limit, 50)
+        self.assertEqual(backend.paths, ())
+
+    def test_load_log_passes_selected_path_filter(self):
+        dialog = make_dialog()
+        dialog.paths = ["/tmp/repo/src/a.py"]
+        dialog.path = dialog.paths[0]
+        backend = FakeBackend(BackendLog(ok=True, entries=()))
+
+        with mock.patch.object(
+            log_dialog.backends,
+            "detect_root",
+            return_value=(backend, Path("/tmp/repo")),
+        ):
+            dialog.load_log()
+
+        self.assertEqual(backend.paths, ("src/a.py",))
 
     def test_load_log_reports_missing_worktree(self):
         dialog = make_dialog()

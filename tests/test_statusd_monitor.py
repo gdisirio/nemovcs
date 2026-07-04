@@ -47,6 +47,14 @@ class FakeTimer:
         return callback
 
 
+class FakeClock:
+    def __init__(self, now=0.0):
+        self.now = now
+
+    def __call__(self):
+        return self.now
+
+
 class WorktreeMonitorManagerTest(unittest.TestCase):
     def test_monitor_paths_include_worktree_and_git_metadata(self):
         first = identity("repo")
@@ -155,6 +163,83 @@ class WorktreeMonitorManagerTest(unittest.TestCase):
         manager.ensure(entry)
 
         factory.handles[1].emit(first.gitdir / "index.lock")
+
+        self.assertTrue(entry.stale)
+        self.assertEqual(entry.stale_paths, set())
+        self.assertEqual(len(timer.scheduled), 1)
+
+    def test_git_index_event_during_scan_is_ignored(self):
+        timer = FakeTimer()
+        factory = FakeMonitorFactory()
+        first = identity("repo")
+        cache = statusd.WorktreeCache()
+        entry = cache.touch(first)
+        entry.scanned = True
+        entry.scan_in_flight = True
+        core = statusd.StatusDaemonCore(cache, timer=timer)
+        manager = statusd_monitor.WorktreeMonitorManager(
+            core,
+            monitor_factory=factory,
+        )
+        core.set_monitor_manager(manager)
+        manager.ensure(entry)
+
+        factory.handles[1].emit(first.gitdir / "index.lock")
+
+        self.assertFalse(entry.stale)
+        self.assertEqual(entry.stale_paths, set())
+        self.assertEqual(timer.scheduled, [])
+
+    def test_git_index_event_just_after_scan_is_ignored(self):
+        timer = FakeTimer()
+        clock = FakeClock(now=10.1)
+        factory = FakeMonitorFactory()
+        first = identity("repo")
+        cache = statusd.WorktreeCache()
+        entry = cache.touch(first)
+        entry.scanned = True
+        entry.last_scanned_at = 10.0
+        core = statusd.StatusDaemonCore(
+            cache,
+            debounce_seconds=0.25,
+            timer=timer,
+            clock=clock,
+        )
+        manager = statusd_monitor.WorktreeMonitorManager(
+            core,
+            monitor_factory=factory,
+        )
+        core.set_monitor_manager(manager)
+        manager.ensure(entry)
+
+        factory.handles[1].emit(first.gitdir / "index")
+
+        self.assertFalse(entry.stale)
+        self.assertEqual(timer.scheduled, [])
+
+    def test_git_index_event_after_suppression_window_marks_stale(self):
+        timer = FakeTimer()
+        clock = FakeClock(now=10.5)
+        factory = FakeMonitorFactory()
+        first = identity("repo")
+        cache = statusd.WorktreeCache()
+        entry = cache.touch(first)
+        entry.scanned = True
+        entry.last_scanned_at = 10.0
+        core = statusd.StatusDaemonCore(
+            cache,
+            debounce_seconds=0.25,
+            timer=timer,
+            clock=clock,
+        )
+        manager = statusd_monitor.WorktreeMonitorManager(
+            core,
+            monitor_factory=factory,
+        )
+        core.set_monitor_manager(manager)
+        manager.ensure(entry)
+
+        factory.handles[1].emit(first.gitdir / "index")
 
         self.assertTrue(entry.stale)
         self.assertEqual(entry.stale_paths, set())

@@ -244,6 +244,8 @@ class StatusDaemonCore:
         return changed_worktrees
 
     def should_scan_seen_entry(self, entry: WorktreeEntry) -> bool:
+        if entry.scan_in_flight or entry.scan_scheduled:
+            return False
         return (
             not entry.scanned
             or entry.stale

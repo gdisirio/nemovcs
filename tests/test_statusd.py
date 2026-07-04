@@ -330,6 +330,36 @@ class StatusDaemonSchedulerTest(unittest.TestCase):
         self.assertEqual(entry.statuses["file.txt"], statusd.EmblemStatus.MODIFIED)
         self.assertEqual(changed, [(first.cache_key, [str(first.root)])])
 
+    def test_seen_during_initial_scan_does_not_request_rescan(self):
+        scheduler = FakeScanScheduler()
+        first = identity("one")
+        cache = statusd.WorktreeCache()
+
+        def scan(_entry: statusd.WorktreeEntry) -> None:
+            _entry.scanned = True
+
+        core = statusd.StatusDaemonCore(
+            cache,
+            scan_scheduler=scheduler,
+            scan_func=scan,
+        )
+
+        with mock.patch("nemovcs.statusd.identify_worktree", return_value=first):
+            self.assertEqual(core.seen([first.root / "a.txt"]), [first.cache_key])
+            self.assertEqual(core.seen([first.root / "b.txt"]), [first.cache_key])
+
+        entry = cache.entry_by_key(first.cache_key)
+        assert entry is not None
+        self.assertTrue(entry.scan_in_flight)
+        self.assertFalse(entry.rescan_needed)
+        self.assertEqual(len(scheduler.pending), 1)
+
+        scheduler.run_next()
+
+        self.assertFalse(entry.scan_in_flight)
+        self.assertFalse(entry.rescan_needed)
+        self.assertFalse(entry.scan_scheduled)
+
     def test_status_record_includes_scanned_remote_url(self):
         first = identity("one")
         cache = statusd.WorktreeCache()
