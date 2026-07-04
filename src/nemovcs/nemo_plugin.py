@@ -803,6 +803,8 @@ def location_widget_details(spec: LocationWidgetSpec) -> list[tuple[str, str]]:
 
 
 def populate_location_details_widget(Gtk, grid, spec: LocationWidgetSpec) -> None:
+    from gi.repository import Pango
+
     for row, (label_text, value_text) in enumerate(location_widget_details(spec)):
         label = Gtk.Label()
         label.set_markup(f"<b>{escape(label_text)}</b>")
@@ -810,10 +812,21 @@ def populate_location_details_widget(Gtk, grid, spec: LocationWidgetSpec) -> Non
         grid.attach(label, 0, row, 1, 1)
 
         value = Gtk.Label(label=value_text)
-        value.set_xalign(0)
-        value.set_selectable(True)
-        value.set_line_wrap(True)
+        configure_location_detail_value_label(
+            value,
+            value_text,
+            Pango.EllipsizeMode.END,
+        )
         grid.attach(value, 1, row, 1, 1)
+
+
+def configure_location_detail_value_label(label, text: str, ellipsize_mode) -> None:
+    label.set_xalign(0)
+    label.set_hexpand(True)
+    label.set_ellipsize(ellipsize_mode)
+    label.set_max_width_chars(80)
+    label.set_selectable(True)
+    label.set_tooltip_text(text)
 
 
 def clear_container(container) -> None:

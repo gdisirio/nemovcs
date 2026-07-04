@@ -60,6 +60,11 @@ class FakeWidget:
         self.parent = None
         self.resized = False
         self.connections = []
+        self.xalign = None
+        self.hexpand = False
+        self.ellipsize = None
+        self.selectable = False
+        self.tooltip = ""
 
     def show_all(self):
         self.visible = True
@@ -75,6 +80,21 @@ class FakeWidget:
 
     def set_max_width_chars(self, chars):
         self.max_width_chars = chars
+
+    def set_xalign(self, xalign):
+        self.xalign = xalign
+
+    def set_hexpand(self, hexpand):
+        self.hexpand = hexpand
+
+    def set_ellipsize(self, ellipsize):
+        self.ellipsize = ellipsize
+
+    def set_selectable(self, selectable):
+        self.selectable = selectable
+
+    def set_tooltip_text(self, text):
+        self.tooltip = text
 
     def get_parent(self):
         return self.parent
@@ -447,6 +467,22 @@ class NemoVCSInfoProviderCoreTest(unittest.TestCase):
 
         self.assertIn(("Problem", "daemon timeout"), nemo_plugin.location_widget_details(spec))
         self.assertIn("Problem: daemon timeout", nemo_plugin.location_widget_tooltip(spec))
+
+    def test_location_detail_value_label_is_ellipsized(self):
+        label = FakeWidget()
+
+        nemo_plugin.configure_location_detail_value_label(
+            label,
+            "git@example.com:very/long/repository/path.git",
+            "end",
+        )
+
+        self.assertEqual(label.xalign, 0)
+        self.assertTrue(label.hexpand)
+        self.assertEqual(label.ellipsize, "end")
+        self.assertEqual(label.max_width_chars, 80)
+        self.assertTrue(label.selectable)
+        self.assertEqual(label.tooltip, "git@example.com:very/long/repository/path.git")
 
     def test_location_details_toggle_state_is_remembered_on_provider(self):
         provider = object.__new__(nemo_plugin.NemoVCSInfoProviderMixin)

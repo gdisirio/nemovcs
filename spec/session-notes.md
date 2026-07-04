@@ -123,6 +123,9 @@ sessions. Update this file before pushing changes.
   longer rewrites source text, preventing stale creation-time `loading` specs
   from overwriting a refreshed remote URL. Live testing showed the bar now
   refreshes without changing directories.
+- Expanded context bar detail values are single-line, selectable, ellipsized at
+  the end, and carry the full value in their tooltip so long URLs and paths do
+  not stretch the Nemo window.
 - Future context bar action refinement: allow selected/pinnable context-menu
   actions to appear as icon-only buttons on the right side of the compact bar,
   before the expand button. Keep the first-line repository summary short and
