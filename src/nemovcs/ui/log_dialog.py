@@ -11,12 +11,15 @@ from datetime import datetime
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
+import threading
 from typing import Sequence
 
 import gi
 
 gi.require_version("Gtk", "3.0")
-from gi.repository import Gtk  # noqa: E402
+gi.require_version("Gdk", "3.0")
+from gi.repository import Gdk, Gtk  # noqa: E402
 from gi.repository import Pango  # noqa: E402
 
 from nemovcs import backends
@@ -128,6 +131,19 @@ def git_revision_diff_command(root: Path, revision: str) -> list[str]:
     ]
 
 
+def git_revision_diff_current_command(root: Path, revision: str) -> list[str]:
+    return [
+        "git",
+        "-C",
+        str(root),
+        "difftool",
+        "-d",
+        "--tool=meld",
+        "--no-prompt",
+        revision,
+    ]
+
+
 def git_revision_file_diff_command(root: Path, revision: str, path: str) -> list[str]:
     return [
         "git",
@@ -141,6 +157,60 @@ def git_revision_file_diff_command(root: Path, revision: str, path: str) -> list
         "--",
         path,
     ]
+
+
+def git_revision_file_diff_current_command(
+    root: Path,
+    revision: str,
+    path: str,
+) -> list[str]:
+    return [
+        "git",
+        "-C",
+        str(root),
+        "difftool",
+        "--tool=meld",
+        "--no-prompt",
+        revision,
+        "--",
+        path,
+    ]
+
+
+def git_revision_file_content_command(
+    root: Path,
+    revision: str,
+    path: str,
+) -> list[str]:
+    return ["git", "-C", str(root), "show", f"{revision}:{path}"]
+
+
+def deleted_worktree_file_source_revision(entry: LogEntry, change: LogChange) -> str:
+    if change.action == "deleted":
+        return f"{entry.revision}~1"
+    return entry.revision
+
+
+def meld_deleted_file_command(path: Path) -> list[str]:
+    return ["meld", str(path), "/dev/null"]
+
+
+def temporary_revision_file_suffix(path: str) -> str:
+    name = Path(path).name or "deleted"
+    return f"-{name}"
+
+
+def cleanup_paths(paths: Sequence[Path]) -> None:
+    for path in paths:
+        try:
+            path.unlink()
+        except OSError:
+            pass
+
+
+def cleanup_after_process(process: subprocess.Popen, paths: Sequence[Path]) -> None:
+    process.wait()
+    cleanup_paths(paths)
 
 
 class LogDialog(Gtk.Window):
@@ -184,6 +254,7 @@ class LogDialog(Gtk.Window):
         self.tree = Gtk.TreeView(model=self.store)
         self.tree.set_headers_visible(True)
         self.tree.connect("row-activated", self.on_revision_activated)
+        self.tree.connect("button-press-event", self.on_revision_button_press)
         self.tree.get_selection().connect("changed", self.on_revision_selected)
 
         for title, column_id, min_width in (
@@ -226,6 +297,7 @@ class LogDialog(Gtk.Window):
         self.changes_tree = Gtk.TreeView(model=self.changes_store)
         self.changes_tree.set_headers_visible(True)
         self.changes_tree.connect("row-activated", self.on_change_activated)
+        self.changes_tree.connect("button-press-event", self.on_change_button_press)
 
         for title, column_id, min_width in (
             ("Action", CH_ACTION, 90),
@@ -316,7 +388,7 @@ class LogDialog(Gtk.Window):
         _column: Gtk.TreeViewColumn,
     ) -> None:
         entry = self.store[self.store.get_iter(path)][COL_ENTRY]
-        self.open_revision_diff(entry)
+        self.open_revision_diff_with_previous(entry)
 
     def on_change_activated(
         self,
@@ -328,24 +400,190 @@ class LogDialog(Gtk.Window):
         if entry is None:
             return
         change = self.changes_store[self.changes_store.get_iter(path)][CH_CHANGE]
-        self.open_file_diff(entry, change)
+        self.open_file_diff_with_previous(entry, change)
 
-    def open_revision_diff(self, entry: LogEntry) -> None:
+    def on_revision_button_press(
+        self,
+        tree: Gtk.TreeView,
+        event: Gdk.EventButton,
+    ) -> bool:
+        if event.button != 3:
+            return False
+
+        hit = tree.get_path_at_pos(int(event.x), int(event.y))
+        if hit is None:
+            return False
+
+        path, _column, _cell_x, _cell_y = hit
+        tree.get_selection().select_path(path)
+        entry = self.store[self.store.get_iter(path)][COL_ENTRY]
+        menu = self.build_revision_context_menu(entry)
+        menu.popup_at_pointer(event)
+        return True
+
+    def on_change_button_press(
+        self,
+        tree: Gtk.TreeView,
+        event: Gdk.EventButton,
+    ) -> bool:
+        if event.button != 3:
+            return False
+
+        hit = tree.get_path_at_pos(int(event.x), int(event.y))
+        if hit is None:
+            return False
+
+        path, _column, _cell_x, _cell_y = hit
+        tree.get_selection().select_path(path)
+        entry = self.selected_entry()
+        if entry is None:
+            return False
+
+        change = self.changes_store[self.changes_store.get_iter(path)][CH_CHANGE]
+        menu = self.build_change_context_menu(entry, change)
+        menu.popup_at_pointer(event)
+        return True
+
+    def build_revision_context_menu(self, entry: LogEntry) -> Gtk.Menu:
+        menu = Gtk.Menu()
+        for label, callback in (
+            ("Diff with previous...", self.on_revision_diff_previous),
+            ("Diff with current...", self.on_revision_diff_current),
+        ):
+            item = Gtk.MenuItem(label=label)
+            item.set_sensitive(self.backend_id == "git" and self.root is not None)
+            item.connect("activate", callback, entry)
+            menu.append(item)
+        menu.show_all()
+        return menu
+
+    def build_change_context_menu(
+        self,
+        entry: LogEntry,
+        change: LogChange,
+    ) -> Gtk.Menu:
+        menu = Gtk.Menu()
+        for label, callback in (
+            ("Diff with previous...", self.on_change_diff_previous),
+            ("Diff with current...", self.on_change_diff_current),
+        ):
+            item = Gtk.MenuItem(label=label)
+            item.set_sensitive(self.backend_id == "git" and self.root is not None)
+            item.connect("activate", callback, entry, change)
+            menu.append(item)
+        menu.show_all()
+        return menu
+
+    def on_revision_diff_previous(
+        self,
+        _item: Gtk.MenuItem,
+        entry: LogEntry,
+    ) -> None:
+        self.open_revision_diff_with_previous(entry)
+
+    def on_revision_diff_current(
+        self,
+        _item: Gtk.MenuItem,
+        entry: LogEntry,
+    ) -> None:
+        self.open_revision_diff_with_current(entry)
+
+    def on_change_diff_previous(
+        self,
+        _item: Gtk.MenuItem,
+        entry: LogEntry,
+        change: LogChange,
+    ) -> None:
+        self.open_file_diff_with_previous(entry, change)
+
+    def on_change_diff_current(
+        self,
+        _item: Gtk.MenuItem,
+        entry: LogEntry,
+        change: LogChange,
+    ) -> None:
+        self.open_file_diff_with_current(entry, change)
+
+    def open_revision_diff_with_previous(self, entry: LogEntry) -> None:
         if self.backend_id != "git" or self.root is None:
             self.show_error("Per-revision diff is only available for Git so far.")
             return
         self.spawn(git_revision_diff_command(self.root, entry.revision))
 
-    def open_file_diff(self, entry: LogEntry, change: LogChange) -> None:
+    def open_revision_diff_with_current(self, entry: LogEntry) -> None:
         if self.backend_id != "git" or self.root is None:
             self.show_error("Per-revision diff is only available for Git so far.")
             return
-        if change.action == "deleted":
-            self.show_error("Deleted paths do not have a diff at this revision.")
+        self.spawn(git_revision_diff_current_command(self.root, entry.revision))
+
+    def open_file_diff_with_previous(self, entry: LogEntry, change: LogChange) -> None:
+        if self.backend_id != "git" or self.root is None:
+            self.show_error("Per-revision diff is only available for Git so far.")
             return
         self.spawn(
             git_revision_file_diff_command(self.root, entry.revision, change.path)
         )
+
+    def open_file_diff_with_current(self, entry: LogEntry, change: LogChange) -> None:
+        if self.backend_id != "git" or self.root is None:
+            self.show_error("Per-revision diff is only available for Git so far.")
+            return
+        if not (self.root / change.path).exists():
+            self.open_deleted_file_diff_with_current(entry, change)
+            return
+        self.spawn(
+            git_revision_file_diff_current_command(
+                self.root,
+                entry.revision,
+                change.path,
+            )
+        )
+
+    def open_deleted_file_diff_with_current(
+        self,
+        entry: LogEntry,
+        change: LogChange,
+    ) -> None:
+        assert self.root is not None
+        source_revision = deleted_worktree_file_source_revision(entry, change)
+        command = git_revision_file_content_command(
+            self.root,
+            source_revision,
+            change.path,
+        )
+        try:
+            result = subprocess.run(
+                command,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+        except OSError as exc:
+            self.show_error(str(exc))
+            return
+
+        if result.returncode != 0:
+            self.show_error(
+                result.stderr.decode(errors="replace").strip()
+                or result.stdout.decode(errors="replace").strip()
+                or "Failed to read file content from the selected revision."
+            )
+            return
+
+        temp_file = tempfile.NamedTemporaryFile(
+            prefix="nemovcs-",
+            suffix=temporary_revision_file_suffix(change.path),
+            delete=False,
+        )
+        temp_path = Path(temp_file.name)
+        try:
+            with temp_file:
+                temp_file.write(result.stdout)
+        except OSError as exc:
+            cleanup_paths((temp_path,))
+            self.show_error(str(exc))
+            return
+
+        self.spawn_with_cleanup(meld_deleted_file_command(temp_path), (temp_path,))
 
     def on_show_more_clicked(self, _button: Gtk.Button) -> None:
         self.limit += PAGE_SIZE
@@ -373,6 +611,25 @@ class LogDialog(Gtk.Window):
             subprocess.Popen(command)
         except OSError as exc:
             self.show_error(str(exc))
+
+    def spawn_with_cleanup(
+        self,
+        command: Sequence[str],
+        cleanup: Sequence[Path],
+    ) -> None:
+        try:
+            process = subprocess.Popen(command)
+        except OSError as exc:
+            cleanup_paths(cleanup)
+            self.show_error(str(exc))
+            return
+
+        thread = threading.Thread(
+            target=cleanup_after_process,
+            args=(process, tuple(cleanup)),
+            daemon=True,
+        )
+        thread.start()
 
 
 if __name__ == "__main__":

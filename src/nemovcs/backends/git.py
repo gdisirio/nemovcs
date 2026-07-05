@@ -196,6 +196,45 @@ class GitBackend:
         limit: int,
         paths: Sequence[str] = (),
     ) -> BackendLog:
+        if paths:
+            revisions = git.run_git(
+                root,
+                ["log", f"-n{limit}", "--format=%H", "--", *paths],
+                env={"GIT_OPTIONAL_LOCKS": "0"},
+            )
+            if not revisions.ok:
+                return BackendLog(
+                    ok=False,
+                    error=revisions.stderr.strip() or revisions.stdout.strip(),
+                )
+
+            hashes = [
+                line.strip()
+                for line in revisions.stdout.splitlines()
+                if line.strip()
+            ]
+            if not hashes:
+                return BackendLog(ok=True)
+
+            result = git.run_git(
+                root,
+                [
+                    "log",
+                    "--no-walk=unsorted",
+                    "--no-color",
+                    f"--pretty=format:{LOG_PRETTY_FORMAT}",
+                    "--name-status",
+                    *hashes,
+                ],
+                env={"GIT_OPTIONAL_LOCKS": "0"},
+            )
+            if not result.ok:
+                return BackendLog(
+                    ok=False,
+                    error=result.stderr.strip() or result.stdout.strip(),
+                )
+            return BackendLog(ok=True, entries=tuple(parse_git_log(result.stdout)))
+
         args = [
             "log",
             f"-n{limit}",
@@ -203,8 +242,6 @@ class GitBackend:
             f"--pretty=format:{LOG_PRETTY_FORMAT}",
             "--name-status",
         ]
-        if paths:
-            args.extend(["--", *paths])
         result = git.run_git(root, args, env={"GIT_OPTIONAL_LOCKS": "0"})
         if not result.ok:
             return BackendLog(

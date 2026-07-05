@@ -19,6 +19,7 @@ from nemovcs.backends.git import (
     GitBackend,
     LOG_FIELD_SEP,
     LOG_HEADER_END,
+    LOG_PRETTY_FORMAT,
     LOG_RECORD_SEP,
     parse_git_log,
     parse_git_name_status,
@@ -725,6 +726,64 @@ class BackendRegistryTest(unittest.TestCase):
             result.entries[0].changes,
             (LogChange(action="added", path="file.txt"),),
         )
+
+    def test_git_backend_scan_log_path_filter_keeps_full_commit_changes(self):
+        backend = GitBackend()
+        root = Path("/tmp/repo")
+        text = (
+            LOG_RECORD_SEP
+            + LOG_FIELD_SEP.join(
+                ["abc123", "Alice", "2024-01-02T03:04:05+00:00", "Two files", ""]
+            )
+            + LOG_HEADER_END
+            + "\nM\tsrc/selected.py\nA\tREADME.md\n"
+        )
+
+        with mock.patch("nemovcs.git.run_git") as run_git:
+            run_git.side_effect = [
+                git.GitResult(("git",), root, 0, "abc123\n", ""),
+                git.GitResult(("git",), root, 0, text, ""),
+            ]
+
+            result = backend.scan_log(root, limit=5, paths=("src/selected.py",))
+
+        self.assertTrue(result.ok)
+        self.assertEqual(len(result.entries), 1)
+        self.assertEqual(
+            result.entries[0].changes,
+            (
+                LogChange(action="modified", path="src/selected.py"),
+                LogChange(action="added", path="README.md"),
+            ),
+        )
+        self.assertEqual(
+            run_git.call_args_list[0].args[1],
+            ["log", "-n5", "--format=%H", "--", "src/selected.py"],
+        )
+        self.assertEqual(
+            run_git.call_args_list[1].args[1],
+            [
+                "log",
+                "--no-walk=unsorted",
+                "--no-color",
+                f"--pretty=format:{LOG_PRETTY_FORMAT}",
+                "--name-status",
+                "abc123",
+            ],
+        )
+
+    def test_git_backend_scan_log_path_filter_returns_empty_without_revisions(self):
+        backend = GitBackend()
+        root = Path("/tmp/repo")
+
+        with mock.patch("nemovcs.git.run_git") as run_git:
+            run_git.return_value = git.GitResult(("git",), root, 0, "", "")
+
+            result = backend.scan_log(root, limit=5, paths=("missing.py",))
+
+        self.assertTrue(result.ok)
+        self.assertEqual(result.entries, ())
+        self.assertEqual(run_git.call_count, 1)
 
     def test_git_backend_scan_log_reports_command_error(self):
         backend = GitBackend()

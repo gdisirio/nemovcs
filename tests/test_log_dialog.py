@@ -1,4 +1,6 @@
 from pathlib import Path
+import subprocess
+import tempfile
 import unittest
 from unittest import mock
 
@@ -8,13 +10,19 @@ from nemovcs.ui.log_dialog import (
     LogDialog,
     changed_path_label,
     changed_row,
+    deleted_worktree_file_source_revision,
     format_date,
+    git_revision_file_content_command,
     git_revision_diff_command,
+    git_revision_diff_current_command,
     git_revision_file_diff_command,
+    git_revision_file_diff_current_command,
     log_filter_paths,
+    meld_deleted_file_command,
     message_text,
     revision_row,
     short_revision,
+    temporary_revision_file_suffix,
 )
 
 
@@ -176,6 +184,58 @@ class LogDialogHelpersTest(unittest.TestCase):
                 "src/a.py",
             ],
         )
+        self.assertEqual(
+            git_revision_diff_current_command(root, "abc123"),
+            [
+                "git",
+                "-C",
+                "/tmp/repo",
+                "difftool",
+                "-d",
+                "--tool=meld",
+                "--no-prompt",
+                "abc123",
+            ],
+        )
+        self.assertEqual(
+            git_revision_file_diff_current_command(root, "abc123", "src/a.py"),
+            [
+                "git",
+                "-C",
+                "/tmp/repo",
+                "difftool",
+                "--tool=meld",
+                "--no-prompt",
+                "abc123",
+                "--",
+                "src/a.py",
+            ],
+        )
+        self.assertEqual(
+            git_revision_file_content_command(root, "abc123", "src/a.py"),
+            ["git", "-C", "/tmp/repo", "show", "abc123:src/a.py"],
+        )
+        self.assertEqual(
+            meld_deleted_file_command(Path("/tmp/nemovcs-old")),
+            ["meld", "/tmp/nemovcs-old", "/dev/null"],
+        )
+        self.assertEqual(temporary_revision_file_suffix("src/a.py"), "-a.py")
+        self.assertEqual(temporary_revision_file_suffix(""), "-deleted")
+        entry = LogEntry(revision="abc123", author="", date="", summary="", body="")
+        self.assertEqual(
+            deleted_worktree_file_source_revision(
+                entry,
+                LogChange(action="modified", path="src/a.py"),
+            ),
+            "abc123",
+        )
+        self.assertEqual(
+            deleted_worktree_file_source_revision(
+                entry,
+                LogChange(action="deleted", path="src/a.py"),
+            ),
+            "abc123~1",
+        )
 
     def test_log_filter_paths_returns_relative_selected_paths(self):
         self.assertEqual(
@@ -291,6 +351,77 @@ class LogDialogLoadTest(unittest.TestCase):
             dialog.changes_store.rows,
             [changed_row(change) for change in entry.changes],
         )
+
+    def test_file_diff_with_current_uses_dev_null_for_deleted_worktree_file(self):
+        dialog = make_dialog()
+        entry = LogEntry(revision="abc123", author="", date="", summary="", body="")
+        change = LogChange(action="modified", path="src/deleted.py")
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            dialog.backend_id = "git"
+            dialog.root = Path(tempdir)
+            spawned: list[list[str]] = []
+
+            with mock.patch(
+                "nemovcs.ui.log_dialog.subprocess.run",
+                return_value=subprocess.CompletedProcess(
+                    ("git",),
+                    0,
+                    stdout=b"old content",
+                    stderr=b"",
+                ),
+            ) as run, mock.patch.object(
+                dialog,
+                "spawn_with_cleanup",
+                side_effect=lambda command, cleanup: spawned.append(list(command)),
+            ):
+                dialog.open_file_diff_with_current(entry, change)
+
+            run.assert_called_once_with(
+                ["git", "-C", tempdir, "show", "abc123:src/deleted.py"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+            self.assertEqual(len(spawned), 1)
+            self.assertEqual(spawned[0][0], "meld")
+            self.assertEqual(spawned[0][2], "/dev/null")
+            self.assertEqual(Path(spawned[0][1]).read_bytes(), b"old content")
+            Path(spawned[0][1]).unlink()
+
+    def test_file_diff_with_current_uses_previous_revision_for_deletion_commit(self):
+        dialog = make_dialog()
+        entry = LogEntry(revision="abc123", author="", date="", summary="", body="")
+        change = LogChange(action="deleted", path="src/deleted.py")
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            dialog.backend_id = "git"
+            dialog.root = Path(tempdir)
+            spawned: list[list[str]] = []
+
+            with mock.patch(
+                "nemovcs.ui.log_dialog.subprocess.run",
+                return_value=subprocess.CompletedProcess(
+                    ("git",),
+                    0,
+                    stdout=b"old content",
+                    stderr=b"",
+                ),
+            ) as run, mock.patch.object(
+                dialog,
+                "spawn_with_cleanup",
+                side_effect=lambda command, cleanup: spawned.append(list(command)),
+            ):
+                dialog.open_file_diff_with_current(entry, change)
+
+            run.assert_called_once_with(
+                ["git", "-C", tempdir, "show", "abc123~1:src/deleted.py"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+            self.assertEqual(len(spawned), 1)
+            self.assertEqual(spawned[0][0], "meld")
+            self.assertEqual(spawned[0][2], "/dev/null")
+            Path(spawned[0][1]).unlink()
 
 
 if __name__ == "__main__":
