@@ -191,8 +191,37 @@ def deleted_worktree_file_source_revision(entry: LogEntry, change: LogChange) ->
     return entry.revision
 
 
+def revision_file_content(
+    root: Path,
+    revision: str,
+    path: str,
+) -> tuple[bytes | None, str]:
+    command = git_revision_file_content_command(root, revision, path)
+    try:
+        result = subprocess.run(
+            command,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+    except OSError as exc:
+        return None, str(exc)
+
+    if result.returncode != 0:
+        return (
+            None,
+            result.stderr.decode(errors="replace").strip()
+            or result.stdout.decode(errors="replace").strip()
+            or "Failed to read file content from the selected revision.",
+        )
+    return result.stdout, ""
+
+
 def meld_deleted_file_command(path: Path) -> list[str]:
     return ["meld", str(path), "/dev/null"]
+
+
+def meld_added_file_command(path: Path) -> list[str]:
+    return ["meld", "/dev/null", str(path)]
 
 
 def temporary_revision_file_suffix(path: str) -> str:
@@ -471,6 +500,11 @@ class LogDialog(Gtk.Window):
             item.set_sensitive(self.backend_id == "git" and self.root is not None)
             item.connect("activate", callback, entry, change)
             menu.append(item)
+        menu.append(Gtk.SeparatorMenuItem())
+        save_item = Gtk.MenuItem(label="Save as...")
+        save_item.set_sensitive(self.backend_id == "git" and self.root is not None)
+        save_item.connect("activate", self.on_change_save_as, entry, change)
+        menu.append(save_item)
         menu.show_all()
         return menu
 
@@ -504,6 +538,14 @@ class LogDialog(Gtk.Window):
     ) -> None:
         self.open_file_diff_with_current(entry, change)
 
+    def on_change_save_as(
+        self,
+        _item: Gtk.MenuItem,
+        entry: LogEntry,
+        change: LogChange,
+    ) -> None:
+        self.save_file_as(entry, change)
+
     def open_revision_diff_with_previous(self, entry: LogEntry) -> None:
         if self.backend_id != "git" or self.root is None:
             self.show_error("Per-revision diff is only available for Git so far.")
@@ -528,7 +570,11 @@ class LogDialog(Gtk.Window):
         if self.backend_id != "git" or self.root is None:
             self.show_error("Per-revision diff is only available for Git so far.")
             return
-        if not (self.root / change.path).exists():
+        current_path = self.root / change.path
+        if change.action == "added" and current_path.exists():
+            self.spawn(meld_added_file_command(current_path))
+            return
+        if not current_path.exists():
             self.open_deleted_file_diff_with_current(entry, change)
             return
         self.spawn(
@@ -546,27 +592,13 @@ class LogDialog(Gtk.Window):
     ) -> None:
         assert self.root is not None
         source_revision = deleted_worktree_file_source_revision(entry, change)
-        command = git_revision_file_content_command(
+        content, error = revision_file_content(
             self.root,
             source_revision,
             change.path,
         )
-        try:
-            result = subprocess.run(
-                command,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-            )
-        except OSError as exc:
-            self.show_error(str(exc))
-            return
-
-        if result.returncode != 0:
-            self.show_error(
-                result.stderr.decode(errors="replace").strip()
-                or result.stdout.decode(errors="replace").strip()
-                or "Failed to read file content from the selected revision."
-            )
+        if content is None:
+            self.show_error(error)
             return
 
         temp_file = tempfile.NamedTemporaryFile(
@@ -577,13 +609,53 @@ class LogDialog(Gtk.Window):
         temp_path = Path(temp_file.name)
         try:
             with temp_file:
-                temp_file.write(result.stdout)
+                temp_file.write(content)
         except OSError as exc:
             cleanup_paths((temp_path,))
             self.show_error(str(exc))
             return
 
         self.spawn_with_cleanup(meld_deleted_file_command(temp_path), (temp_path,))
+
+    def save_file_as(self, entry: LogEntry, change: LogChange) -> None:
+        if self.backend_id != "git" or self.root is None:
+            self.show_error("Per-revision file saving is only available for Git so far.")
+            return
+
+        source_revision = deleted_worktree_file_source_revision(entry, change)
+        content, error = revision_file_content(
+            self.root,
+            source_revision,
+            change.path,
+        )
+        if content is None:
+            self.show_error(error)
+            return
+
+        dialog = Gtk.FileChooserDialog(
+            title="Save file as",
+            transient_for=self,
+            action=Gtk.FileChooserAction.SAVE,
+        )
+        dialog.add_buttons(
+            "Cancel",
+            Gtk.ResponseType.CANCEL,
+            "Save",
+            Gtk.ResponseType.ACCEPT,
+        )
+        dialog.set_do_overwrite_confirmation(True)
+        dialog.set_current_name(Path(change.path).name or "file")
+
+        response = dialog.run()
+        filename = dialog.get_filename()
+        dialog.destroy()
+        if response != Gtk.ResponseType.ACCEPT or not filename:
+            return
+
+        try:
+            Path(filename).write_bytes(content)
+        except OSError as exc:
+            self.show_error(str(exc))
 
     def on_show_more_clicked(self, _button: Gtk.Button) -> None:
         self.limit += PAGE_SIZE

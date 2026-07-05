@@ -184,6 +184,16 @@ sessions. Update this file before pushing changes.
 - The Log dialog can filter revision history by the selected paths, so opening
   it on a file or subdirectory shows relevant history instead of always showing
   whole-repository history.
+- Git Log dialog path-filtered history now matches SVN behavior more closely:
+  selected paths filter which revisions are listed, but each listed Git
+  revision shows the full set of files changed in that revision.
+- The Log dialog changed-files context menu has `Diff with previous...`,
+  `Diff with current...`, a separator, and `Save as...`. Git file-level
+  `Diff with current...` handles added files with `/dev/null` on the left and
+  deleted/missing files by materializing revision content to a temporary file
+  and comparing it to `/dev/null`; deletion commits read content from
+  `revision~1:path`. `Save as...` exports the selected revision content and
+  also uses `revision~1:path` for deleted entries.
 - New icon resources: `emblem-nemovcs-problems.svg` and
   `emblem-nemovcs-problems-small.svg`. Installer/uninstaller and the statusd
   settings cache view know about the new problem emblem.
@@ -192,9 +202,9 @@ sessions. Update this file before pushing changes.
 
 - Log dialog follow-ups: implement real backend paging for "Show more"
   (`--skip` for Git, revision-range for SVN) instead of re-fetching a larger
-  limit; add per-revision diff for SVN (currently Git-only, others show an
-  info message); optionally add status icons to the changed-paths column and
-  author/date sorting niceties.
+  limit; add per-revision diff/save support for SVN (currently Git-only, others
+  show an info message); optionally add status icons to the changed-paths
+  column and author/date sorting niceties.
 
 - Continue manual testing from Nemo on real Git and SVN working trees after
   reinstalling the extension and restarting Nemo.

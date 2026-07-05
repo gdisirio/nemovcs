@@ -18,8 +18,10 @@ from nemovcs.ui.log_dialog import (
     git_revision_file_diff_command,
     git_revision_file_diff_current_command,
     log_filter_paths,
+    meld_added_file_command,
     meld_deleted_file_command,
     message_text,
+    revision_file_content,
     revision_row,
     short_revision,
     temporary_revision_file_suffix,
@@ -219,6 +221,10 @@ class LogDialogHelpersTest(unittest.TestCase):
             meld_deleted_file_command(Path("/tmp/nemovcs-old")),
             ["meld", "/tmp/nemovcs-old", "/dev/null"],
         )
+        self.assertEqual(
+            meld_added_file_command(Path("/tmp/nemovcs-new")),
+            ["meld", "/dev/null", "/tmp/nemovcs-new"],
+        )
         self.assertEqual(temporary_revision_file_suffix("src/a.py"), "-a.py")
         self.assertEqual(temporary_revision_file_suffix(""), "-deleted")
         entry = LogEntry(revision="abc123", author="", date="", summary="", body="")
@@ -257,6 +263,44 @@ class LogDialogHelpersTest(unittest.TestCase):
             ),
             ("src/a.py",),
         )
+
+    def test_revision_file_content_returns_bytes(self):
+        root = Path("/tmp/repo")
+
+        with mock.patch(
+            "nemovcs.ui.log_dialog.subprocess.run",
+            return_value=subprocess.CompletedProcess(
+                ("git",),
+                0,
+                stdout=b"content",
+                stderr=b"",
+            ),
+        ) as run:
+            self.assertEqual(
+                revision_file_content(root, "abc123", "src/a.py"),
+                (b"content", ""),
+            )
+
+        run.assert_called_once_with(
+            ["git", "-C", "/tmp/repo", "show", "abc123:src/a.py"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+
+    def test_revision_file_content_reports_git_error(self):
+        with mock.patch(
+            "nemovcs.ui.log_dialog.subprocess.run",
+            return_value=subprocess.CompletedProcess(
+                ("git",),
+                128,
+                stdout=b"",
+                stderr=b"fatal: missing",
+            ),
+        ):
+            self.assertEqual(
+                revision_file_content(Path("/tmp/repo"), "bad", "src/a.py"),
+                (None, "fatal: missing"),
+            )
 
 
 class LogDialogLoadTest(unittest.TestCase):
@@ -388,6 +432,32 @@ class LogDialogLoadTest(unittest.TestCase):
             self.assertEqual(Path(spawned[0][1]).read_bytes(), b"old content")
             Path(spawned[0][1]).unlink()
 
+    def test_file_diff_with_current_uses_dev_null_for_added_worktree_file(self):
+        dialog = make_dialog()
+        entry = LogEntry(revision="abc123", author="", date="", summary="", body="")
+        change = LogChange(action="added", path="src/added.py")
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            dialog.backend_id = "git"
+            dialog.root = Path(tempdir)
+            path = dialog.root / change.path
+            path.parent.mkdir(parents=True)
+            path.write_text("new content")
+            spawned: list[list[str]] = []
+
+            with mock.patch.object(
+                dialog,
+                "spawn",
+                side_effect=lambda command: spawned.append(list(command)),
+            ), mock.patch("nemovcs.ui.log_dialog.subprocess.run") as run:
+                dialog.open_file_diff_with_current(entry, change)
+
+            run.assert_not_called()
+            self.assertEqual(
+                spawned,
+                [["meld", "/dev/null", str(path)]],
+            )
+
     def test_file_diff_with_current_uses_previous_revision_for_deletion_commit(self):
         dialog = make_dialog()
         entry = LogEntry(revision="abc123", author="", date="", summary="", body="")
@@ -422,6 +492,92 @@ class LogDialogLoadTest(unittest.TestCase):
             self.assertEqual(spawned[0][0], "meld")
             self.assertEqual(spawned[0][2], "/dev/null")
             Path(spawned[0][1]).unlink()
+
+    def test_save_file_as_writes_selected_revision_content(self):
+        dialog = make_dialog()
+        entry = LogEntry(revision="abc123", author="", date="", summary="", body="")
+        change = LogChange(action="modified", path="src/app.py")
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            dialog.backend_id = "git"
+            dialog.root = Path(tempdir)
+            target = Path(tempdir) / "saved.py"
+
+            class FakeChooser:
+                def __init__(self, *args, **kwargs):
+                    self.current_name = None
+
+                def add_buttons(self, *args):
+                    pass
+
+                def set_do_overwrite_confirmation(self, value):
+                    pass
+
+                def set_current_name(self, value):
+                    self.current_name = value
+
+                def run(self):
+                    return log_dialog.Gtk.ResponseType.ACCEPT
+
+                def get_filename(self):
+                    return str(target)
+
+                def destroy(self):
+                    pass
+
+            with mock.patch(
+                "nemovcs.ui.log_dialog.revision_file_content",
+                return_value=(b"saved content", ""),
+            ) as content, mock.patch(
+                "nemovcs.ui.log_dialog.Gtk.FileChooserDialog",
+                FakeChooser,
+            ):
+                dialog.save_file_as(entry, change)
+
+            content.assert_called_once_with(dialog.root, "abc123", "src/app.py")
+            self.assertEqual(target.read_bytes(), b"saved content")
+
+    def test_save_file_as_uses_previous_revision_for_deleted_entries(self):
+        dialog = make_dialog()
+        entry = LogEntry(revision="abc123", author="", date="", summary="", body="")
+        change = LogChange(action="deleted", path="src/deleted.py")
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            dialog.backend_id = "git"
+            dialog.root = Path(tempdir)
+
+            class FakeChooser:
+                def __init__(self, *args, **kwargs):
+                    pass
+
+                def add_buttons(self, *args):
+                    pass
+
+                def set_do_overwrite_confirmation(self, value):
+                    pass
+
+                def set_current_name(self, value):
+                    pass
+
+                def run(self):
+                    return log_dialog.Gtk.ResponseType.CANCEL
+
+                def get_filename(self):
+                    return None
+
+                def destroy(self):
+                    pass
+
+            with mock.patch(
+                "nemovcs.ui.log_dialog.revision_file_content",
+                return_value=(b"old content", ""),
+            ) as content, mock.patch(
+                "nemovcs.ui.log_dialog.Gtk.FileChooserDialog",
+                FakeChooser,
+            ):
+                dialog.save_file_as(entry, change)
+
+            content.assert_called_once_with(dialog.root, "abc123~1", "src/deleted.py")
 
 
 if __name__ == "__main__":
