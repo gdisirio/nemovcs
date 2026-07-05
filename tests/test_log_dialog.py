@@ -11,6 +11,7 @@ from nemovcs.ui.log_dialog import (
     changed_path_label,
     changed_row,
     deleted_worktree_file_source_revision,
+    DIFF_ICON_PATH,
     format_date,
     git_revision_file_content_command,
     git_revision_diff_command,
@@ -96,10 +97,16 @@ def make_dialog() -> LogDialog:
     dialog.header_label = FakeLabel()
     dialog.show_more_button = FakeButton()
     dialog.tree = None
+    dialog.icon_cache = {}
+    dialog.icon_theme = None
     return dialog
 
 
 class LogDialogHelpersTest(unittest.TestCase):
+    def test_diff_menu_icon_resource_exists(self):
+        self.assertTrue(DIFF_ICON_PATH.exists())
+        self.assertEqual(DIFF_ICON_PATH.name, "nemovcs-diff.svg")
+
     def test_short_revision_truncates_git_hashes_only(self):
         self.assertEqual(short_revision("abcdef0123456789"), "abcdef0123")
         self.assertEqual(short_revision("42"), "42")
@@ -153,7 +160,7 @@ class LogDialogHelpersTest(unittest.TestCase):
         )
 
         change = LogChange(action="added", path="x.py")
-        self.assertEqual(changed_row(change), ["added", "x.py", change])
+        self.assertEqual(changed_row(change), ["added", None, "x.py", change])
 
     def test_git_diff_commands(self):
         root = Path("/tmp/repo")
@@ -387,6 +394,7 @@ class LogDialogLoadTest(unittest.TestCase):
             ),
         )
         dialog.selected_entry = lambda: entry
+        dialog.file_icon = lambda change: None
 
         dialog.on_revision_selected(None)
 

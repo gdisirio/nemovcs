@@ -194,6 +194,10 @@ sessions. Update this file before pushing changes.
   and comparing it to `/dev/null`; deletion commits read content from
   `revision~1:path`. `Save as...` exports the selected revision content and
   also uses `revision~1:path` for deleted entries.
+- Log dialog context menus now show icons: both diff actions use the NemoVCS
+  diff icon, `Save as...` uses the themed `document-save-as-symbolic` icon, and
+  the changed-files list shows system file icons in the Path column with a
+  generic fallback for missing/deleted paths.
 - New icon resources: `emblem-nemovcs-problems.svg` and
   `emblem-nemovcs-problems-small.svg`. Installer/uninstaller and the statusd
   settings cache view know about the new problem emblem.

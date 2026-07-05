@@ -19,7 +19,7 @@ import gi
 
 gi.require_version("Gtk", "3.0")
 gi.require_version("Gdk", "3.0")
-from gi.repository import Gdk, Gtk  # noqa: E402
+from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk  # noqa: E402
 from gi.repository import Pango  # noqa: E402
 
 from nemovcs import backends
@@ -33,12 +33,16 @@ COL_SUMMARY = 3
 COL_ENTRY = 4
 
 CH_ACTION = 0
-CH_PATH = 1
-CH_CHANGE = 2
+CH_ICON = 1
+CH_PATH = 2
+CH_CHANGE = 3
 
 DEFAULT_LIMIT = 50
 PAGE_SIZE = 50
 SHORT_REVISION_LENGTH = 10
+ICON_SIZE = 20
+RESOURCE_ROOT = Path(__file__).resolve().parents[3] / "rsc" / "icons" / "nemovcs"
+DIFF_ICON_PATH = RESOURCE_ROOT / "actions" / "nemovcs-diff.svg"
 
 
 def run(paths: Sequence[str], limit: int = DEFAULT_LIMIT) -> int:
@@ -87,8 +91,8 @@ def revision_row(entry: LogEntry) -> list[object]:
     ]
 
 
-def changed_row(change: LogChange) -> list[object]:
-    return [change.action, changed_path_label(change), change]
+def changed_row(change: LogChange, icon: GdkPixbuf.Pixbuf | None = None) -> list[object]:
+    return [change.action, icon, changed_path_label(change), change]
 
 
 def log_filter_paths(paths: Sequence[str], root: str | Path) -> tuple[str, ...]:
@@ -251,6 +255,8 @@ class LogDialog(Gtk.Window):
         self.exit_code = 0
         self.backend_id = ""
         self.root: Path | None = None
+        self.icon_theme = Gtk.IconTheme.get_default()
+        self.icon_cache: dict[str, GdkPixbuf.Pixbuf | None] = {}
 
         self.set_default_size(940, 660)
         self.set_border_width(12)
@@ -322,22 +328,30 @@ class LogDialog(Gtk.Window):
         message_scroll.add(self.message_view)
         hsplit.pack1(message_scroll, resize=True, shrink=False)
 
-        self.changes_store = Gtk.ListStore(str, str, object)
+        self.changes_store = Gtk.ListStore(str, GdkPixbuf.Pixbuf, str, object)
         self.changes_tree = Gtk.TreeView(model=self.changes_store)
         self.changes_tree.set_headers_visible(True)
         self.changes_tree.connect("row-activated", self.on_change_activated)
         self.changes_tree.connect("button-press-event", self.on_change_button_press)
 
-        for title, column_id, min_width in (
-            ("Action", CH_ACTION, 90),
-            ("Path", CH_PATH, 320),
-        ):
-            renderer = Gtk.CellRendererText()
-            renderer.set_property("ellipsize", Pango.EllipsizeMode.END)
-            column = Gtk.TreeViewColumn(title, renderer, text=column_id)
-            column.set_resizable(True)
-            column.set_min_width(min_width)
-            self.changes_tree.append_column(column)
+        action_renderer = Gtk.CellRendererText()
+        action_renderer.set_property("ellipsize", Pango.EllipsizeMode.END)
+        action_column = Gtk.TreeViewColumn("Action", action_renderer, text=CH_ACTION)
+        action_column.set_resizable(True)
+        action_column.set_min_width(90)
+        self.changes_tree.append_column(action_column)
+
+        path_column = Gtk.TreeViewColumn("Path")
+        path_column.set_resizable(True)
+        path_column.set_min_width(320)
+        icon_renderer = Gtk.CellRendererPixbuf()
+        path_column.pack_start(icon_renderer, False)
+        path_column.add_attribute(icon_renderer, "pixbuf", CH_ICON)
+        path_renderer = Gtk.CellRendererText()
+        path_renderer.set_property("ellipsize", Pango.EllipsizeMode.END)
+        path_column.pack_start(path_renderer, True)
+        path_column.add_attribute(path_renderer, "text", CH_PATH)
+        self.changes_tree.append_column(path_column)
 
         changes_scroll = Gtk.ScrolledWindow()
         changes_scroll.set_shadow_type(Gtk.ShadowType.IN)
@@ -408,7 +422,7 @@ class LogDialog(Gtk.Window):
             return
         self.message_buffer.set_text(message_text(entry))
         for change in entry.changes:
-            self.changes_store.append(changed_row(change))
+            self.changes_store.append(changed_row(change, self.file_icon(change)))
 
     def on_revision_activated(
         self,
@@ -479,7 +493,9 @@ class LogDialog(Gtk.Window):
             ("Diff with previous...", self.on_revision_diff_previous),
             ("Diff with current...", self.on_revision_diff_current),
         ):
-            item = Gtk.MenuItem(label=label)
+            item = Gtk.ImageMenuItem(label=label)
+            item.set_always_show_image(True)
+            item.set_image(self.menu_image(icon_path=DIFF_ICON_PATH))
             item.set_sensitive(self.backend_id == "git" and self.root is not None)
             item.connect("activate", callback, entry)
             menu.append(item)
@@ -496,17 +512,74 @@ class LogDialog(Gtk.Window):
             ("Diff with previous...", self.on_change_diff_previous),
             ("Diff with current...", self.on_change_diff_current),
         ):
-            item = Gtk.MenuItem(label=label)
+            item = Gtk.ImageMenuItem(label=label)
+            item.set_always_show_image(True)
+            item.set_image(self.menu_image(icon_path=DIFF_ICON_PATH))
             item.set_sensitive(self.backend_id == "git" and self.root is not None)
             item.connect("activate", callback, entry, change)
             menu.append(item)
         menu.append(Gtk.SeparatorMenuItem())
-        save_item = Gtk.MenuItem(label="Save as...")
+        save_item = Gtk.ImageMenuItem(label="Save as...")
+        save_item.set_always_show_image(True)
+        save_item.set_image(self.menu_image(icon_name="document-save-as-symbolic"))
         save_item.set_sensitive(self.backend_id == "git" and self.root is not None)
         save_item.connect("activate", self.on_change_save_as, entry, change)
         menu.append(save_item)
         menu.show_all()
         return menu
+
+    def menu_image(
+        self,
+        *,
+        icon_name: str | None = None,
+        icon_path: Path | None = None,
+    ) -> Gtk.Image:
+        if icon_path is not None:
+            try:
+                pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(
+                    str(icon_path),
+                    ICON_SIZE,
+                    ICON_SIZE,
+                )
+                return Gtk.Image.new_from_pixbuf(pixbuf)
+            except GLib.Error:
+                pass
+
+        if icon_name is not None:
+            return Gtk.Image.new_from_icon_name(icon_name, Gtk.IconSize.MENU)
+
+        return Gtk.Image.new_from_icon_name("image-missing", Gtk.IconSize.MENU)
+
+    def file_icon(self, change: LogChange) -> GdkPixbuf.Pixbuf | None:
+        path = self.root / change.path if self.root is not None else Path(change.path)
+        try:
+            info = Gio.File.new_for_path(str(path)).query_info(
+                "standard::icon",
+                Gio.FileQueryInfoFlags.NONE,
+                None,
+            )
+            icon = info.get_icon()
+            if isinstance(icon, Gio.ThemedIcon):
+                icon_names = icon.get_names()
+            else:
+                icon_names = ["text-x-generic", "application-x-executable"]
+        except GLib.Error:
+            icon_names = ["text-x-generic", "unknown"]
+
+        for icon_name in icon_names:
+            if icon_name not in self.icon_cache:
+                try:
+                    self.icon_cache[icon_name] = self.icon_theme.load_icon(
+                        icon_name,
+                        ICON_SIZE,
+                        Gtk.IconLookupFlags.FORCE_SIZE,
+                    )
+                except GLib.Error:
+                    self.icon_cache[icon_name] = None
+            icon_pixbuf = self.icon_cache[icon_name]
+            if icon_pixbuf is not None:
+                return icon_pixbuf
+        return None
 
     def on_revision_diff_previous(
         self,
