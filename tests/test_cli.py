@@ -720,7 +720,9 @@ class InitCommandTest(unittest.TestCase):
     def test_cmd_init_dialog_runs_logger_with_init_phase(self):
         args = argparse.Namespace(paths=["/tmp/newrepo"], branch="trunk")
 
-        with mock.patch("nemovcs.ui.logger.run", return_value=0) as run:
+        with mock.patch("nemovcs.ui.logger.run", return_value=0) as run, mock.patch(
+            "nemovcs.statusd_dbus.call_seen"
+        ):
             self.assertEqual(cmd_init_dialog(args), 0)
 
         run.assert_called_once()
@@ -730,6 +732,26 @@ class InitCommandTest(unittest.TestCase):
             phases[0].command,
             ("git", "-C", "/tmp/newrepo", "init", "-b", "trunk"),
         )
+
+    def test_cmd_init_dialog_notifies_daemon_on_success(self):
+        args = argparse.Namespace(paths=["/tmp/newrepo"], branch="main")
+
+        with mock.patch("nemovcs.ui.logger.run", return_value=0), mock.patch(
+            "nemovcs.statusd_dbus.call_seen"
+        ) as seen:
+            self.assertEqual(cmd_init_dialog(args), 0)
+
+        seen.assert_called_once_with(["/tmp/newrepo"])
+
+    def test_cmd_init_dialog_skips_notify_on_failure(self):
+        args = argparse.Namespace(paths=["/tmp/newrepo"], branch="main")
+
+        with mock.patch("nemovcs.ui.logger.run", return_value=1), mock.patch(
+            "nemovcs.statusd_dbus.call_seen"
+        ) as seen:
+            self.assertEqual(cmd_init_dialog(args), 1)
+
+        seen.assert_not_called()
 
 
 class ForgeCommandTest(unittest.TestCase):

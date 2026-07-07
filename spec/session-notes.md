@@ -217,6 +217,14 @@ sessions. Update this file before pushing changes.
   the logger via the new `nemovcs init-dialog` command (`init_phases` builds the
   phase). This is the local-repo precursor to the forthcoming forge "publish"
   action. Not bare -- it creates a normal working repository.
+- Emblem refresh across worktree-membership changes: when a directory becomes a
+  repository (or otherwise changes worktree), its cached status must refresh
+  even though the stale record still names the old/empty worktree id. Two fixes:
+  (1) `StatusClientCache.invalidate` and `affected_visible_paths` now match by
+  path overlap for pathful signals (worktree id is only the fallback for
+  pathless whole-worktree signals); (2) `init-dialog`, on success, nudges the
+  daemon via `notify_daemon_seen` (`call_seen`) so it scans the new repo and
+  emits `StatusChanged`, which the plugin then maps to the visible item by path.
 - Forge menu wiring: when a repository has an associated, available forge, a
   submenu labelled and iconed by the forge appears inside the "Git NemoVCS"
   group; with no forge (or no advertised actions) the submenu is absent.

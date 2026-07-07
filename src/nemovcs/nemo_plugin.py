@@ -288,12 +288,21 @@ class NemoVCSInfoProviderCore:
         affected: list[str] = []
         for path in self.visible_items:
             record = self.cache.get(path)
-            if record is None or record.get("worktree_id") != str(worktree_id):
-                continue
-            if not changed or any(
-                status_client.paths_overlap(path, changed_path)
-                for changed_path in changed
-            ):
+            # Match by path so an item whose worktree membership just changed
+            # (e.g. a directory that became a repository) is refreshed even
+            # though its cached record still names the old/empty worktree. Only
+            # fall back to the worktree id for pathless whole-worktree signals.
+            if changed:
+                matched = any(
+                    status_client.paths_overlap(path, changed_path)
+                    for changed_path in changed
+                )
+            else:
+                matched = (
+                    record is not None
+                    and record.get("worktree_id") == str(worktree_id)
+                )
+            if matched:
                 affected.append(path)
         return affected
 

@@ -164,6 +164,21 @@ class NemoVCSInfoProviderCoreTest(unittest.TestCase):
         )
         self.assertIn("/tmp/repo/tracked.txt", core.visible_items)
 
+    def test_status_changed_refreshes_item_after_becoming_versioned(self):
+        core = nemo_plugin.NemoVCSInfoProviderCore()
+        item = FakeItem("/tmp/newrepo")
+        core.track_visible_item("/tmp/newrepo", item)
+        # Stale record from when the directory was non-versioned.
+        core.cache.update(
+            [{"path": "/tmp/newrepo", "worktree_id": "", "status": "error"}]
+        )
+
+        invalidated = core.on_status_changed("git:/tmp/newrepo", ["/tmp/newrepo"])
+
+        self.assertEqual(len(invalidated), 1)
+        self.assertEqual(item.invalidated, 1)
+        self.assertIsNone(core.cache.get("/tmp/newrepo"))
+
     def test_update_item_uses_single_query_status_call(self):
         query_calls = []
 

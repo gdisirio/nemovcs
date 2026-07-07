@@ -47,12 +47,18 @@ class StatusClientCache:
         changed = [normalize_path(path) for path in changed_paths]
         removed: list[str] = []
         for path, record in list(self.records.items()):
-            if record.get("worktree_id") != worktree_id:
-                continue
-            if not changed or any(
-                paths_overlap(path, changed_path)
-                for changed_path in changed
-            ):
+            # Match by path so a path that changed worktree membership (e.g. a
+            # directory that just became a repository) is invalidated even
+            # though its cached record still names the old/empty worktree. Fall
+            # back to the worktree id only for whole-worktree signals that carry
+            # no specific paths.
+            if changed:
+                matched = any(
+                    paths_overlap(path, changed_path) for changed_path in changed
+                )
+            else:
+                matched = record.get("worktree_id") == worktree_id
+            if matched:
                 removed.append(path)
                 del self.records[path]
         return removed

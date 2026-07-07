@@ -200,7 +200,26 @@ def init_phases(paths: Sequence[str], branch: str) -> list[BackendCommandPhase]:
 def cmd_init_dialog(args: argparse.Namespace) -> int:
     from .ui import logger
 
-    return logger.run("Create Repository", init_phases(args.paths, args.branch))
+    exit_code = logger.run("Create Repository", init_phases(args.paths, args.branch))
+    if exit_code == 0:
+        notify_daemon_seen(args.paths)
+    return exit_code
+
+
+def notify_daemon_seen(paths: Sequence[str]) -> None:
+    """Prompt the status daemon to (re)scan paths and emit StatusChanged.
+
+    Used after operations that change a path's worktree membership -- such as
+    creating a repository -- so live emblems refresh without the daemon having
+    been monitoring the directory beforehand. Best effort: a missing daemon is
+    fine.
+    """
+    from . import statusd_dbus
+
+    try:
+        statusd_dbus.call_seen([str(path) for path in (paths or ["."])])
+    except Exception:
+        pass
 
 
 def cmd_forge(args: argparse.Namespace) -> int:

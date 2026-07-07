@@ -146,6 +146,21 @@ class StatusClientCacheTest(unittest.TestCase):
 
         self.assertEqual(removed, [str(root / "a.txt"), str(root / "b.txt")])
 
+    def test_invalidate_drops_record_whose_worktree_membership_changed(self):
+        cache = status_client.StatusClientCache()
+        root = Path("/tmp/newrepo")
+        # Previously cached as non-versioned: empty worktree id.
+        cache.update(
+            [{"path": str(root), "worktree_id": "", "status": "error"}]
+        )
+
+        # The directory just became a Git worktree; the daemon reports a change
+        # there under the new worktree id.
+        removed = cache.invalidate(f"git:{root}", [root])
+
+        self.assertEqual(removed, [str(root)])
+        self.assertIsNone(cache.get(root))
+
 
 if __name__ == "__main__":
     unittest.main()
