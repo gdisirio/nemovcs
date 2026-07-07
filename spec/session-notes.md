@@ -237,6 +237,15 @@ sessions. Update this file before pushing changes.
   GitHub that is `gh repo create <name> --source <root> --push --private/--public`.
   On success the daemon is nudged (`notify_daemon_seen`) so the remote/context
   bar refreshes and the menu flips from "Publish" to the detected-forge submenu.
+- Publish account selection: `gh` can have several accounts logged in (this box
+  has `gdisirio` and, per AGENTS.md, potentially `chibios-sheriff`), and
+  `gh repo create` uses the globally-active one -- so the publish dialog shows an
+  Account combo. `Forge.accounts()` parses `hosts.yml` (`parse_gh_accounts`:
+  `users:` children + the host-level `user:` as active); the combo defaults to
+  the active account. Picking a different one prepends a
+  `Forge.switch_account_command` phase (`gh auth switch`) before the create --
+  which changes the active account *globally* (intended and explicit), not a
+  per-command trick.
 - Forge menu wiring: when a repository has an associated, available forge, a
   submenu labelled and iconed by the forge appears inside the "Git NemoVCS"
   group; with no forge (or no advertised actions) the submenu is absent.

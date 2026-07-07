@@ -9,6 +9,7 @@ from typing import Sequence
 
 from nemovcs.forge.base import (
     FORGE_ACTION_LAUNCH,
+    ForgeAccount,
     ForgeAction,
     ForgeContext,
     ForgeMatch,
@@ -48,6 +49,55 @@ def parse_gh_hosts_config(text: str) -> list[str]:
             if host:
                 hosts.append(host)
     return hosts
+
+
+def parse_gh_accounts(text: str, host: str = GITHUB_PUBLIC_HOST) -> list[ForgeAccount]:
+    """Parse the accounts `gh` is logged in as for `host` from its hosts.yml.
+
+    Multi-account hosts.yml nests account names under a `users:` map and names
+    the active one in a host-level `user:` key. Single-account configs only have
+    the host-level `user:`. Parsed by indentation to avoid a YAML dependency.
+    """
+    block: list[tuple[int, str]] = []
+    in_block = False
+    for line in text.splitlines():
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        indent = len(line) - len(line.lstrip(" "))
+        if indent == 0:
+            key = line.strip()
+            in_block = (
+                key.endswith(":")
+                and key[:-1].strip().strip("\"'").lower() == host
+            )
+            continue
+        if in_block:
+            block.append((indent, line.strip()))
+
+    if not block:
+        return []
+
+    base_indent = min(indent for indent, _ in block)
+    active: str | None = None
+    names: list[str] = []
+    in_users = False
+    users_child_indent: int | None = None
+    for indent, stripped in block:
+        if indent == base_indent:
+            in_users = stripped == "users:"
+            users_child_indent = None
+            if stripped.startswith("user:"):
+                active = stripped.split(":", 1)[1].strip().strip("\"'") or None
+            continue
+        if in_users:
+            if users_child_indent is None:
+                users_child_indent = indent
+            if indent == users_child_indent and stripped.endswith(":"):
+                names.append(stripped[:-1].strip().strip("\"'"))
+
+    if not names and active:
+        names = [active]
+    return [ForgeAccount(name=name, active=(name == active)) for name in names]
 
 
 def classify_github_host(
@@ -113,3 +163,13 @@ class GitHubForge:
             "--push",
             visibility,
         ]
+
+    def accounts(self) -> list[ForgeAccount]:
+        try:
+            text = gh_hosts_config_path().read_text(encoding="utf-8")
+        except OSError:
+            return []
+        return parse_gh_accounts(text)
+
+    def switch_account_command(self, name: str) -> list[str]:
+        return [self.cli, "auth", "switch", "--hostname", GITHUB_PUBLIC_HOST, "--user", name]

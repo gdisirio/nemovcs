@@ -8,6 +8,7 @@ from nemovcs.forge.github import (
     GitHubForge,
     classify_github_host,
     gh_hosts_config_path,
+    parse_gh_accounts,
     parse_gh_hosts_config,
 )
 
@@ -55,6 +56,36 @@ class ParseGhHostsConfigTest(unittest.TestCase):
     def test_empty_config_returns_no_hosts(self):
         self.assertEqual(parse_gh_hosts_config(""), [])
         self.assertEqual(parse_gh_hosts_config("# just a comment\n"), [])
+
+
+class ParseGhAccountsTest(unittest.TestCase):
+    def test_reads_multiple_accounts_and_marks_active(self):
+        text = (
+            "github.com:\n"
+            "    users:\n"
+            "        gdisirio:\n"
+            "            git_protocol: ssh\n"
+            "            oauth_token: gho_aaa\n"
+            "        chibios-sheriff:\n"
+            "            oauth_token: gho_bbb\n"
+            "    git_protocol: ssh\n"
+            "    user: gdisirio\n"
+            "    oauth_token: gho_aaa\n"
+        )
+        accounts = parse_gh_accounts(text)
+        self.assertEqual(
+            [(a.name, a.active) for a in accounts],
+            [("gdisirio", True), ("chibios-sheriff", False)],
+        )
+
+    def test_single_account_config(self):
+        text = "github.com:\n    user: solo\n    oauth_token: gho_x\n"
+        accounts = parse_gh_accounts(text)
+        self.assertEqual([(a.name, a.active) for a in accounts], [("solo", True)])
+
+    def test_other_host_yields_nothing(self):
+        text = "gitlab.com:\n    user: someone\n"
+        self.assertEqual(parse_gh_accounts(text), [])
 
 
 class ClassifyGithubHostTest(unittest.TestCase):
@@ -156,6 +187,12 @@ class GitHubForgeTest(unittest.TestCase):
         self.assertEqual(
             gh.publish_command("/tmp/repo", "myrepo", False)[-1],
             "--public",
+        )
+
+    def test_switch_account_command(self):
+        self.assertEqual(
+            GitHubForge().switch_account_command("gdisirio"),
+            ["gh", "auth", "switch", "--hostname", "github.com", "--user", "gdisirio"],
         )
 
     def test_is_available_follows_cli_presence(self):

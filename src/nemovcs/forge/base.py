@@ -95,6 +95,14 @@ class ForgeAction:
     disabled_reason: str = ""
 
 
+@dataclass(frozen=True)
+class ForgeAccount:
+    """An account the forge CLI is logged in as."""
+
+    name: str
+    active: bool = False
+
+
 class Forge(Protocol):
     id: str
     label: str
@@ -111,3 +119,7 @@ class Forge(Protocol):
     def run(self, action_id: str, root: str) -> list[str]: ...
 
     def publish_command(self, root: str, name: str, private: bool) -> list[str]: ...
+
+    def accounts(self) -> list[ForgeAccount]: ...
+
+    def switch_account_command(self, name: str) -> list[str]: ...
