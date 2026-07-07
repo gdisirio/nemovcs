@@ -467,6 +467,69 @@ class NemoVCSInfoProviderCoreTest(unittest.TestCase):
             "https://svn.example.com/project/trunk",
         )
 
+    def test_location_widget_details_include_forge_line(self):
+        spec = nemo_plugin.LocationWidgetSpec(
+            backend="git",
+            backend_label="Git",
+            head="main",
+            status="modified",
+            status_label="modified",
+            root="/tmp/repo",
+            root_label="repo",
+            icon="nemovcs-git",
+            forge_name="GitHub",
+            forge_login="gdisirio",
+        )
+
+        self.assertIn(
+            ("Forge", "GitHub (gdisirio)"),
+            nemo_plugin.location_widget_details(spec),
+        )
+
+    def test_location_widget_details_omit_forge_when_absent(self):
+        spec = nemo_plugin.LocationWidgetSpec(
+            backend="git",
+            backend_label="Git",
+            head="main",
+            status="modified",
+            status_label="modified",
+            root="/tmp/repo",
+            root_label="repo",
+            icon="nemovcs-git",
+        )
+
+        labels = [label for label, _ in nemo_plugin.location_widget_details(spec)]
+        self.assertNotIn("Forge", labels)
+
+    def test_forge_detail_value_omits_login_parens_when_empty(self):
+        self.assertEqual(nemo_plugin.forge_detail_value("GitHub", "gdisirio"), "GitHub (gdisirio)")
+        self.assertEqual(nemo_plugin.forge_detail_value("GitHub", ""), "GitHub")
+
+    def test_forge_summary_for_remote_detects_forge_and_login(self):
+        from nemovcs.forge.base import ForgeAccount
+
+        forge = mock.Mock()
+        forge.label = "GitHub"
+        forge.accounts.return_value = [
+            ForgeAccount("chibios-sheriff", active=False),
+            ForgeAccount("gdisirio", active=True),
+        ]
+        with mock.patch(
+            "nemovcs.forge.detect_forge", return_value=forge
+        ):
+            self.assertEqual(
+                nemo_plugin.forge_summary_for_remote("git@github.com:me/repo.git"),
+                ("GitHub", "gdisirio"),
+            )
+
+    def test_forge_summary_for_remote_empty_when_no_forge(self):
+        self.assertEqual(nemo_plugin.forge_summary_for_remote(""), ("", ""))
+        with mock.patch("nemovcs.forge.detect_forge", return_value=None):
+            self.assertEqual(
+                nemo_plugin.forge_summary_for_remote("git@example.com:me/repo.git"),
+                ("", ""),
+            )
+
     def test_location_widget_details_include_problem_text(self):
         spec = nemo_plugin.LocationWidgetSpec(
             backend="git",

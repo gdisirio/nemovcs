@@ -104,6 +104,8 @@ class LocationWidgetSpec:
     remote: str = ""
     error: str = ""
     worktree_id: str = ""
+    forge_name: str = ""
+    forge_login: str = ""
 
 
 @dataclass
@@ -427,6 +429,8 @@ class NemoVCSInfoProviderCore:
 
         head = str(record.get("head", "")) or "unknown"
         status = str(record.get("status", ""))
+        remote = str(record.get("remote", ""))
+        forge_name, forge_login = forge_summary_for_remote(remote)
         return LocationWidgetSpec(
             backend=backend,
             backend_label=BACKEND_LABELS.get(backend, backend.upper()),
@@ -437,8 +441,10 @@ class NemoVCSInfoProviderCore:
             root=root,
             root_label=Path(root).name or root,
             icon=BACKEND_ICONS.get(backend, MENU_ICON),
-            remote=str(record.get("remote", "")),
+            remote=remote,
             error=str(record.get("error", "")),
+            forge_name=forge_name,
+            forge_login=forge_login,
         )
 
 
@@ -800,6 +806,29 @@ def compact_text(text: str, *, max_chars: int = LOCATION_BAR_MAX_CHARS) -> str:
     return text[: max_chars - 1] + "..."
 
 
+def forge_summary_for_remote(remote: str) -> tuple[str, str]:
+    """Return (forge label, active login) for a remote, or ("", "") if none.
+
+    The forge is detected from the remote URL (network-free); the login is the
+    account the forge CLI is currently logged in as, which is global state that
+    can change independently of the worktree, so it is read here rather than
+    baked into the daemon status record.
+    """
+    if not remote:
+        return "", ""
+    from . import forge as forge_registry
+
+    detected = forge_registry.detect_forge(remote)
+    if detected is None:
+        return "", ""
+    login = next((a.name for a in detected.accounts() if a.active), "")
+    return detected.label, login
+
+
+def forge_detail_value(name: str, login: str) -> str:
+    return f"{name} ({login})" if login else name
+
+
 def location_widget_details(spec: LocationWidgetSpec) -> list[tuple[str, str]]:
     details: list[tuple[str, str]] = [
         ("Worktree", spec.root),
@@ -807,6 +836,10 @@ def location_widget_details(spec: LocationWidgetSpec) -> list[tuple[str, str]]:
     ]
     if spec.head:
         details.append((location_widget_identity_label(spec), spec.head))
+    if spec.forge_name:
+        details.append(
+            ("Forge", forge_detail_value(spec.forge_name, spec.forge_login))
+        )
     if spec.status == "error" and spec.error:
         details.append(("Problem", spec.error))
     return details
