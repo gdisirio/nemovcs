@@ -231,33 +231,59 @@ def notify_daemon_seen(paths: Sequence[str]) -> None:
         pass
 
 
-def cmd_forge(args: argparse.Namespace) -> int:
+def resolve_forge(paths: Sequence[str]):
+    """Resolve the forge for a worktree, or print why not and return None.
+
+    Returns a (forge, root) pair on success, or None after emitting a message.
+    """
     from . import forge
     from . import git
 
-    path = (args.paths or ["."])[0]
+    path = (list(paths) or ["."])[0]
     detected = backends.detect_root(path)
     if detected is None:
         print("not inside a versioned working tree", file=sys.stderr)
-        return 1
+        return None
 
     backend, root = detected
     remote = git.remote_url(root) if backend.id == "git" else ""
     hosting = forge.detect_forge(remote or "")
     if hosting is None:
         print("no forge is associated with this repository", file=sys.stderr)
-        return 1
+        return None
     if not hosting.is_available():
         print(f"{hosting.cli} is not installed", file=sys.stderr)
+        return None
+    return hosting, root
+
+
+def cmd_forge(args: argparse.Namespace) -> int:
+    resolved = resolve_forge(args.paths)
+    if resolved is None:
         return 1
+    hosting, root = resolved
 
     command = hosting.run(args.action, str(root))
     if not command:
         print(f"unknown forge action: {args.action}", file=sys.stderr)
         return 1
 
+    if args.output:
+        from .ui import logger
+
+        title = f"{hosting.label}: {args.action}"
+        return logger.run(title, [logger.CommandPhase(title, root, tuple(command))])
+
     subprocess.Popen(command, cwd=str(root))
     return 0
+
+
+def cmd_forge_dialog(args: argparse.Namespace) -> int:
+    from .ui import change_request_dialog
+
+    return change_request_dialog.run(
+        args.paths or ["."], forge_id=args.forge, action=args.action
+    )
 
 
 def cmd_update(args: argparse.Namespace) -> int:
@@ -721,8 +747,22 @@ def build_parser() -> argparse.ArgumentParser:
         help="run a hosting-forge action for the repository",
     )
     forge_cmd.add_argument("action")
+    forge_cmd.add_argument(
+        "--output",
+        action="store_true",
+        help="show the command's output in a logger window instead of detaching",
+    )
     forge_cmd.add_argument("paths", nargs="*")
     forge_cmd.set_defaults(func=cmd_forge)
+
+    forge_dialog = subparsers.add_parser(
+        "forge-dialog",
+        help="open a GTK dialog for a hosting-forge action",
+    )
+    forge_dialog.add_argument("--forge", default="github")
+    forge_dialog.add_argument("--action", required=True)
+    forge_dialog.add_argument("paths", nargs="*")
+    forge_dialog.set_defaults(func=cmd_forge_dialog)
 
     publish_dialog = subparsers.add_parser(
         "publish-dialog",

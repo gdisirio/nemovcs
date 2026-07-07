@@ -16,6 +16,7 @@ from nemovcs.cli import (
     cmd_diff,
     cmd_diff_dialog,
     cmd_forge,
+    cmd_forge_dialog,
     cmd_init_dialog,
     cmd_log,
     cmd_publish_dialog,
@@ -785,7 +786,7 @@ class ForgeCommandTest(unittest.TestCase):
         return backend
 
     def test_runs_action_command_for_detected_forge(self):
-        args = argparse.Namespace(action="open", paths=["/tmp/repo"])
+        args = argparse.Namespace(action="open", paths=["/tmp/repo"], output=False)
         hosting = mock.Mock()
         hosting.is_available.return_value = True
         hosting.run.return_value = ["gh", "browse"]
@@ -806,7 +807,7 @@ class ForgeCommandTest(unittest.TestCase):
         popen.assert_called_once_with(["gh", "browse"], cwd="/tmp/repo")
 
     def test_reports_unknown_action(self):
-        args = argparse.Namespace(action="mystery", paths=["/tmp/repo"])
+        args = argparse.Namespace(action="mystery", paths=["/tmp/repo"], output=False)
         hosting = mock.Mock()
         hosting.is_available.return_value = True
         hosting.run.return_value = []
@@ -826,7 +827,7 @@ class ForgeCommandTest(unittest.TestCase):
         popen.assert_not_called()
 
     def test_reports_when_no_forge_detected(self):
-        args = argparse.Namespace(action="open", paths=["/tmp/repo"])
+        args = argparse.Namespace(action="open", paths=["/tmp/repo"], output=False)
 
         with mock.patch(
             "nemovcs.backends.detect_root",
@@ -843,7 +844,7 @@ class ForgeCommandTest(unittest.TestCase):
         popen.assert_not_called()
 
     def test_reports_when_not_a_worktree(self):
-        args = argparse.Namespace(action="open", paths=["/tmp/plain"])
+        args = argparse.Namespace(action="open", paths=["/tmp/plain"], output=False)
 
         with mock.patch(
             "nemovcs.backends.detect_root", return_value=None
@@ -853,6 +854,48 @@ class ForgeCommandTest(unittest.TestCase):
             self.assertEqual(cmd_forge(args), 1)
 
         popen.assert_not_called()
+
+    def test_output_action_runs_in_logger_window(self):
+        args = argparse.Namespace(action="cr-list", paths=["/tmp/repo"], output=True)
+        hosting = mock.Mock()
+        hosting.is_available.return_value = True
+        hosting.label = "GitHub"
+        hosting.run.return_value = ["gh", "pr", "list"]
+
+        with mock.patch(
+            "nemovcs.backends.detect_root",
+            return_value=(self._backend(), Path("/tmp/repo")),
+        ), mock.patch(
+            "nemovcs.git.remote_url", return_value="git@github.com:o/r.git"
+        ), mock.patch(
+            "nemovcs.forge.detect_forge", return_value=hosting
+        ), mock.patch(
+            "nemovcs.cli.subprocess.Popen"
+        ) as popen, mock.patch(
+            "nemovcs.ui.logger.run", return_value=0
+        ) as logger_run:
+            self.assertEqual(cmd_forge(args), 0)
+
+        popen.assert_not_called()
+        logger_run.assert_called_once()
+        title, phases = logger_run.call_args.args
+        self.assertEqual(phases[0].command, ("gh", "pr", "list"))
+        self.assertEqual(phases[0].cwd, Path("/tmp/repo"))
+
+
+class ForgeDialogCommandTest(unittest.TestCase):
+    def test_forge_dialog_dispatches_to_change_request_dialog(self):
+        args = argparse.Namespace(
+            forge="github", action="cr-create", paths=["/tmp/repo"]
+        )
+        with mock.patch(
+            "nemovcs.ui.change_request_dialog.run", return_value=0
+        ) as run:
+            self.assertEqual(cmd_forge_dialog(args), 0)
+
+        run.assert_called_once_with(
+            ["/tmp/repo"], forge_id="github", action="cr-create"
+        )
 
 
 if __name__ == "__main__":

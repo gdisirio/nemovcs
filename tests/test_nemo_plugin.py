@@ -1593,12 +1593,13 @@ class ForgeMenuSpecsTest(unittest.TestCase):
             mock.patch("nemovcs.git.remote_url", return_value=remote),
             mock.patch("nemovcs.git.current_branch_name", return_value="main"),
             mock.patch("nemovcs.git.worktree_dirty", return_value=False),
+            mock.patch("nemovcs.git.default_branch_name", return_value="main"),
         )
 
     def test_detected_forge_returns_submenu_with_actions(self):
         hosting = self._forge()
         patches = self._patch_repo("git@github.com:o/r.git")
-        with patches[0], patches[1], patches[2], patches[3], mock.patch(
+        with patches[0], patches[1], patches[2], patches[3], patches[4], mock.patch(
             "nemovcs.forge.detect_forge", return_value=hosting
         ):
             specs = nemo_plugin.forge_menu_specs(["/tmp/repo/src/app.py"])
@@ -1615,6 +1616,34 @@ class ForgeMenuSpecsTest(unittest.TestCase):
             child.command, ("nemovcs", "forge", "open", "/tmp/repo/src/app.py")
         )
 
+    def test_action_command_routes_by_kind(self):
+        from nemovcs.forge.base import (
+            FORGE_ACTION_DIALOG,
+            FORGE_ACTION_OUTPUT,
+            ForgeAction,
+        )
+
+        launch = ForgeAction(id="open", label="Open")
+        output = ForgeAction(id="cr-list", label="List", kind=FORGE_ACTION_OUTPUT)
+        dialog = ForgeAction(id="cr-create", label="Create", kind=FORGE_ACTION_DIALOG)
+        paths = ["/tmp/repo/app.py"]
+
+        self.assertEqual(
+            nemo_plugin.forge_action_command(launch, paths, "github"),
+            ("nemovcs", "forge", "open", "/tmp/repo/app.py"),
+        )
+        self.assertEqual(
+            nemo_plugin.forge_action_command(output, paths, "github"),
+            ("nemovcs", "forge", "--output", "cr-list", "/tmp/repo/app.py"),
+        )
+        self.assertEqual(
+            nemo_plugin.forge_action_command(dialog, paths, "github"),
+            (
+                "nemovcs", "forge-dialog", "--forge", "github",
+                "--action", "cr-create", "/tmp/repo/app.py",
+            ),
+        )
+
     def test_disabled_action_renders_insensitive_with_reason(self):
         from nemovcs.forge.base import ForgeAction
 
@@ -1629,7 +1658,7 @@ class ForgeMenuSpecsTest(unittest.TestCase):
             ]
         )
         patches = self._patch_repo("git@github.com:o/r.git")
-        with patches[0], patches[1], patches[2], patches[3], mock.patch(
+        with patches[0], patches[1], patches[2], patches[3], patches[4], mock.patch(
             "nemovcs.forge.detect_forge", return_value=hosting
         ):
             specs = nemo_plugin.forge_menu_specs(["/tmp/repo"])
@@ -1641,7 +1670,7 @@ class ForgeMenuSpecsTest(unittest.TestCase):
     def test_no_remote_offers_publish_for_available_forges(self):
         hosting = self._forge()
         patches = self._patch_repo("")
-        with patches[0], patches[1], patches[2], patches[3], mock.patch(
+        with patches[0], patches[1], patches[2], patches[3], patches[4], mock.patch(
             "nemovcs.forge.registered_forges", return_value=(hosting,)
         ):
             specs = nemo_plugin.forge_menu_specs(["/tmp/repo"])
@@ -1658,7 +1687,7 @@ class ForgeMenuSpecsTest(unittest.TestCase):
     def test_no_remote_skips_unavailable_forges(self):
         hosting = self._forge(available=False)
         patches = self._patch_repo("")
-        with patches[0], patches[1], patches[2], patches[3], mock.patch(
+        with patches[0], patches[1], patches[2], patches[3], patches[4], mock.patch(
             "nemovcs.forge.registered_forges", return_value=(hosting,)
         ):
             self.assertEqual(nemo_plugin.forge_menu_specs(["/tmp/repo"]), [])
@@ -1669,7 +1698,7 @@ class ForgeMenuSpecsTest(unittest.TestCase):
 
     def test_empty_when_no_forge_detected(self):
         patches = self._patch_repo("git@example.com:o/r.git")
-        with patches[0], patches[1], patches[2], patches[3], mock.patch(
+        with patches[0], patches[1], patches[2], patches[3], patches[4], mock.patch(
             "nemovcs.forge.detect_forge", return_value=None
         ):
             self.assertEqual(nemo_plugin.forge_menu_specs(["/tmp/repo"]), [])

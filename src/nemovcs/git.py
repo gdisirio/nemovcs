@@ -326,6 +326,20 @@ def current_branch_name(root: str | Path) -> str | None:
     return None
 
 
+def default_branch_name(root: str | Path, remote: str = "origin") -> str | None:
+    """Return the remote's default branch (e.g. "main"), or None.
+
+    Reads the cached `refs/remotes/<remote>/HEAD` symbolic ref, which git sets
+    at clone time -- network-free. Returns None when it is not set so callers
+    that compare against the current branch simply skip the comparison.
+    """
+    result = run_git(root, ["symbolic-ref", "--short", f"refs/remotes/{remote}/HEAD"])
+    ref = result.stdout.strip()
+    if result.ok and ref:
+        return ref.split("/", 1)[1] if "/" in ref else ref
+    return None
+
+
 def remote_url(root: str | Path) -> str | None:
     """Return a display remote URL for a worktree, or None when none is set.
 

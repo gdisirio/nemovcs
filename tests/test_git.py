@@ -34,6 +34,16 @@ class GitExecutableAvailabilityTest(unittest.TestCase):
         with mock.patch("nemovcs.git.run_git", return_value=result):
             self.assertIsNone(git.current_branch_name("/tmp/repo"))
 
+    def test_default_branch_name_strips_remote_prefix(self):
+        result = git.GitResult(("git",), Path("/tmp/repo"), 0, "origin/main\n", "")
+        with mock.patch("nemovcs.git.run_git", return_value=result):
+            self.assertEqual(git.default_branch_name("/tmp/repo"), "main")
+
+    def test_default_branch_name_none_when_head_ref_absent(self):
+        result = git.GitResult(("git",), Path("/tmp/repo"), 1, "", "no ref")
+        with mock.patch("nemovcs.git.run_git", return_value=result):
+            self.assertIsNone(git.default_branch_name("/tmp/repo"))
+
     def test_recent_branches_are_sorted_by_git_output_and_limited(self):
         result = git.GitResult(
             ("git",),

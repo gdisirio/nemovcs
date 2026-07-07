@@ -1117,11 +1117,13 @@ def forge_menu_specs(paths: Sequence[str]) -> list[MenuActionSpec]:
             root=str(root),
             remote_url=remote,
             branch=git.current_branch_name(root),
+            default_branch=git.default_branch_name(root),
             worktree_dirty=git.worktree_dirty(root),
             selection=tuple(str(path) for path in paths),
         )
         children = tuple(
-            forge_action_spec(item, paths) for item in hosting.actions(context)
+            forge_action_spec(item, paths, hosting.id)
+            for item in hosting.actions(context)
         )
         if not children:
             return []
@@ -1147,15 +1149,36 @@ def forge_menu_specs(paths: Sequence[str]) -> list[MenuActionSpec]:
     ]
 
 
-def forge_action_spec(item, paths: Sequence[str]) -> MenuActionSpec:
+def forge_action_spec(item, paths: Sequence[str], forge_id: str) -> MenuActionSpec:
     return MenuActionSpec(
         name=f"NemoVCS::Forge::{item.id}",
         label=item.label,
-        command=("nemovcs", "forge", item.id, *paths),
+        command=forge_action_command(item, paths, forge_id),
         tip=item.disabled_reason or item.label.removesuffix("..."),
         icon=item.icon or MENU_ICON,
         sensitive=item.enabled,
     )
+
+
+def forge_action_command(
+    item, paths: Sequence[str], forge_id: str
+) -> tuple[str, ...]:
+    """Map a forge action to the CLI invocation that carries out its kind.
+
+    - launch: spawn the command detached (browser, etc.)
+    - output: run it and show its output in a logger window
+    - dialog: hand off to a GTK form that gathers input before running
+    """
+    from .forge.base import FORGE_ACTION_DIALOG, FORGE_ACTION_OUTPUT
+
+    if item.kind == FORGE_ACTION_DIALOG:
+        return (
+            "nemovcs", "forge-dialog",
+            "--forge", forge_id, "--action", item.id, *paths,
+        )
+    if item.kind == FORGE_ACTION_OUTPUT:
+        return ("nemovcs", "forge", "--output", item.id, *paths)
+    return ("nemovcs", "forge", item.id, *paths)
 
 
 def git_menu_specs(

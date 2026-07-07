@@ -161,19 +161,58 @@ class GitHubForgeTest(unittest.TestCase):
                 ForgeMatch.NONE,
             )
 
-    def test_actions_advertise_open_with_icon(self):
+    def test_actions_advertise_open_and_pull_request_verbs(self):
         actions = GitHubForge().actions(ForgeContext(root="/tmp/repo"))
-        self.assertEqual([a.id for a in actions], ["open"])
-        open_action = actions[0]
-        self.assertEqual(open_action.label, "Open on GitHub")
-        self.assertEqual(open_action.kind, "launch")
-        self.assertEqual(open_action.icon, "web-browser")
-        self.assertTrue(open_action.enabled)
+        by_id = {a.id: a for a in actions}
+        self.assertEqual(list(by_id), ["open", "cr-list", "cr-create"])
+
+        self.assertEqual(by_id["open"].label, "Open on GitHub")
+        self.assertEqual(by_id["open"].kind, "launch")
+        self.assertEqual(by_id["open"].icon, "web-browser")
+
+        self.assertEqual(by_id["cr-list"].label, "List Pull Requests")
+        self.assertEqual(by_id["cr-list"].kind, "output")
+
+        self.assertEqual(by_id["cr-create"].label, "Create Pull Request...")
+        self.assertEqual(by_id["cr-create"].kind, "dialog")
+        self.assertTrue(by_id["cr-create"].enabled)
+
+    def test_create_action_disabled_on_default_branch(self):
+        actions = GitHubForge().actions(
+            ForgeContext(root="/tmp/repo", branch="main", default_branch="main")
+        )
+        create = next(a for a in actions if a.id == "cr-create")
+        self.assertFalse(create.enabled)
+        self.assertIn("feature branch", create.disabled_reason)
+
+    def test_create_action_enabled_on_feature_branch(self):
+        actions = GitHubForge().actions(
+            ForgeContext(root="/tmp/repo", branch="feature", default_branch="main")
+        )
+        create = next(a for a in actions if a.id == "cr-create")
+        self.assertTrue(create.enabled)
 
     def test_run_returns_command_for_known_action_only(self):
         gh = GitHubForge()
         self.assertEqual(gh.run("open", "/tmp/repo"), ["gh", "browse"])
+        self.assertEqual(gh.run("cr-list", "/tmp/repo"), ["gh", "pr", "list"])
         self.assertEqual(gh.run("unknown", "/tmp/repo"), [])
+
+    def test_change_request_create_command(self):
+        gh = GitHubForge()
+        self.assertEqual(
+            gh.change_request_create_command(
+                "/tmp/repo", title="Fix", body="Details", base="main"
+            ),
+            ["gh", "pr", "create", "--title", "Fix", "--body", "Details",
+             "--base", "main"],
+        )
+        self.assertEqual(
+            gh.change_request_create_command(
+                "/tmp/repo", title="Fix", body="", base=None
+            ),
+            ["gh", "pr", "create", "--title", "Fix", "--body", ""],
+        )
 
     def test_publish_command_uses_source_push_and_visibility(self):
         gh = GitHubForge()

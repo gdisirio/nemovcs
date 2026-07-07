@@ -8,7 +8,9 @@ import shutil
 from typing import Sequence
 
 from nemovcs.forge.base import (
+    FORGE_ACTION_DIALOG,
     FORGE_ACTION_LAUNCH,
+    FORGE_ACTION_OUTPUT,
     ForgeAccount,
     ForgeAction,
     ForgeContext,
@@ -21,6 +23,8 @@ GITHUB_CLI = "gh"
 GITHUB_PUBLIC_HOST = "github.com"
 GITHUB_ICON = "nemovcs-git"
 OPEN_ICON = "web-browser"
+CR_LIST_ICON = "nemovcs-show-log"
+CR_CREATE_ICON = "nemovcs-add"
 
 
 def gh_hosts_config_path() -> Path:
@@ -137,6 +141,7 @@ class GitHubForge:
         return shutil.which(self.cli) is not None
 
     def actions(self, context: ForgeContext) -> list[ForgeAction]:
+        cr = self.change_request_label
         return [
             ForgeAction(
                 id="open",
@@ -144,12 +149,54 @@ class GitHubForge:
                 kind=FORGE_ACTION_LAUNCH,
                 icon=OPEN_ICON,
             ),
+            ForgeAction(
+                id="cr-list",
+                label=f"List {cr}s",
+                kind=FORGE_ACTION_OUTPUT,
+                icon=CR_LIST_ICON,
+            ),
+            ForgeAction(
+                id="cr-create",
+                label=f"Create {cr}...",
+                kind=FORGE_ACTION_DIALOG,
+                icon=CR_CREATE_ICON,
+                **self._create_availability(context),
+            ),
         ]
+
+    def _create_availability(self, context: ForgeContext) -> dict:
+        """Disable 'create' when the current branch cannot open a change request.
+
+        A change request compares a feature branch against the default branch,
+        so being on the default branch (when we can tell) makes it impossible.
+        """
+        if (
+            context.branch is not None
+            and context.default_branch is not None
+            and context.branch == context.default_branch
+        ):
+            return {
+                "enabled": False,
+                "disabled_reason": (
+                    f"Switch to a feature branch to open a {self.change_request_label}"
+                ),
+            }
+        return {}
 
     def run(self, action_id: str, root: str) -> list[str]:
         if action_id == "open":
             return [self.cli, "browse"]
+        if action_id == "cr-list":
+            return [self.cli, "pr", "list"]
         return []
+
+    def change_request_create_command(
+        self, root: str, *, title: str, body: str, base: str | None = None
+    ) -> list[str]:
+        command = [self.cli, "pr", "create", "--title", title, "--body", body]
+        if base:
+            command += ["--base", base]
+        return command
 
     def publish_command(self, root: str, name: str, private: bool) -> list[str]:
         visibility = "--private" if private else "--public"
