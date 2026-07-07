@@ -352,17 +352,14 @@ class NemoVCSInfoProviderCore:
         groups: list[MenuGroupSpec] = []
         for backend_id in matching_backend_ids(normalized):
             if backend_id == "git":
-                git_items = list(git_menu_specs(normalized))
                 forge_spec = forge_submenu_spec(normalized)
-                if forge_spec is not None:
-                    git_items.append(forge_spec)
                 groups.append(
                     MenuGroupSpec(
                         name="NemoVCS::GitMenu",
                         label="Git NemoVCS",
                         tip="Git actions",
                         icon=GIT_ICON,
-                        items=tuple(git_items),
+                        items=tuple(git_menu_specs(normalized, forge_spec)),
                     )
                 )
             elif backend_id == "svn":
@@ -1104,7 +1101,10 @@ def forge_action_spec(item, paths: Sequence[str]) -> MenuActionSpec:
     )
 
 
-def git_menu_specs(paths: Sequence[str]) -> list[MenuActionSpec]:
+def git_menu_specs(
+    paths: Sequence[str],
+    forge_spec: MenuActionSpec | None = None,
+) -> list[MenuActionSpec]:
     specs = [
         action("GitCommit", "Commit...", ["commit-dialog", *paths], icon=COMMIT_ICON),
         action("GitUpdate", "Update...", ["update-dialog", *paths], icon=UPDATE_ICON),
@@ -1135,6 +1135,13 @@ def git_menu_specs(paths: Sequence[str]) -> list[MenuActionSpec]:
             separator("GitSep1"),
             action("GitStatus", "Status...", ["status-dialog", *paths], icon=STATUS_ICON),
             action("GitLog", "Log...", ["log-dialog", *paths], icon=LOG_ICON),
+        ]
+    )
+    if forge_spec is not None:
+        specs.append(separator("GitForgeSep"))
+        specs.append(forge_spec)
+    specs.extend(
+        [
             separator("GitSep2"),
             action("GitSettings", "Settings...", ["settings-dialog"], icon=SETTINGS_ICON),
             action("GitAbout", "About...", ["about-dialog"], icon=ABOUT_ICON),

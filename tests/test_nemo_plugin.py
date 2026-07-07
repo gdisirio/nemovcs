@@ -1575,6 +1575,27 @@ class ForgeSubmenuSpecTest(unittest.TestCase):
         ), mock.patch("nemovcs.forge.detect_forge", return_value=hosting):
             self.assertIsNone(nemo_plugin.forge_submenu_spec(["/tmp/repo"]))
 
+    def test_git_menu_places_forge_after_log_with_separator(self):
+        forge_spec = nemo_plugin.MenuActionSpec(
+            name="NemoVCS::Forge", label="GitHub"
+        )
+        specs = nemo_plugin.git_menu_specs(["/tmp/a", "/tmp/b"], forge_spec)
+        names = [spec.name for spec in specs]
+
+        log_index = names.index("NemoVCS::GitLog")
+        self.assertEqual(names[log_index + 1], "NemoVCS::GitForgeSep")
+        self.assertTrue(specs[log_index + 1].separator)
+        self.assertEqual(names[log_index + 2], "NemoVCS::Forge")
+        self.assertEqual(names[log_index + 3], "NemoVCS::GitSep2")
+
+    def test_git_menu_omits_forge_separator_without_forge(self):
+        specs = nemo_plugin.git_menu_specs(["/tmp/a", "/tmp/b"])
+        names = [spec.name for spec in specs]
+
+        self.assertNotIn("NemoVCS::GitForgeSep", names)
+        log_index = names.index("NemoVCS::GitLog")
+        self.assertEqual(names[log_index + 1], "NemoVCS::GitSep2")
+
     def test_git_submenu_group_includes_forge_submenu(self):
         core = nemo_plugin.NemoVCSInfoProviderCore()
         forge_spec = nemo_plugin.MenuActionSpec(
