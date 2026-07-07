@@ -201,8 +201,27 @@ sessions. Update this file before pushing changes.
 - New icon resources: `emblem-nemovcs-problems.svg` and
   `emblem-nemovcs-problems-small.svg`. Installer/uninstaller and the statusd
   settings cache view know about the new problem emblem.
+- Forge detection seam (`src/nemovcs/forge/`): a `Forge` abstraction layered on
+  top of the VCS backends for hosting services (GitHub via `gh`, later GitLab
+  via `glab`, Gitea/Forgejo via `tea`). Detection is delegated to each adapter
+  like `detect_backend`: `detect_forge(remote_url)` asks every forge for a
+  `ForgeMatch` (NONE/WEAK/STRONG) and picks the strongest, so self-hosted hosts
+  resolve without a central table. `parse_remote_host` (shared) handles https,
+  ssh://, and scp-like remotes; `GitHubForge.match_remote` classifies via the
+  public host, `gh`'s locally-configured hosts (`hosts.yml`, network-free), or a
+  `github.*` heuristic. Only the detection seam exists so far -- no capability
+  verbs yet. Verified live: this repo's SSH remote resolves to the GitHub forge.
 
 ## Next Likely Tasks
+
+- Forge integration, next steps on the detection seam (`src/nemovcs/forge/`):
+  wire `detect_forge` into the daemon scan so a `forge` id rides on the status
+  record next to `remote` (compute-once, cached), then add the agreed common
+  capability set (open-in-browser, publish, list/create/checkout change
+  request, show active account) as forge-neutral verbs with per-adapter
+  capability advertisement and per-forge labels (PR vs MR). Add the `glab`
+  (GitLab) adapter second to validate the verbs are truly forge-neutral. Keep
+  destructive ops (merge/close/delete) out — do those in the browser.
 
 - Log dialog follow-ups: implement real backend paging for "Show more"
   (`--skip` for Git, revision-range for SVN) instead of re-fetching a larger
