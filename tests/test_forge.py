@@ -3,7 +3,7 @@ from unittest import mock
 
 from nemovcs import forge
 from nemovcs.forge import github
-from nemovcs.forge.base import ForgeMatch, parse_remote_host
+from nemovcs.forge.base import ForgeContext, ForgeMatch, parse_remote_host
 from nemovcs.forge.github import (
     GitHubForge,
     classify_github_host,
@@ -130,11 +130,19 @@ class GitHubForgeTest(unittest.TestCase):
                 ForgeMatch.NONE,
             )
 
-    def test_open_in_browser_command(self):
-        self.assertEqual(
-            GitHubForge().open_in_browser_command("/tmp/repo"),
-            ["gh", "browse"],
-        )
+    def test_actions_advertise_open_with_icon(self):
+        actions = GitHubForge().actions(ForgeContext(root="/tmp/repo"))
+        self.assertEqual([a.id for a in actions], ["open"])
+        open_action = actions[0]
+        self.assertEqual(open_action.label, "Open on GitHub")
+        self.assertEqual(open_action.kind, "launch")
+        self.assertEqual(open_action.icon, "web-browser")
+        self.assertTrue(open_action.enabled)
+
+    def test_run_returns_command_for_known_action_only(self):
+        gh = GitHubForge()
+        self.assertEqual(gh.run("open", "/tmp/repo"), ["gh", "browse"])
+        self.assertEqual(gh.run("unknown", "/tmp/repo"), [])
 
     def test_is_available_follows_cli_presence(self):
         gh = GitHubForge()

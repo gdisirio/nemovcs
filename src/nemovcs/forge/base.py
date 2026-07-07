@@ -8,9 +8,16 @@ whether it recognizes a remote, so dispatch never needs a central host table.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from enum import IntEnum
 from typing import Protocol
 from urllib.parse import urlsplit
+
+
+# How the plugin should surface a forge action.
+FORGE_ACTION_LAUNCH = "launch"   # spawn the command (e.g. open a browser)
+FORGE_ACTION_OUTPUT = "output"   # run the command, show output in the logger
+FORGE_ACTION_DIALOG = "dialog"   # hand off to a GTK dialog in ui/
 
 
 class ForgeMatch(IntEnum):
@@ -60,14 +67,45 @@ def parse_remote_host(remote_url: str) -> str | None:
     return None
 
 
+@dataclass(frozen=True)
+class ForgeContext:
+    """Cheap, network-free signals gathered once per menu build.
+
+    Passed to `Forge.actions` so an adapter can decide which actions to show and
+    whether each is enabled without doing any I/O of its own.
+    """
+
+    root: str
+    remote_url: str = ""
+    branch: str | None = None
+    default_branch: str | None = None
+    worktree_dirty: bool = False
+    selection: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class ForgeAction:
+    """A menu action a forge advertises for a given context."""
+
+    id: str
+    label: str
+    kind: str = FORGE_ACTION_LAUNCH
+    icon: str | None = None
+    enabled: bool = True
+    disabled_reason: str = ""
+
+
 class Forge(Protocol):
     id: str
     label: str
     cli: str
+    icon: str
     change_request_label: str
 
     def match_remote(self, remote_url: str) -> ForgeMatch: ...
 
     def is_available(self) -> bool: ...
 
-    def open_in_browser_command(self, root: str) -> list[str]: ...
+    def actions(self, context: ForgeContext) -> list[ForgeAction]: ...
+
+    def run(self, action_id: str, root: str) -> list[str]: ...

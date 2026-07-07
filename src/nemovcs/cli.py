@@ -186,7 +186,7 @@ def cmd_log_dialog(args: argparse.Namespace) -> int:
     return log_dialog.run(args.paths or ["."], args.limit)
 
 
-def cmd_forge_open(args: argparse.Namespace) -> int:
+def cmd_forge(args: argparse.Namespace) -> int:
     from . import forge
     from . import git
 
@@ -206,7 +206,12 @@ def cmd_forge_open(args: argparse.Namespace) -> int:
         print(f"{hosting.cli} is not installed", file=sys.stderr)
         return 1
 
-    subprocess.Popen(hosting.open_in_browser_command(str(root)), cwd=str(root))
+    command = hosting.run(args.action, str(root))
+    if not command:
+        print(f"unknown forge action: {args.action}", file=sys.stderr)
+        return 1
+
+    subprocess.Popen(command, cwd=str(root))
     return 0
 
 
@@ -658,12 +663,13 @@ def build_parser() -> argparse.ArgumentParser:
     log_dialog.add_argument("paths", nargs="*")
     log_dialog.set_defaults(func=cmd_log_dialog)
 
-    forge_open = subparsers.add_parser(
-        "forge-open",
-        help="open the repository on its hosting forge in a browser",
+    forge_cmd = subparsers.add_parser(
+        "forge",
+        help="run a hosting-forge action for the repository",
     )
-    forge_open.add_argument("paths", nargs="*")
-    forge_open.set_defaults(func=cmd_forge_open)
+    forge_cmd.add_argument("action")
+    forge_cmd.add_argument("paths", nargs="*")
+    forge_cmd.set_defaults(func=cmd_forge)
 
     update = subparsers.add_parser("update", help="update the current VCS worktree")
     update.add_argument("paths", nargs="*")

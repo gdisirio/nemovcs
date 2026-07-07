@@ -1053,32 +1053,54 @@ def forge_submenu_spec(paths: Sequence[str]) -> MenuActionSpec | None:
 
     Forges sit on top of Git, so this resolves the worktree's remote, asks the
     forge registry which forge owns it, and only builds the submenu when an
-    available forge is found. No forge (or its CLI missing) means no submenu.
+    available forge advertises at least one action. The forge owns its label,
+    icon, and action list (resolved against a network-free context); the plugin
+    only renders them. No forge (or its CLI missing) means no submenu.
     """
     from . import forge as forge_registry
     from . import git
+    from .forge.base import ForgeContext
 
     if not paths:
         return None
     root = git.repo_root(paths[0])
     if root is None:
         return None
-    hosting = forge_registry.detect_forge(git.remote_url(root) or "")
+    remote = git.remote_url(root) or ""
+    hosting = forge_registry.detect_forge(remote)
     if hosting is None or not hosting.is_available():
+        return None
+
+    context = ForgeContext(
+        root=str(root),
+        remote_url=remote,
+        branch=git.current_branch_name(root),
+        worktree_dirty=git.worktree_dirty(root),
+        selection=tuple(str(path) for path in paths),
+    )
+    children = tuple(
+        forge_action_spec(item, paths) for item in hosting.actions(context)
+    )
+    if not children:
         return None
 
     return MenuActionSpec(
         name="NemoVCS::Forge",
         label=hosting.label,
         tip=f"{hosting.label} actions",
-        icon=MENU_ICON,
-        children=(
-            action(
-                "ForgeOpen",
-                f"Open on {hosting.label}",
-                ["forge-open", *paths],
-            ),
-        ),
+        icon=hosting.icon,
+        children=children,
+    )
+
+
+def forge_action_spec(item, paths: Sequence[str]) -> MenuActionSpec:
+    return MenuActionSpec(
+        name=f"NemoVCS::Forge::{item.id}",
+        label=item.label,
+        command=("nemovcs", "forge", item.id, *paths),
+        tip=item.disabled_reason or item.label.removesuffix("..."),
+        icon=item.icon or MENU_ICON,
+        sensitive=item.enabled,
     )
 
 

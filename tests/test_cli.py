@@ -15,7 +15,7 @@ from nemovcs.cli import (
     cmd_commit,
     cmd_diff,
     cmd_diff_dialog,
-    cmd_forge_open,
+    cmd_forge,
     cmd_log,
     cmd_push,
     cmd_revert_dialog,
@@ -704,17 +704,17 @@ class CliParserTest(unittest.TestCase):
             self.assertEqual(cmd_rename_dialog(args), 1)
 
 
-class ForgeOpenCommandTest(unittest.TestCase):
+class ForgeCommandTest(unittest.TestCase):
     def _backend(self):
         backend = mock.Mock()
         backend.id = "git"
         return backend
 
-    def test_launches_browser_command_for_detected_forge(self):
-        args = argparse.Namespace(paths=["/tmp/repo"])
+    def test_runs_action_command_for_detected_forge(self):
+        args = argparse.Namespace(action="open", paths=["/tmp/repo"])
         hosting = mock.Mock()
         hosting.is_available.return_value = True
-        hosting.open_in_browser_command.return_value = ["gh", "browse"]
+        hosting.run.return_value = ["gh", "browse"]
 
         with mock.patch(
             "nemovcs.backends.detect_root",
@@ -726,12 +726,33 @@ class ForgeOpenCommandTest(unittest.TestCase):
         ), mock.patch(
             "nemovcs.cli.subprocess.Popen"
         ) as popen:
-            self.assertEqual(cmd_forge_open(args), 0)
+            self.assertEqual(cmd_forge(args), 0)
 
+        hosting.run.assert_called_once_with("open", "/tmp/repo")
         popen.assert_called_once_with(["gh", "browse"], cwd="/tmp/repo")
 
+    def test_reports_unknown_action(self):
+        args = argparse.Namespace(action="mystery", paths=["/tmp/repo"])
+        hosting = mock.Mock()
+        hosting.is_available.return_value = True
+        hosting.run.return_value = []
+
+        with mock.patch(
+            "nemovcs.backends.detect_root",
+            return_value=(self._backend(), Path("/tmp/repo")),
+        ), mock.patch(
+            "nemovcs.git.remote_url", return_value="git@github.com:o/r.git"
+        ), mock.patch(
+            "nemovcs.forge.detect_forge", return_value=hosting
+        ), mock.patch(
+            "nemovcs.cli.subprocess.Popen"
+        ) as popen, mock.patch("sys.stderr", new=io.StringIO()):
+            self.assertEqual(cmd_forge(args), 1)
+
+        popen.assert_not_called()
+
     def test_reports_when_no_forge_detected(self):
-        args = argparse.Namespace(paths=["/tmp/repo"])
+        args = argparse.Namespace(action="open", paths=["/tmp/repo"])
 
         with mock.patch(
             "nemovcs.backends.detect_root",
@@ -743,19 +764,19 @@ class ForgeOpenCommandTest(unittest.TestCase):
         ), mock.patch(
             "nemovcs.cli.subprocess.Popen"
         ) as popen, mock.patch("sys.stderr", new=io.StringIO()):
-            self.assertEqual(cmd_forge_open(args), 1)
+            self.assertEqual(cmd_forge(args), 1)
 
         popen.assert_not_called()
 
     def test_reports_when_not_a_worktree(self):
-        args = argparse.Namespace(paths=["/tmp/plain"])
+        args = argparse.Namespace(action="open", paths=["/tmp/plain"])
 
         with mock.patch(
             "nemovcs.backends.detect_root", return_value=None
         ), mock.patch(
             "nemovcs.cli.subprocess.Popen"
         ) as popen, mock.patch("sys.stderr", new=io.StringIO()):
-            self.assertEqual(cmd_forge_open(args), 1)
+            self.assertEqual(cmd_forge(args), 1)
 
         popen.assert_not_called()
 

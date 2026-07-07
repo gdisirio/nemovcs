@@ -1475,28 +1475,71 @@ class NemoVCSInfoProviderCoreTest(unittest.TestCase):
 
 
 class ForgeSubmenuSpecTest(unittest.TestCase):
-    def _forge(self, *, available=True, label="GitHub"):
+    def _forge(self, *, available=True, label="GitHub", actions=None):
+        from nemovcs.forge.base import ForgeAction
+
         forge = mock.Mock()
         forge.label = label
+        forge.icon = "nemovcs-git"
         forge.is_available.return_value = available
+        forge.actions.return_value = (
+            actions
+            if actions is not None
+            else [
+                ForgeAction(id="open", label="Open on GitHub", icon="web-browser"),
+            ]
+        )
         return forge
 
     def test_builds_submenu_when_available_forge_detected(self):
+        hosting = self._forge()
         with mock.patch("nemovcs.git.repo_root", return_value=Path("/tmp/repo")), (
-            mock.patch(
-                "nemovcs.git.remote_url", return_value="git@github.com:o/r.git"
-            )
-        ), mock.patch("nemovcs.forge.detect_forge", return_value=self._forge()):
+            mock.patch("nemovcs.git.remote_url", return_value="git@github.com:o/r.git")
+        ), mock.patch(
+            "nemovcs.git.current_branch_name", return_value="main"
+        ), mock.patch(
+            "nemovcs.git.worktree_dirty", return_value=False
+        ), mock.patch("nemovcs.forge.detect_forge", return_value=hosting):
             spec = nemo_plugin.forge_submenu_spec(["/tmp/repo/src/app.py"])
 
         assert spec is not None
         self.assertEqual(spec.label, "GitHub")
+        self.assertEqual(spec.icon, "nemovcs-git")
         self.assertEqual(len(spec.children), 1)
         child = spec.children[0]
         self.assertEqual(child.label, "Open on GitHub")
+        self.assertEqual(child.icon, "web-browser")
+        self.assertTrue(child.sensitive)
         self.assertEqual(
-            child.command, ("nemovcs", "forge-open", "/tmp/repo/src/app.py")
+            child.command, ("nemovcs", "forge", "open", "/tmp/repo/src/app.py")
         )
+
+    def test_disabled_action_renders_insensitive_with_reason(self):
+        from nemovcs.forge.base import ForgeAction
+
+        hosting = self._forge(
+            actions=[
+                ForgeAction(
+                    id="create-pr",
+                    label="Create Pull Request",
+                    enabled=False,
+                    disabled_reason="current branch is the default branch",
+                ),
+            ]
+        )
+        with mock.patch("nemovcs.git.repo_root", return_value=Path("/tmp/repo")), (
+            mock.patch("nemovcs.git.remote_url", return_value="git@github.com:o/r.git")
+        ), mock.patch(
+            "nemovcs.git.current_branch_name", return_value="main"
+        ), mock.patch(
+            "nemovcs.git.worktree_dirty", return_value=False
+        ), mock.patch("nemovcs.forge.detect_forge", return_value=hosting):
+            spec = nemo_plugin.forge_submenu_spec(["/tmp/repo"])
+
+        assert spec is not None
+        child = spec.children[0]
+        self.assertFalse(child.sensitive)
+        self.assertEqual(child.tip, "current branch is the default branch")
 
     def test_none_without_repo_root(self):
         with mock.patch("nemovcs.git.repo_root", return_value=None):
@@ -1519,6 +1562,17 @@ class ForgeSubmenuSpecTest(unittest.TestCase):
             "nemovcs.forge.detect_forge",
             return_value=self._forge(available=False),
         ):
+            self.assertIsNone(nemo_plugin.forge_submenu_spec(["/tmp/repo"]))
+
+    def test_none_when_no_actions_advertised(self):
+        hosting = self._forge(actions=[])
+        with mock.patch("nemovcs.git.repo_root", return_value=Path("/tmp/repo")), (
+            mock.patch("nemovcs.git.remote_url", return_value="git@github.com:o/r.git")
+        ), mock.patch(
+            "nemovcs.git.current_branch_name", return_value="main"
+        ), mock.patch(
+            "nemovcs.git.worktree_dirty", return_value=False
+        ), mock.patch("nemovcs.forge.detect_forge", return_value=hosting):
             self.assertIsNone(nemo_plugin.forge_submenu_spec(["/tmp/repo"]))
 
     def test_git_submenu_group_includes_forge_submenu(self):

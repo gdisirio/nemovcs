@@ -212,12 +212,22 @@ sessions. Update this file before pushing changes.
   `github.*` heuristic. Verified live: this repo's SSH remote resolves to the
   GitHub forge.
 - Forge menu wiring: when a repository has an associated, available forge, a
-  submenu labelled by the forge (`Forge.label`, e.g. "GitHub") appears inside
-  the "Git NemoVCS" group; with no forge the submenu is absent. Detection runs
-  in `forge_submenu_spec` (git-only, off the resolved remote) so `git_menu_specs`
-  stays pure. The first capability verb is `open_in_browser_command`
-  (`gh browse`), driven by the new `nemovcs forge-open` CLI command. Verified
-  live: `gh browse` resolves this repo's GitHub URL.
+  submenu labelled and iconed by the forge appears inside the "Git NemoVCS"
+  group; with no forge (or no advertised actions) the submenu is absent.
+- Forge actions are data-driven. Each adapter advertises its actions via
+  `Forge.actions(ForgeContext) -> [ForgeAction]`, where `ForgeContext` carries
+  cheap, network-free signals (root, remote, branch, worktree_dirty, selection)
+  the plugin gathers once per menu build. A `ForgeAction` is
+  `(id, label, kind, icon, enabled, disabled_reason)`; the adapter decides
+  visibility (omit) and enabled-state (with a reason) from the context, and the
+  plugin renders each to a `MenuActionSpec` (icon, `sensitive`, tooltip).
+  `kind` is launch/output/dialog for how the plugin surfaces it (only launch so
+  far). Icons are themed name strings owned by the adapter (`Forge.icon`,
+  `ForgeAction.icon`); dedicated forge SVGs are a follow-up (GitHub currently
+  reuses `nemovcs-git` and the system `web-browser` icon). Actions execute
+  through a generic `nemovcs forge <action-id>` command that calls
+  `Forge.run(action_id, root)`. GitHub advertises one action so far, `open`
+  (`gh browse`). Verified live: detection + actions + run resolve for this repo.
 
 ## Next Likely Tasks
 

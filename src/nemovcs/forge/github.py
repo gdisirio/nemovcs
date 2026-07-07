@@ -7,11 +7,19 @@ from pathlib import Path
 import shutil
 from typing import Sequence
 
-from nemovcs.forge.base import ForgeMatch, parse_remote_host
+from nemovcs.forge.base import (
+    FORGE_ACTION_LAUNCH,
+    ForgeAction,
+    ForgeContext,
+    ForgeMatch,
+    parse_remote_host,
+)
 
 
 GITHUB_CLI = "gh"
 GITHUB_PUBLIC_HOST = "github.com"
+GITHUB_ICON = "nemovcs-git"
+OPEN_ICON = "web-browser"
 
 
 def gh_hosts_config_path() -> Path:
@@ -59,6 +67,7 @@ class GitHubForge:
     id = "github"
     label = "GitHub"
     cli = GITHUB_CLI
+    icon = GITHUB_ICON
     change_request_label = "Pull Request"
 
     def authenticated_hosts(self) -> list[str]:
@@ -77,5 +86,17 @@ class GitHubForge:
     def is_available(self) -> bool:
         return shutil.which(self.cli) is not None
 
-    def open_in_browser_command(self, root: str) -> list[str]:
-        return [self.cli, "browse"]
+    def actions(self, context: ForgeContext) -> list[ForgeAction]:
+        return [
+            ForgeAction(
+                id="open",
+                label=f"Open on {self.label}",
+                kind=FORGE_ACTION_LAUNCH,
+                icon=OPEN_ICON,
+            ),
+        ]
+
+    def run(self, action_id: str, root: str) -> list[str]:
+        if action_id == "open":
+            return [self.cli, "browse"]
+        return []
