@@ -9,11 +9,19 @@ manual testing and hardening before unattended daily use.
 ## Features
 
 - Context menu actions inside Git and Subversion working trees.
-- Clone and checkout actions for unversioned directories.
+- Clone and checkout actions for unversioned directories, plus creating a new
+  local Git repository (`git init`) in an unversioned directory.
 - GTK dialogs for stage/add, commit, rename, revert, status, update, push, log,
-  settings, and about.
+  branch switch, settings, and about.
+- Hosting-forge integration, currently GitHub through the `gh` CLI:
+  - forge submenu that appears only when the repository's remote is recognized;
+  - open the repository on the forge in a browser;
+  - list pull requests and create a pull request from the current branch;
+  - publish an unpublished local repository to the forge, choosing the account
+    when more than one is logged in.
 - Meld integration for selected-path diffs and two-path comparisons.
-- Repository context bar showing backend, active branch/head, status, and root.
+- Repository context bar showing backend, active branch/head, status, root,
+  remote URL, and the detected forge with its active account.
 - Live status emblems in Nemo:
   - clean paths,
   - modified paths and folders,
@@ -37,6 +45,8 @@ Required:
 Optional:
 
 - Meld, for the `Diff...` action.
+- GitHub CLI (`gh`), for the GitHub forge integration (open on GitHub, pull
+  requests, publish).
 
 NemoVCS shells out to native VCS tools such as `git` and `svn`. It does not use
 Python VCS libraries.
@@ -92,23 +102,38 @@ Top-level actions:
 
 - `Diff...`
 
-Backend submenu actions:
+Actions are grouped under a per-backend submenu (`Git NemoVCS` / `SVN NemoVCS`).
+The items shown depend on context: whether the path is versioned, unversioned,
+a single selection, and, for forge items, whether the remote is recognized.
 
-- `Git NemoVCS`
-- `SVN NemoVCS`
+Working-tree actions:
+
 - `Commit...`
 - `Update...`
-- `Git Clone...`
-- `SVN Checkout...`
-- `Stage...`
-- `Add...`
-- `Rename...`
+- `Stage...` / `Add...`
+- `Rename...` (single selection)
+- `Switch Branch` (Git, single selection; submenu of recent branches)
 - `Revert...`
 - `Push...`
 - `Status...`
 - `Log...`
 - `Settings...`
 - `About...`
+
+Unversioned-directory actions:
+
+- `Git Clone...`
+- `SVN Checkout...`
+- `Create Repository...` (initialize a new local Git repository)
+
+Forge submenu (shown when a remote is recognized, e.g. GitHub):
+
+- `Open on GitHub`
+- `List Pull Requests`
+- `Create Pull Request...` (disabled while on the default branch)
+
+When a repository has no remote yet, a `Publish to <forge>...` action is offered
+instead, which creates the remote repository and pushes to it.
 
 The status daemon is started automatically through session DBus activation when
 Nemo asks for status.
