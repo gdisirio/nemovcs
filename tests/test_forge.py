@@ -144,6 +144,20 @@ class GitHubForgeTest(unittest.TestCase):
         self.assertEqual(gh.run("open", "/tmp/repo"), ["gh", "browse"])
         self.assertEqual(gh.run("unknown", "/tmp/repo"), [])
 
+    def test_publish_command_uses_source_push_and_visibility(self):
+        gh = GitHubForge()
+        self.assertEqual(
+            gh.publish_command("/tmp/repo", "myrepo", True),
+            [
+                "gh", "repo", "create", "myrepo",
+                "--source", "/tmp/repo", "--push", "--private",
+            ],
+        )
+        self.assertEqual(
+            gh.publish_command("/tmp/repo", "myrepo", False)[-1],
+            "--public",
+        )
+
     def test_is_available_follows_cli_presence(self):
         gh = GitHubForge()
         with mock.patch("nemovcs.forge.github.shutil.which", return_value="/usr/bin/gh"):

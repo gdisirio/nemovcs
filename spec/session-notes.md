@@ -225,6 +225,18 @@ sessions. Update this file before pushing changes.
   pathless whole-worktree signals); (2) `init-dialog`, on success, nudges the
   daemon via `notify_daemon_seen` (`call_seen`) so it scans the new repo and
   emits `StatusChanged`, which the plugin then maps to the visible item by path.
+- Forge menu wiring (`forge_menu_specs`): a Git repo shows either the
+  detected-forge submenu (has a remote a forge recognizes) OR, when it has no
+  remote, a "Publish to <forge>..." action per available forge -- publish is
+  how a local repo adopts a forge, so it can't live behind remote-based forge
+  detection. Both are inserted after "Log..." with a separator (only when
+  present). git_menu_specs now takes an `extra_specs` list.
+- Publish: `nemovcs publish-dialog --forge <id>` opens `ui/publish_dialog.py`
+  (repository name defaulting to the directory name + a Private checkbox),
+  running `Forge.publish_command(root, name, private)` through the logger. For
+  GitHub that is `gh repo create <name> --source <root> --push --private/--public`.
+  On success the daemon is nudged (`notify_daemon_seen`) so the remote/context
+  bar refreshes and the menu flips from "Publish" to the detected-forge submenu.
 - Forge menu wiring: when a repository has an associated, available forge, a
   submenu labelled and iconed by the forge appears inside the "Git NemoVCS"
   group; with no forge (or no advertised actions) the submenu is absent.
@@ -246,7 +258,7 @@ sessions. Update this file before pushing changes.
 ## Next Likely Tasks
 
 - Forge integration next steps: add the remaining common capability verbs
-  beyond open-in-browser (publish, list/create/checkout change request, show
+  beyond open-in-browser and publish (list/create/checkout change request, show
   active account) with per-adapter capability advertisement so the submenu only
   shows supported actions, and per-forge labels (PR vs MR). The list/create
   change-request actions want a dialog (reuse the Log dialog TreeView pattern).

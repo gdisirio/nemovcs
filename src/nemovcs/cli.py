@@ -206,6 +206,15 @@ def cmd_init_dialog(args: argparse.Namespace) -> int:
     return exit_code
 
 
+def cmd_publish_dialog(args: argparse.Namespace) -> int:
+    from .ui import publish_dialog
+
+    exit_code = publish_dialog.run(args.paths or ["."], forge_id=args.forge)
+    if exit_code == 0:
+        notify_daemon_seen(args.paths)
+    return exit_code
+
+
 def notify_daemon_seen(paths: Sequence[str]) -> None:
     """Prompt the status daemon to (re)scan paths and emit StatusChanged.
 
@@ -714,6 +723,14 @@ def build_parser() -> argparse.ArgumentParser:
     forge_cmd.add_argument("action")
     forge_cmd.add_argument("paths", nargs="*")
     forge_cmd.set_defaults(func=cmd_forge)
+
+    publish_dialog = subparsers.add_parser(
+        "publish-dialog",
+        help="publish a local repository to a hosting forge",
+    )
+    publish_dialog.add_argument("--forge", default="github")
+    publish_dialog.add_argument("paths", nargs="*")
+    publish_dialog.set_defaults(func=cmd_publish_dialog)
 
     update = subparsers.add_parser("update", help="update the current VCS worktree")
     update.add_argument("paths", nargs="*")

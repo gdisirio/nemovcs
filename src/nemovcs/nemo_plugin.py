@@ -361,14 +361,14 @@ class NemoVCSInfoProviderCore:
         groups: list[MenuGroupSpec] = []
         for backend_id in matching_backend_ids(normalized):
             if backend_id == "git":
-                forge_spec = forge_submenu_spec(normalized)
+                extras = forge_menu_specs(normalized)
                 groups.append(
                     MenuGroupSpec(
                         name="NemoVCS::GitMenu",
                         label="Git NemoVCS",
                         tip="Git actions",
                         icon=GIT_ICON,
-                        items=tuple(git_menu_specs(normalized, forge_spec)),
+                        items=tuple(git_menu_specs(normalized, extras)),
                     )
                 )
             elif backend_id == "svn":
@@ -1054,49 +1054,64 @@ def is_clone_target(path: str | Path) -> bool:
     return candidate.is_dir() and backends.detect_backend(candidate) is None
 
 
-def forge_submenu_spec(paths: Sequence[str]) -> MenuActionSpec | None:
-    """Return a hosting-forge submenu for the repository, or None.
+def forge_menu_specs(paths: Sequence[str]) -> list[MenuActionSpec]:
+    """Return the forge-related menu items for a Git repository.
 
-    Forges sit on top of Git, so this resolves the worktree's remote, asks the
-    forge registry which forge owns it, and only builds the submenu when an
-    available forge advertises at least one action. The forge owns its label,
-    icon, and action list (resolved against a network-free context); the plugin
-    only renders them. No forge (or its CLI missing) means no submenu.
+    Two mutually exclusive cases:
+      - the repository has a remote that a forge recognizes -> a submenu
+        labelled and iconed by the forge, filled with the actions the adapter
+        advertises for the current (network-free) context;
+      - the repository has no remote -> a "Publish to <forge>..." action for
+        each available forge, since publish is how a local repo adopts a forge.
+    Anything else (not a repo, no forge, no advertised actions) -> no items.
     """
     from . import forge as forge_registry
     from . import git
     from .forge.base import ForgeContext
 
     if not paths:
-        return None
+        return []
     root = git.repo_root(paths[0])
     if root is None:
-        return None
+        return []
     remote = git.remote_url(root) or ""
-    hosting = forge_registry.detect_forge(remote)
-    if hosting is None or not hosting.is_available():
-        return None
 
-    context = ForgeContext(
-        root=str(root),
-        remote_url=remote,
-        branch=git.current_branch_name(root),
-        worktree_dirty=git.worktree_dirty(root),
-        selection=tuple(str(path) for path in paths),
-    )
-    children = tuple(
-        forge_action_spec(item, paths) for item in hosting.actions(context)
-    )
-    if not children:
-        return None
+    if remote:
+        hosting = forge_registry.detect_forge(remote)
+        if hosting is None or not hosting.is_available():
+            return []
+        context = ForgeContext(
+            root=str(root),
+            remote_url=remote,
+            branch=git.current_branch_name(root),
+            worktree_dirty=git.worktree_dirty(root),
+            selection=tuple(str(path) for path in paths),
+        )
+        children = tuple(
+            forge_action_spec(item, paths) for item in hosting.actions(context)
+        )
+        if not children:
+            return []
+        return [
+            MenuActionSpec(
+                name="NemoVCS::Forge",
+                label=hosting.label,
+                tip=f"{hosting.label} actions",
+                icon=hosting.icon,
+                children=children,
+            )
+        ]
 
-    return MenuActionSpec(
-        name="NemoVCS::Forge",
-        label=hosting.label,
-        tip=f"{hosting.label} actions",
-        icon=hosting.icon,
-        children=children,
-    )
+    return [
+        action(
+            f"Publish{forge.id}",
+            f"Publish to {forge.label}...",
+            ["publish-dialog", "--forge", forge.id, *paths],
+            icon=forge.icon,
+        )
+        for forge in forge_registry.registered_forges()
+        if forge.is_available()
+    ]
 
 
 def forge_action_spec(item, paths: Sequence[str]) -> MenuActionSpec:
@@ -1112,7 +1127,7 @@ def forge_action_spec(item, paths: Sequence[str]) -> MenuActionSpec:
 
 def git_menu_specs(
     paths: Sequence[str],
-    forge_spec: MenuActionSpec | None = None,
+    extra_specs: Sequence[MenuActionSpec] = (),
 ) -> list[MenuActionSpec]:
     specs = [
         action("GitCommit", "Commit...", ["commit-dialog", *paths], icon=COMMIT_ICON),
@@ -1146,9 +1161,9 @@ def git_menu_specs(
             action("GitLog", "Log...", ["log-dialog", *paths], icon=LOG_ICON),
         ]
     )
-    if forge_spec is not None:
+    if extra_specs:
         specs.append(separator("GitForgeSep"))
-        specs.append(forge_spec)
+        specs.extend(extra_specs)
     specs.extend(
         [
             separator("GitSep2"),

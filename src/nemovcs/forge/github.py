@@ -100,3 +100,16 @@ class GitHubForge:
         if action_id == "open":
             return [self.cli, "browse"]
         return []
+
+    def publish_command(self, root: str, name: str, private: bool) -> list[str]:
+        visibility = "--private" if private else "--public"
+        return [
+            self.cli,
+            "repo",
+            "create",
+            name,
+            "--source",
+            str(root),
+            "--push",
+            visibility,
+        ]

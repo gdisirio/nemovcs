@@ -18,6 +18,7 @@ from nemovcs.cli import (
     cmd_forge,
     cmd_init_dialog,
     cmd_log,
+    cmd_publish_dialog,
     cmd_push,
     cmd_revert_dialog,
     cmd_rename_dialog,
@@ -750,6 +751,29 @@ class InitCommandTest(unittest.TestCase):
             "nemovcs.statusd_dbus.call_seen"
         ) as seen:
             self.assertEqual(cmd_init_dialog(args), 1)
+
+        seen.assert_not_called()
+
+
+class PublishCommandTest(unittest.TestCase):
+    def test_cmd_publish_dialog_runs_dialog_and_notifies_on_success(self):
+        args = argparse.Namespace(paths=["/tmp/repo"], forge="github")
+
+        with mock.patch(
+            "nemovcs.ui.publish_dialog.run", return_value=0
+        ) as run, mock.patch("nemovcs.statusd_dbus.call_seen") as seen:
+            self.assertEqual(cmd_publish_dialog(args), 0)
+
+        run.assert_called_once_with(["/tmp/repo"], forge_id="github")
+        seen.assert_called_once_with(["/tmp/repo"])
+
+    def test_cmd_publish_dialog_skips_notify_on_failure(self):
+        args = argparse.Namespace(paths=["/tmp/repo"], forge="github")
+
+        with mock.patch(
+            "nemovcs.ui.publish_dialog.run", return_value=1
+        ), mock.patch("nemovcs.statusd_dbus.call_seen") as seen:
+            self.assertEqual(cmd_publish_dialog(args), 1)
 
         seen.assert_not_called()
 
