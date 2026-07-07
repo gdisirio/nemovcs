@@ -1474,6 +1474,23 @@ class NemoVCSInfoProviderCoreTest(unittest.TestCase):
             self.assertEqual(core.top_level_specs(["/tmp/path"]), [])
 
 
+class CloneTargetMenuTest(unittest.TestCase):
+    def test_git_clone_menu_includes_create_repository(self):
+        specs = nemo_plugin.git_clone_menu_specs(["/tmp/dir"])
+
+        create = next(
+            spec for spec in specs if spec.name == "NemoVCS::GitInit"
+        )
+        self.assertEqual(create.label, "Create Repository...")
+        self.assertEqual(
+            create.command, ("nemovcs", "init-dialog", "/tmp/dir")
+        )
+        # The clone action is still offered alongside it.
+        self.assertIn(
+            "NemoVCS::GitClone", [spec.name for spec in specs]
+        )
+
+
 class ForgeSubmenuSpecTest(unittest.TestCase):
     def _forge(self, *, available=True, label="GitHub", actions=None):
         from nemovcs.forge.base import ForgeAction

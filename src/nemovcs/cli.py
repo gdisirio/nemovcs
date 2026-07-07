@@ -186,6 +186,23 @@ def cmd_log_dialog(args: argparse.Namespace) -> int:
     return log_dialog.run(args.paths or ["."], args.limit)
 
 
+def init_phases(paths: Sequence[str], branch: str) -> list[BackendCommandPhase]:
+    directory = Path((list(paths) or ["."])[0])
+    return [
+        BackendCommandPhase(
+            title="Initialize repository",
+            cwd=directory,
+            command=("git", "-C", str(directory), "init", "-b", branch),
+        )
+    ]
+
+
+def cmd_init_dialog(args: argparse.Namespace) -> int:
+    from .ui import logger
+
+    return logger.run("Create Repository", init_phases(args.paths, args.branch))
+
+
 def cmd_forge(args: argparse.Namespace) -> int:
     from . import forge
     from . import git
@@ -662,6 +679,14 @@ def build_parser() -> argparse.ArgumentParser:
     log_dialog.add_argument("-n", "--limit", type=int, default=50)
     log_dialog.add_argument("paths", nargs="*")
     log_dialog.set_defaults(func=cmd_log_dialog)
+
+    init_dialog = subparsers.add_parser(
+        "init-dialog",
+        help="create a local Git repository in a directory",
+    )
+    init_dialog.add_argument("-b", "--branch", default="main")
+    init_dialog.add_argument("paths", nargs="*")
+    init_dialog.set_defaults(func=cmd_init_dialog)
 
     forge_cmd = subparsers.add_parser(
         "forge",

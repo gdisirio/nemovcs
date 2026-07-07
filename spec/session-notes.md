@@ -211,6 +211,12 @@ sessions. Update this file before pushing changes.
   public host, `gh`'s locally-configured hosts (`hosts.yml`, network-free), or a
   `github.*` heuristic. Verified live: this repo's SSH remote resolves to the
   GitHub forge.
+- Non-versioned directories can now create a plain local Git repository via
+  "Create Repository..." in the Git NemoVCS clone-target menu (alongside "Git
+  Clone..."). It runs `git -C <dir> init -b <branch>` (default `main`) through
+  the logger via the new `nemovcs init-dialog` command (`init_phases` builds the
+  phase). This is the local-repo precursor to the forthcoming forge "publish"
+  action. Not bare -- it creates a normal working repository.
 - Forge menu wiring: when a repository has an associated, available forge, a
   submenu labelled and iconed by the forge appears inside the "Git NemoVCS"
   group; with no forge (or no advertised actions) the submenu is absent.

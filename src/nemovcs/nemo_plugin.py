@@ -1280,6 +1280,12 @@ def svn_menu_specs(paths: Sequence[str]) -> list[MenuActionSpec]:
 def git_clone_menu_specs(paths: Sequence[str]) -> list[MenuActionSpec]:
     return [
         action(
+            "GitInit",
+            "Create Repository...",
+            ["init-dialog", *paths],
+            icon=ADD_ICON,
+        ),
+        action(
             "GitClone",
             "Git Clone...",
             ["clone-dialog", "--vcs", "git", *paths],

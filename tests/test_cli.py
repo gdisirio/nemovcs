@@ -16,6 +16,7 @@ from nemovcs.cli import (
     cmd_diff,
     cmd_diff_dialog,
     cmd_forge,
+    cmd_init_dialog,
     cmd_log,
     cmd_push,
     cmd_revert_dialog,
@@ -28,6 +29,7 @@ from nemovcs.cli import (
     cmd_svn_meld_diff,
     cmd_switch_branch_dialog,
     cmd_update,
+    init_phases,
     log_phases,
     push_phases,
     switch_branch_phase,
@@ -702,6 +704,32 @@ class CliParserTest(unittest.TestCase):
             mock.patch("sys.stderr", new=io.StringIO())
         ):
             self.assertEqual(cmd_rename_dialog(args), 1)
+
+
+class InitCommandTest(unittest.TestCase):
+    def test_init_phases_builds_git_init_with_branch(self):
+        phases = init_phases(["/tmp/newrepo"], "main")
+
+        self.assertEqual(len(phases), 1)
+        self.assertEqual(str(phases[0].cwd), "/tmp/newrepo")
+        self.assertEqual(
+            phases[0].command,
+            ("git", "-C", "/tmp/newrepo", "init", "-b", "main"),
+        )
+
+    def test_cmd_init_dialog_runs_logger_with_init_phase(self):
+        args = argparse.Namespace(paths=["/tmp/newrepo"], branch="trunk")
+
+        with mock.patch("nemovcs.ui.logger.run", return_value=0) as run:
+            self.assertEqual(cmd_init_dialog(args), 0)
+
+        run.assert_called_once()
+        title, phases = run.call_args[0]
+        self.assertEqual(title, "Create Repository")
+        self.assertEqual(
+            phases[0].command,
+            ("git", "-C", "/tmp/newrepo", "init", "-b", "trunk"),
+        )
 
 
 class ForgeCommandTest(unittest.TestCase):
