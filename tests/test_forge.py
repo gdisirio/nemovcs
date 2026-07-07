@@ -130,6 +130,12 @@ class GitHubForgeTest(unittest.TestCase):
                 ForgeMatch.NONE,
             )
 
+    def test_open_in_browser_command(self):
+        self.assertEqual(
+            GitHubForge().open_in_browser_command("/tmp/repo"),
+            ["gh", "browse"],
+        )
+
     def test_is_available_follows_cli_presence(self):
         gh = GitHubForge()
         with mock.patch("nemovcs.forge.github.shutil.which", return_value="/usr/bin/gh"):

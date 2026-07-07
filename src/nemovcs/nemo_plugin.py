@@ -352,13 +352,17 @@ class NemoVCSInfoProviderCore:
         groups: list[MenuGroupSpec] = []
         for backend_id in matching_backend_ids(normalized):
             if backend_id == "git":
+                git_items = list(git_menu_specs(normalized))
+                forge_spec = forge_submenu_spec(normalized)
+                if forge_spec is not None:
+                    git_items.append(forge_spec)
                 groups.append(
                     MenuGroupSpec(
                         name="NemoVCS::GitMenu",
                         label="Git NemoVCS",
                         tip="Git actions",
                         icon=GIT_ICON,
-                        items=tuple(git_menu_specs(normalized)),
+                        items=tuple(git_items),
                     )
                 )
             elif backend_id == "svn":
@@ -1042,6 +1046,40 @@ def is_clone_target(path: str | Path) -> bool:
         candidate = Path.cwd() / candidate
     candidate = candidate.resolve(strict=False)
     return candidate.is_dir() and backends.detect_backend(candidate) is None
+
+
+def forge_submenu_spec(paths: Sequence[str]) -> MenuActionSpec | None:
+    """Return a hosting-forge submenu for the repository, or None.
+
+    Forges sit on top of Git, so this resolves the worktree's remote, asks the
+    forge registry which forge owns it, and only builds the submenu when an
+    available forge is found. No forge (or its CLI missing) means no submenu.
+    """
+    from . import forge as forge_registry
+    from . import git
+
+    if not paths:
+        return None
+    root = git.repo_root(paths[0])
+    if root is None:
+        return None
+    hosting = forge_registry.detect_forge(git.remote_url(root) or "")
+    if hosting is None or not hosting.is_available():
+        return None
+
+    return MenuActionSpec(
+        name="NemoVCS::Forge",
+        label=hosting.label,
+        tip=f"{hosting.label} actions",
+        icon=MENU_ICON,
+        children=(
+            action(
+                "ForgeOpen",
+                f"Open on {hosting.label}",
+                ["forge-open", *paths],
+            ),
+        ),
+    )
 
 
 def git_menu_specs(paths: Sequence[str]) -> list[MenuActionSpec]:

@@ -209,19 +209,27 @@ sessions. Update this file before pushing changes.
   resolve without a central table. `parse_remote_host` (shared) handles https,
   ssh://, and scp-like remotes; `GitHubForge.match_remote` classifies via the
   public host, `gh`'s locally-configured hosts (`hosts.yml`, network-free), or a
-  `github.*` heuristic. Only the detection seam exists so far -- no capability
-  verbs yet. Verified live: this repo's SSH remote resolves to the GitHub forge.
+  `github.*` heuristic. Verified live: this repo's SSH remote resolves to the
+  GitHub forge.
+- Forge menu wiring: when a repository has an associated, available forge, a
+  submenu labelled by the forge (`Forge.label`, e.g. "GitHub") appears inside
+  the "Git NemoVCS" group; with no forge the submenu is absent. Detection runs
+  in `forge_submenu_spec` (git-only, off the resolved remote) so `git_menu_specs`
+  stays pure. The first capability verb is `open_in_browser_command`
+  (`gh browse`), driven by the new `nemovcs forge-open` CLI command. Verified
+  live: `gh browse` resolves this repo's GitHub URL.
 
 ## Next Likely Tasks
 
-- Forge integration, next steps on the detection seam (`src/nemovcs/forge/`):
-  wire `detect_forge` into the daemon scan so a `forge` id rides on the status
-  record next to `remote` (compute-once, cached), then add the agreed common
-  capability set (open-in-browser, publish, list/create/checkout change
-  request, show active account) as forge-neutral verbs with per-adapter
-  capability advertisement and per-forge labels (PR vs MR). Add the `glab`
-  (GitLab) adapter second to validate the verbs are truly forge-neutral. Keep
-  destructive ops (merge/close/delete) out — do those in the browser.
+- Forge integration next steps: add the remaining common capability verbs
+  beyond open-in-browser (publish, list/create/checkout change request, show
+  active account) with per-adapter capability advertisement so the submenu only
+  shows supported actions, and per-forge labels (PR vs MR). The list/create
+  change-request actions want a dialog (reuse the Log dialog TreeView pattern).
+  Add the `glab` (GitLab) adapter second to validate the verbs are truly
+  forge-neutral. Keep destructive ops (merge/close/delete) out — do those in the
+  browser. Consider moving forge detection onto the status record (compute-once
+  in the daemon scan) if the per-right-click detection cost becomes noticeable.
 
 - Log dialog follow-ups: implement real backend paging for "Show more"
   (`--skip` for Git, revision-range for SVN) instead of re-fetching a larger

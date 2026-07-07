@@ -76,3 +76,6 @@ class GitHubForge:
 
     def is_available(self) -> bool:
         return shutil.which(self.cli) is not None
+
+    def open_in_browser_command(self, root: str) -> list[str]:
+        return [self.cli, "browse"]

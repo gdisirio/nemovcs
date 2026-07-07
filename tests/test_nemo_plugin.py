@@ -1474,5 +1474,75 @@ class NemoVCSInfoProviderCoreTest(unittest.TestCase):
             self.assertEqual(core.top_level_specs(["/tmp/path"]), [])
 
 
+class ForgeSubmenuSpecTest(unittest.TestCase):
+    def _forge(self, *, available=True, label="GitHub"):
+        forge = mock.Mock()
+        forge.label = label
+        forge.is_available.return_value = available
+        return forge
+
+    def test_builds_submenu_when_available_forge_detected(self):
+        with mock.patch("nemovcs.git.repo_root", return_value=Path("/tmp/repo")), (
+            mock.patch(
+                "nemovcs.git.remote_url", return_value="git@github.com:o/r.git"
+            )
+        ), mock.patch("nemovcs.forge.detect_forge", return_value=self._forge()):
+            spec = nemo_plugin.forge_submenu_spec(["/tmp/repo/src/app.py"])
+
+        assert spec is not None
+        self.assertEqual(spec.label, "GitHub")
+        self.assertEqual(len(spec.children), 1)
+        child = spec.children[0]
+        self.assertEqual(child.label, "Open on GitHub")
+        self.assertEqual(
+            child.command, ("nemovcs", "forge-open", "/tmp/repo/src/app.py")
+        )
+
+    def test_none_without_repo_root(self):
+        with mock.patch("nemovcs.git.repo_root", return_value=None):
+            self.assertIsNone(nemo_plugin.forge_submenu_spec(["/tmp/x"]))
+
+    def test_none_when_no_forge_detected(self):
+        with mock.patch("nemovcs.git.repo_root", return_value=Path("/tmp/repo")), (
+            mock.patch(
+                "nemovcs.git.remote_url", return_value="git@example.com:o/r.git"
+            )
+        ), mock.patch("nemovcs.forge.detect_forge", return_value=None):
+            self.assertIsNone(nemo_plugin.forge_submenu_spec(["/tmp/repo"]))
+
+    def test_none_when_forge_cli_unavailable(self):
+        with mock.patch("nemovcs.git.repo_root", return_value=Path("/tmp/repo")), (
+            mock.patch(
+                "nemovcs.git.remote_url", return_value="git@github.com:o/r.git"
+            )
+        ), mock.patch(
+            "nemovcs.forge.detect_forge",
+            return_value=self._forge(available=False),
+        ):
+            self.assertIsNone(nemo_plugin.forge_submenu_spec(["/tmp/repo"]))
+
+    def test_git_submenu_group_includes_forge_submenu(self):
+        core = nemo_plugin.NemoVCSInfoProviderCore()
+        forge_spec = nemo_plugin.MenuActionSpec(
+            name="NemoVCS::Forge",
+            label="GitHub",
+            children=(
+                nemo_plugin.MenuActionSpec(
+                    name="NemoVCS::ForgeOpen", label="Open on GitHub"
+                ),
+            ),
+        )
+
+        with mock.patch("nemovcs.nemo_plugin.is_clone_target", return_value=False), (
+            mock.patch("nemovcs.nemo_plugin.matching_backend_ids", return_value=["git"])
+        ), mock.patch(
+            "nemovcs.nemo_plugin.forge_submenu_spec", return_value=forge_spec
+        ):
+            groups = core.submenu_groups(["/tmp/repo/src/app.py"])
+
+        self.assertEqual([group.label for group in groups], ["Git NemoVCS"])
+        self.assertIn("GitHub", [item.label for item in groups[0].items])
+
+
 if __name__ == "__main__":
     unittest.main()

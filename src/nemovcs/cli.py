@@ -186,6 +186,30 @@ def cmd_log_dialog(args: argparse.Namespace) -> int:
     return log_dialog.run(args.paths or ["."], args.limit)
 
 
+def cmd_forge_open(args: argparse.Namespace) -> int:
+    from . import forge
+    from . import git
+
+    path = (args.paths or ["."])[0]
+    detected = backends.detect_root(path)
+    if detected is None:
+        print("not inside a versioned working tree", file=sys.stderr)
+        return 1
+
+    backend, root = detected
+    remote = git.remote_url(root) if backend.id == "git" else ""
+    hosting = forge.detect_forge(remote or "")
+    if hosting is None:
+        print("no forge is associated with this repository", file=sys.stderr)
+        return 1
+    if not hosting.is_available():
+        print(f"{hosting.cli} is not installed", file=sys.stderr)
+        return 1
+
+    subprocess.Popen(hosting.open_in_browser_command(str(root)), cwd=str(root))
+    return 0
+
+
 def cmd_update(args: argparse.Namespace) -> int:
     return _print_results(_backend_results(args.paths, "update"))
 
@@ -633,6 +657,13 @@ def build_parser() -> argparse.ArgumentParser:
     log_dialog.add_argument("-n", "--limit", type=int, default=50)
     log_dialog.add_argument("paths", nargs="*")
     log_dialog.set_defaults(func=cmd_log_dialog)
+
+    forge_open = subparsers.add_parser(
+        "forge-open",
+        help="open the repository on its hosting forge in a browser",
+    )
+    forge_open.add_argument("paths", nargs="*")
+    forge_open.set_defaults(func=cmd_forge_open)
 
     update = subparsers.add_parser("update", help="update the current VCS worktree")
     update.add_argument("paths", nargs="*")
