@@ -286,6 +286,22 @@ def cmd_forge_dialog(args: argparse.Namespace) -> int:
     )
 
 
+def cmd_forge_switch(args: argparse.Namespace) -> int:
+    from .ui import logger
+
+    resolved = resolve_forge(args.paths)
+    if resolved is None:
+        return 1
+    hosting, root = resolved
+
+    command = hosting.switch_account_command(args.user)
+    title = f"Switch {hosting.label} account to {args.user}"
+    exit_code = logger.run(title, [logger.CommandPhase(title, root, tuple(command))])
+    if exit_code == 0:
+        notify_daemon_seen(args.paths)
+    return exit_code
+
+
 def cmd_update(args: argparse.Namespace) -> int:
     return _print_results(_backend_results(args.paths, "update"))
 
@@ -763,6 +779,15 @@ def build_parser() -> argparse.ArgumentParser:
     forge_dialog.add_argument("--action", required=True)
     forge_dialog.add_argument("paths", nargs="*")
     forge_dialog.set_defaults(func=cmd_forge_dialog)
+
+    forge_switch = subparsers.add_parser(
+        "forge-switch",
+        help="switch the active account of a hosting forge",
+    )
+    forge_switch.add_argument("--forge", default="github")
+    forge_switch.add_argument("--user", required=True)
+    forge_switch.add_argument("paths", nargs="*")
+    forge_switch.set_defaults(func=cmd_forge_switch)
 
     publish_dialog = subparsers.add_parser(
         "publish-dialog",

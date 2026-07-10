@@ -17,6 +17,7 @@ from nemovcs.cli import (
     cmd_diff_dialog,
     cmd_forge,
     cmd_forge_dialog,
+    cmd_forge_switch,
     cmd_init_dialog,
     cmd_log,
     cmd_publish_dialog,
@@ -896,6 +897,68 @@ class ForgeDialogCommandTest(unittest.TestCase):
         run.assert_called_once_with(
             ["/tmp/repo"], forge_id="github", action="cr-create"
         )
+
+
+class ForgeSwitchCommandTest(unittest.TestCase):
+    def _backend(self):
+        backend = mock.Mock()
+        backend.id = "git"
+        return backend
+
+    def test_switch_runs_command_and_notifies_on_success(self):
+        args = argparse.Namespace(
+            forge="github", user="chibios-sheriff", paths=["/tmp/repo"]
+        )
+        hosting = mock.Mock()
+        hosting.is_available.return_value = True
+        hosting.label = "GitHub"
+        hosting.switch_account_command.return_value = [
+            "gh", "auth", "switch", "--user", "chibios-sheriff"
+        ]
+
+        with mock.patch(
+            "nemovcs.backends.detect_root",
+            return_value=(self._backend(), Path("/tmp/repo")),
+        ), mock.patch(
+            "nemovcs.git.remote_url", return_value="git@github.com:o/r.git"
+        ), mock.patch(
+            "nemovcs.forge.detect_forge", return_value=hosting
+        ), mock.patch(
+            "nemovcs.ui.logger.run", return_value=0
+        ) as logger_run, mock.patch(
+            "nemovcs.cli.notify_daemon_seen"
+        ) as notify:
+            self.assertEqual(cmd_forge_switch(args), 0)
+
+        hosting.switch_account_command.assert_called_once_with("chibios-sheriff")
+        _title, phases = logger_run.call_args.args
+        self.assertEqual(
+            phases[0].command, ("gh", "auth", "switch", "--user", "chibios-sheriff")
+        )
+        notify.assert_called_once_with(["/tmp/repo"])
+
+    def test_switch_skips_notify_on_failure(self):
+        args = argparse.Namespace(forge="github", user="x", paths=["/tmp/repo"])
+        hosting = mock.Mock()
+        hosting.is_available.return_value = True
+        hosting.label = "GitHub"
+        hosting.switch_account_command.return_value = ["gh", "auth", "switch"]
+
+        with mock.patch(
+            "nemovcs.backends.detect_root",
+            return_value=(self._backend(), Path("/tmp/repo")),
+        ), mock.patch(
+            "nemovcs.git.remote_url", return_value="git@github.com:o/r.git"
+        ), mock.patch(
+            "nemovcs.forge.detect_forge", return_value=hosting
+        ), mock.patch(
+            "nemovcs.ui.logger.run", return_value=1
+        ), mock.patch(
+            "nemovcs.cli.notify_daemon_seen"
+        ) as notify:
+            self.assertEqual(cmd_forge_switch(args), 1)
+
+        notify.assert_not_called()
 
 
 if __name__ == "__main__":

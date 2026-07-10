@@ -1127,6 +1127,9 @@ def forge_menu_specs(paths: Sequence[str]) -> list[MenuActionSpec]:
         )
         if not children:
             return []
+        change_user = forge_change_user_spec(hosting, paths)
+        if change_user is not None:
+            children += (separator("NemoVCS::Forge::UserSep"), change_user)
         return [
             MenuActionSpec(
                 name="NemoVCS::Forge",
@@ -1157,6 +1160,40 @@ def forge_action_spec(item, paths: Sequence[str], forge_id: str) -> MenuActionSp
         tip=item.disabled_reason or item.label.removesuffix("..."),
         icon=item.icon or MENU_ICON,
         sensitive=item.enabled,
+    )
+
+
+def forge_change_user_spec(forge, paths: Sequence[str]) -> MenuActionSpec | None:
+    """Build the "Change User" submenu from the accounts the forge CLI knows.
+
+    Each account switches the active login globally; the current one is shown
+    with a check mark and greyed out since switching to it is a no-op. Returns
+    None when the forge reports no accounts, so the submenu simply does not
+    appear.
+    """
+    accounts = forge.accounts()
+    if not accounts:
+        return None
+    children = tuple(
+        MenuActionSpec(
+            name=f"NemoVCS::Forge::User::{account.name}",
+            label=f"✓ {account.name}" if account.active else account.name,
+            command=(
+                "nemovcs", "forge-switch",
+                "--forge", forge.id, "--user", account.name, *paths,
+            ),
+            tip=f"Active account: {account.name}"
+            if account.active
+            else f"Switch to {account.name}",
+            sensitive=not account.active,
+        )
+        for account in accounts
+    )
+    return MenuActionSpec(
+        name="NemoVCS::Forge::ChangeUser",
+        label="Change User",
+        tip=f"Switch the active {forge.label} account",
+        children=children,
     )
 
 

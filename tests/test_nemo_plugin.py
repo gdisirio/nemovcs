@@ -1578,6 +1578,7 @@ class ForgeMenuSpecsTest(unittest.TestCase):
         forge.label = label
         forge.icon = "nemovcs-git"
         forge.is_available.return_value = available
+        forge.accounts.return_value = []
         forge.actions.return_value = (
             actions
             if actions is not None
@@ -1666,6 +1667,50 @@ class ForgeMenuSpecsTest(unittest.TestCase):
         child = specs[0].children[0]
         self.assertFalse(child.sensitive)
         self.assertEqual(child.tip, "current branch is the default branch")
+
+    def test_change_user_submenu_marks_active_and_switches_others(self):
+        from nemovcs.forge.base import ForgeAccount
+
+        hosting = self._forge()
+        hosting.accounts.return_value = [
+            ForgeAccount("gdisirio", active=True),
+            ForgeAccount("chibios-sheriff", active=False),
+        ]
+        patches = self._patch_repo("git@github.com:o/r.git")
+        with patches[0], patches[1], patches[2], patches[3], patches[4], mock.patch(
+            "nemovcs.forge.detect_forge", return_value=hosting
+        ):
+            specs = nemo_plugin.forge_menu_specs(["/tmp/repo"])
+
+        children = specs[0].children
+        self.assertTrue(children[-2].separator)
+        change_user = children[-1]
+        self.assertEqual(change_user.label, "Change User")
+
+        active, other = change_user.children
+        self.assertEqual(active.label, "✓ gdisirio")
+        self.assertFalse(active.sensitive)
+        self.assertEqual(other.label, "chibios-sheriff")
+        self.assertTrue(other.sensitive)
+        self.assertEqual(
+            other.command,
+            (
+                "nemovcs", "forge-switch",
+                "--forge", "github", "--user", "chibios-sheriff", "/tmp/repo",
+            ),
+        )
+
+    def test_change_user_submenu_absent_without_accounts(self):
+        hosting = self._forge()
+        hosting.accounts.return_value = []
+        patches = self._patch_repo("git@github.com:o/r.git")
+        with patches[0], patches[1], patches[2], patches[3], patches[4], mock.patch(
+            "nemovcs.forge.detect_forge", return_value=hosting
+        ):
+            specs = nemo_plugin.forge_menu_specs(["/tmp/repo"])
+
+        names = [child.name for child in specs[0].children]
+        self.assertNotIn("NemoVCS::Forge::ChangeUser", names)
 
     def test_no_remote_offers_publish_for_available_forges(self):
         hosting = self._forge()
