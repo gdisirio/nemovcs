@@ -53,38 +53,19 @@ def active_account_name(accounts) -> str | None:
     return next((account.name for account in accounts if account.active), None)
 
 
-def switch_target(selected: str | None, active: str | None) -> str | None:
-    """Return the account to switch to, or None when it is already active."""
-    if not selected or selected == active:
-        return None
-    return selected
-
-
 def publish_phases(
     forge,
     root: Path,
     name: str,
     private: bool,
-    *,
-    switch_to: str | None = None,
 ) -> list[logger.CommandPhase]:
-    phases: list[logger.CommandPhase] = []
-    if switch_to:
-        phases.append(
-            logger.CommandPhase(
-                f"Switch {forge.label} account to {switch_to}",
-                root,
-                tuple(forge.switch_account_command(switch_to)),
-            )
-        )
-    phases.append(
+    return [
         logger.CommandPhase(
             f"Publish to {forge.label}",
             root,
             tuple(forge.publish_command(str(root), name, private)),
         )
-    )
-    return phases
+    ]
 
 
 class PublishDialog(Gtk.Window):
@@ -123,19 +104,11 @@ class PublishDialog(Gtk.Window):
         grid.attach(self.private_check, 1, 1, 1, 1)
 
         grid.attach(Gtk.Label(label="Account", xalign=0), 0, 2, 1, 1)
-        self.account_combo = Gtk.ComboBoxText()
-        for account in self.accounts:
-            self.account_combo.append_text(account.name)
-        if self.accounts:
-            active_index = next(
-                (i for i, a in enumerate(self.accounts) if a.active), 0
-            )
-            self.account_combo.set_active(active_index)
-        else:
-            self.account_combo.append_text("(gh not configured)")
-            self.account_combo.set_active(0)
-            self.account_combo.set_sensitive(False)
-        grid.attach(self.account_combo, 1, 2, 1, 1)
+        account_label = Gtk.Label(
+            label=self.active_account or "(gh not configured)", xalign=0
+        )
+        account_label.set_selectable(True)
+        grid.attach(account_label, 1, 2, 1, 1)
 
         buttons = Gtk.ButtonBox(orientation=Gtk.Orientation.HORIZONTAL)
         buttons.set_layout(Gtk.ButtonBoxStyle.END)
@@ -166,13 +139,11 @@ class PublishDialog(Gtk.Window):
             self.show_error(error)
             return
 
-        selected = self.account_combo.get_active_text() if self.accounts else None
         phases = publish_phases(
             self.forge,
             self.root,
             self.repository_name(),
             self.private_check.get_active(),
-            switch_to=switch_target(selected, self.active_account),
         )
         window = logger.LoggerWindow(
             f"Publish to {self.forge.label}",
