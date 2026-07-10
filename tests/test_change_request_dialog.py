@@ -2,10 +2,13 @@ from pathlib import Path
 import unittest
 from unittest import mock
 
+from nemovcs.forge.base import ChangeRequestTemplate
 from nemovcs.ui import change_request_dialog
 from nemovcs.ui.change_request_dialog import (
+    NO_TEMPLATE,
     change_request_root,
     create_phases,
+    template_body,
     validate_title,
 )
 
@@ -18,6 +21,9 @@ class FakeForge:
         if base:
             command += ["--base", base]
         return command
+
+    def change_request_templates(self, root):
+        return []
 
 
 class ChangeRequestHelpersTest(unittest.TestCase):
@@ -62,6 +68,16 @@ class ChangeRequestHelpersTest(unittest.TestCase):
             phases[0].command,
             ("gh", "pr", "create", "--title", "Fix", "--body", ""),
         )
+
+    def test_template_body_selects_by_name(self):
+        templates = [
+            ChangeRequestTemplate("bug", "bug body"),
+            ChangeRequestTemplate("feature", "feature body"),
+        ]
+        self.assertEqual(template_body(templates, "feature"), "feature body")
+        self.assertEqual(template_body(templates, NO_TEMPLATE), "")
+        self.assertEqual(template_body(templates, None), "")
+        self.assertEqual(template_body(templates, "missing"), "")
 
     def test_run_rejects_unknown_action(self):
         forge = FakeForge()

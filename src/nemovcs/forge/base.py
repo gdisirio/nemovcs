@@ -103,6 +103,14 @@ class ForgeAccount:
     active: bool = False
 
 
+@dataclass(frozen=True)
+class ChangeRequestTemplate:
+    """A change-request description template found in the working tree."""
+
+    name: str
+    body: str
+
+
 class Forge(Protocol):
     id: str
     label: str
@@ -123,6 +131,8 @@ class Forge(Protocol):
     def change_request_create_command(
         self, root: str, *, title: str, body: str, base: str | None = None
     ) -> list[str]: ...
+
+    def change_request_templates(self, root: str) -> list[ChangeRequestTemplate]: ...
 
     def accounts(self) -> list[ForgeAccount]: ...
 

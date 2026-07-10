@@ -11,6 +11,7 @@ from nemovcs.forge.base import (
     FORGE_ACTION_DIALOG,
     FORGE_ACTION_LAUNCH,
     FORGE_ACTION_OUTPUT,
+    ChangeRequestTemplate,
     ForgeAccount,
     ForgeAction,
     ForgeContext,
@@ -102,6 +103,58 @@ def parse_gh_accounts(text: str, host: str = GITHUB_PUBLIC_HOST) -> list[ForgeAc
     if not names and active:
         names = [active]
     return [ForgeAccount(name=name, active=(name == active)) for name in names]
+
+
+PR_TEMPLATE_STEM = "pull_request_template"
+PR_TEMPLATE_SUFFIXES = {"", ".md", ".markdown", ".txt"}
+
+
+def _read_template(path: Path) -> str | None:
+    try:
+        return path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+
+
+def find_pr_templates(root: str | Path) -> list[ChangeRequestTemplate]:
+    """Discover GitHub pull-request templates under a working tree.
+
+    GitHub looks in the repository root, `.github/`, and `docs/`, accepting
+    either a single `pull_request_template` file or a `PULL_REQUEST_TEMPLATE/`
+    directory holding several named templates. Matching is case-insensitive on
+    the conventional stem. All discovered directory templates are returned, plus
+    a single-file template last as "Default" when one exists.
+    """
+    base = Path(root)
+    search_dirs = [base, base / ".github", base / "docs"]
+    dir_templates: list[ChangeRequestTemplate] = []
+    single: ChangeRequestTemplate | None = None
+
+    for directory in search_dirs:
+        if not directory.is_dir():
+            continue
+        for entry in sorted(directory.iterdir(), key=lambda p: p.name.lower()):
+            if entry.is_dir() and entry.name.lower() == PR_TEMPLATE_STEM:
+                for item in sorted(entry.iterdir(), key=lambda p: p.name.lower()):
+                    if item.is_file() and item.suffix.lower() in {
+                        ".md", ".markdown", ".txt"
+                    }:
+                        body = _read_template(item)
+                        if body is not None:
+                            dir_templates.append(
+                                ChangeRequestTemplate(item.stem, body)
+                            )
+            elif (
+                single is None
+                and entry.is_file()
+                and entry.stem.lower() == PR_TEMPLATE_STEM
+                and entry.suffix.lower() in PR_TEMPLATE_SUFFIXES
+            ):
+                body = _read_template(entry)
+                if body is not None:
+                    single = ChangeRequestTemplate("Default", body)
+
+    return dir_templates + ([single] if single is not None else [])
 
 
 def classify_github_host(
@@ -197,6 +250,9 @@ class GitHubForge:
         if base:
             command += ["--base", base]
         return command
+
+    def change_request_templates(self, root: str) -> list[ChangeRequestTemplate]:
+        return find_pr_templates(root)
 
     def publish_command(self, root: str, name: str, private: bool) -> list[str]:
         visibility = "--private" if private else "--public"

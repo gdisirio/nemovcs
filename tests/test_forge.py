@@ -1,3 +1,5 @@
+from pathlib import Path
+import tempfile
 import unittest
 from unittest import mock
 
@@ -7,6 +9,7 @@ from nemovcs.forge.base import ForgeContext, ForgeMatch, parse_remote_host
 from nemovcs.forge.github import (
     GitHubForge,
     classify_github_host,
+    find_pr_templates,
     gh_hosts_config_path,
     parse_gh_accounts,
     parse_gh_hosts_config,
@@ -86,6 +89,56 @@ class ParseGhAccountsTest(unittest.TestCase):
     def test_other_host_yields_nothing(self):
         text = "gitlab.com:\n    user: someone\n"
         self.assertEqual(parse_gh_accounts(text), [])
+
+
+class FindPrTemplatesTest(unittest.TestCase):
+    def test_single_github_template_is_named_default(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / ".github").mkdir()
+            (root / ".github" / "pull_request_template.md").write_text(
+                "## Summary\n", encoding="utf-8"
+            )
+            templates = find_pr_templates(root)
+        self.assertEqual([(t.name, t.body) for t in templates], [("Default", "## Summary\n")])
+
+    def test_directory_templates_are_named_by_file_stem(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            tdir = root / ".github" / "PULL_REQUEST_TEMPLATE"
+            tdir.mkdir(parents=True)
+            (tdir / "bug.md").write_text("bug body", encoding="utf-8")
+            (tdir / "feature.md").write_text("feature body", encoding="utf-8")
+            (tdir / "ignore.png").write_bytes(b"\x89PNG")
+            templates = find_pr_templates(root)
+        self.assertEqual(
+            [(t.name, t.body) for t in templates],
+            [("bug", "bug body"), ("feature", "feature body")],
+        )
+
+    def test_root_and_docs_locations_are_searched(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "docs").mkdir()
+            (root / "docs" / "PULL_REQUEST_TEMPLATE.md").write_text(
+                "docs template", encoding="utf-8"
+            )
+            templates = find_pr_templates(root)
+        self.assertEqual([t.body for t in templates], ["docs template"])
+
+    def test_no_templates_returns_empty(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertEqual(find_pr_templates(tmp), [])
+
+    def test_forge_exposes_templates(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / ".github").mkdir()
+            (root / ".github" / "PULL_REQUEST_TEMPLATE.md").write_text(
+                "body", encoding="utf-8"
+            )
+            templates = GitHubForge().change_request_templates(str(root))
+        self.assertEqual([t.name for t in templates], ["Default"])
 
 
 class ClassifyGithubHostTest(unittest.TestCase):

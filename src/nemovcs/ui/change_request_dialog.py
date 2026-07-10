@@ -36,8 +36,18 @@ def change_request_root(paths: Sequence[str]) -> Path | None:
     return Path(root) if root is not None else None
 
 
+NO_TEMPLATE = "(none)"
+
+
 def validate_title(title: str) -> str:
     return "" if title.strip() else "Enter a title."
+
+
+def template_body(templates, name: str | None) -> str:
+    """Return the body of the named template, or "" for none/unknown."""
+    if not name or name == NO_TEMPLATE:
+        return ""
+    return next((t.body for t in templates if t.name == name), "")
 
 
 def create_phases(
@@ -73,6 +83,9 @@ class ChangeRequestDialog(Gtk.Window):
 
         self.branch = git.current_branch_name(self.root) if self.root else None
         self.base = git.default_branch_name(self.root) if self.root else None
+        self.templates = (
+            forge.change_request_templates(str(self.root)) if self.root else []
+        )
 
         self.set_default_size(600, 380)
         self.set_border_width(12)
@@ -103,6 +116,17 @@ class ChangeRequestDialog(Gtk.Window):
         self.base_entry.set_placeholder_text("default branch")
         grid.attach(self.base_entry, 1, 1, 1, 1)
 
+        self.template_combo = None
+        if self.templates:
+            grid.attach(Gtk.Label(label="Template", xalign=0), 0, 2, 1, 1)
+            self.template_combo = Gtk.ComboBoxText()
+            self.template_combo.append_text(NO_TEMPLATE)
+            for template in self.templates:
+                self.template_combo.append_text(template.name)
+            self.template_combo.set_active(1)  # first real template
+            self.template_combo.connect("changed", self.on_template_changed)
+            grid.attach(self.template_combo, 1, 2, 1, 1)
+
         outer.pack_start(Gtk.Label(label="Description", xalign=0), False, False, 0)
         self.body_view = Gtk.TextView()
         self.body_view.set_wrap_mode(Gtk.WrapMode.WORD_CHAR)
@@ -110,6 +134,9 @@ class ChangeRequestDialog(Gtk.Window):
         body_scroll.set_shadow_type(Gtk.ShadowType.IN)
         body_scroll.add(self.body_view)
         outer.pack_start(body_scroll, True, True, 0)
+
+        if self.templates:
+            self.set_body_text(self.templates[0].body)
 
         buttons = Gtk.ButtonBox(orientation=Gtk.Orientation.HORIZONTAL)
         buttons.set_layout(Gtk.ButtonBoxStyle.END)
@@ -133,6 +160,12 @@ class ChangeRequestDialog(Gtk.Window):
         return buffer.get_text(
             buffer.get_start_iter(), buffer.get_end_iter(), True
         )
+
+    def set_body_text(self, text: str) -> None:
+        self.body_view.get_buffer().set_text(text)
+
+    def on_template_changed(self, combo: Gtk.ComboBoxText) -> None:
+        self.set_body_text(template_body(self.templates, combo.get_active_text()))
 
     def on_cancel_clicked(self, _button: Gtk.Button) -> None:
         self.destroy()
