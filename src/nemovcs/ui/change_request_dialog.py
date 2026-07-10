@@ -90,10 +90,15 @@ class ChangeRequestDialog(Gtk.Window):
         self.active_logger: logger.LoggerWindow | None = None
         self.create_completed = False
 
-        self.branch = git.current_branch_name(self.root) if self.root else None
-        self.base = git.default_branch_name(self.root) if self.root else None
-        branches = git.recent_branches(self.root) if self.root else []
-        self.base_choices = base_branch_choices(self.base, branches)
+        if self.root:
+            choices = git.branch_choices(self.root)
+            self.branch = choices.current
+            self.base = choices.default
+            self.base_choices = base_branch_choices(choices.default, choices.recent)
+        else:
+            self.branch = None
+            self.base = None
+            self.base_choices = []
         self.templates = (
             forge.change_request_templates(str(self.root)) if self.root else []
         )

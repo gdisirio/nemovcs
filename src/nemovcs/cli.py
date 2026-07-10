@@ -398,12 +398,13 @@ def select_switch_branch(root: str | Path, current: str) -> str | None:
     gi.require_version("Gtk", "3.0")
     from gi.repository import Gtk, Pango  # noqa: E402
 
-    branches = git.recent_branches(root, limit=1000)
+    choices = git.branch_choices(root, limit=1000)
+    branches = list(choices.recent)
     if current not in branches:
         branches.insert(0, current)
     if not branches:
         return None
-    branch_locations = git.worktree_branch_locations(root)
+    branch_locations = choices.checked_out
     current_root = Path(root).resolve(strict=False)
 
     dialog = Gtk.Dialog(

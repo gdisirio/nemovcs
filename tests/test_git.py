@@ -104,6 +104,39 @@ class GitExecutableAvailabilityTest(unittest.TestCase):
         with mock.patch("nemovcs.git.run_git", return_value=result):
             self.assertEqual(git.worktree_branch_locations("/tmp/repo"), {})
 
+    def test_branch_choices_bundles_the_branch_signals(self):
+        with mock.patch("nemovcs.git.current_branch_name", return_value="feature"), (
+            mock.patch("nemovcs.git.default_branch_name", return_value="main")
+        ), mock.patch(
+            "nemovcs.git.recent_branches", return_value=["main", "release"]
+        ) as recent, mock.patch(
+            "nemovcs.git.worktree_branch_locations",
+            return_value={"main": Path("/tmp/repo")},
+        ):
+            choices = git.branch_choices("/tmp/repo", limit=1000)
+
+        self.assertEqual(choices.current, "feature")
+        self.assertEqual(choices.default, "main")
+        self.assertEqual(choices.recent, ["main", "release"])
+        self.assertEqual(choices.checked_out, {"main": Path("/tmp/repo")})
+        recent.assert_called_once_with("/tmp/repo", limit=1000)
+
+    def test_branch_choices_recent_with_current_surfaces_current_first(self):
+        choices = git.BranchChoices(
+            current="feature", default="main", recent=["main"], checked_out={}
+        )
+        self.assertEqual(choices.recent_with_current(), ["feature", "main"])
+
+        already = git.BranchChoices(
+            current="main", default="main", recent=["main", "dev"], checked_out={}
+        )
+        self.assertEqual(already.recent_with_current(), ["main", "dev"])
+
+        detached = git.BranchChoices(
+            current=None, default="main", recent=["main"], checked_out={}
+        )
+        self.assertEqual(detached.recent_with_current(), ["main"])
+
 
 @unittest.skipUnless(have_git(), "git executable is required")
 class GitHelpersTest(unittest.TestCase):

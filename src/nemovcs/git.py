@@ -426,6 +426,42 @@ def worktree_branch_locations(root: str | Path) -> dict[str, Path]:
     return parse_worktree_branch_locations(result.stdout)
 
 
+@dataclass(frozen=True)
+class BranchChoices:
+    """The branch information a branch selector or menu needs, gathered once.
+
+    ``current`` is the raw current branch (None when detached), ``default`` the
+    remote's default branch, ``recent`` the local heads by recency, and
+    ``checked_out`` maps a branch to the linked worktree that holds it.
+    """
+
+    current: str | None
+    default: str | None
+    recent: list[str]
+    checked_out: dict[str, Path]
+
+    def recent_with_current(self) -> list[str]:
+        """Recent branches with the current branch surfaced first."""
+        branches = list(self.recent)
+        if self.current and self.current not in branches:
+            branches.insert(0, self.current)
+        return branches
+
+
+def branch_choices(
+    root: str | Path,
+    *,
+    limit: int = DEFAULT_RECENT_BRANCH_LIMIT,
+) -> BranchChoices:
+    """Gather the branch signals used to build selectors and switch menus."""
+    return BranchChoices(
+        current=current_branch_name(root),
+        default=default_branch_name(root),
+        recent=recent_branches(root, limit=limit),
+        checked_out=worktree_branch_locations(root),
+    )
+
+
 def log(paths: Sequence[str | Path], limit: int = 50) -> list[GitResult]:
     grouped = group_by_repo(paths or [Path.cwd()])
     results: list[GitResult] = []

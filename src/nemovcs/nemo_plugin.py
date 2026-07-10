@@ -1274,12 +1274,11 @@ def git_switch_branch_menu_spec(path: str) -> MenuActionSpec | None:
     if root is None:
         return None
 
-    current = git.current_branch_name(root)
+    choices = git.branch_choices(root)
+    current = choices.current
     dirty = git.worktree_dirty(root)
-    branches = git.recent_branches(root)
-    if current and current not in branches:
-        branches.insert(0, current)
-    branch_locations = git.worktree_branch_locations(root)
+    branches = choices.recent_with_current()
+    branch_locations = choices.checked_out
 
     children: list[MenuActionSpec] = []
     for branch in branches:
