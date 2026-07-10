@@ -287,15 +287,27 @@ def cmd_forge_dialog(args: argparse.Namespace) -> int:
 
 
 def cmd_forge_switch(args: argparse.Namespace) -> int:
-    from .ui import logger
+    from .ui import confirm, logger
 
     resolved = resolve_forge(args.paths)
     if resolved is None:
         return 1
     hosting, root = resolved
 
-    command = hosting.switch_account_command(args.user)
     title = f"Switch {hosting.label} account to {args.user}"
+    accepted = confirm.confirm(
+        title,
+        f"This switches the active {hosting.cli} account globally.",
+        detail=(
+            f"Every tool using {hosting.cli} on this machine will act as "
+            f"{args.user} until you switch back, not just NemoVCS."
+        ),
+        ok_label="Switch",
+    )
+    if not accepted:
+        return 0
+
+    command = hosting.switch_account_command(args.user)
     exit_code = logger.run(title, [logger.CommandPhase(title, root, tuple(command))])
     if exit_code == 0:
         notify_daemon_seen(args.paths)

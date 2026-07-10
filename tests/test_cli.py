@@ -924,6 +924,8 @@ class ForgeSwitchCommandTest(unittest.TestCase):
         ), mock.patch(
             "nemovcs.forge.detect_forge", return_value=hosting
         ), mock.patch(
+            "nemovcs.ui.confirm.confirm", return_value=True
+        ), mock.patch(
             "nemovcs.ui.logger.run", return_value=0
         ) as logger_run, mock.patch(
             "nemovcs.cli.notify_daemon_seen"
@@ -936,6 +938,34 @@ class ForgeSwitchCommandTest(unittest.TestCase):
             phases[0].command, ("gh", "auth", "switch", "--user", "chibios-sheriff")
         )
         notify.assert_called_once_with(["/tmp/repo"])
+
+    def test_switch_aborts_when_confirmation_declined(self):
+        args = argparse.Namespace(
+            forge="github", user="chibios-sheriff", paths=["/tmp/repo"]
+        )
+        hosting = mock.Mock()
+        hosting.is_available.return_value = True
+        hosting.label = "GitHub"
+
+        with mock.patch(
+            "nemovcs.backends.detect_root",
+            return_value=(self._backend(), Path("/tmp/repo")),
+        ), mock.patch(
+            "nemovcs.git.remote_url", return_value="git@github.com:o/r.git"
+        ), mock.patch(
+            "nemovcs.forge.detect_forge", return_value=hosting
+        ), mock.patch(
+            "nemovcs.ui.confirm.confirm", return_value=False
+        ), mock.patch(
+            "nemovcs.ui.logger.run"
+        ) as logger_run, mock.patch(
+            "nemovcs.cli.notify_daemon_seen"
+        ) as notify:
+            self.assertEqual(cmd_forge_switch(args), 0)
+
+        hosting.switch_account_command.assert_not_called()
+        logger_run.assert_not_called()
+        notify.assert_not_called()
 
     def test_switch_skips_notify_on_failure(self):
         args = argparse.Namespace(forge="github", user="x", paths=["/tmp/repo"])
@@ -951,6 +981,8 @@ class ForgeSwitchCommandTest(unittest.TestCase):
             "nemovcs.git.remote_url", return_value="git@github.com:o/r.git"
         ), mock.patch(
             "nemovcs.forge.detect_forge", return_value=hosting
+        ), mock.patch(
+            "nemovcs.ui.confirm.confirm", return_value=True
         ), mock.patch(
             "nemovcs.ui.logger.run", return_value=1
         ), mock.patch(
