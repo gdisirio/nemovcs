@@ -6,6 +6,7 @@ from nemovcs.forge.base import ChangeRequestTemplate
 from nemovcs.ui import change_request_dialog
 from nemovcs.ui.change_request_dialog import (
     NO_TEMPLATE,
+    base_branch_choices,
     change_request_root,
     create_phases,
     template_body,
@@ -78,6 +79,19 @@ class ChangeRequestHelpersTest(unittest.TestCase):
         self.assertEqual(template_body(templates, NO_TEMPLATE), "")
         self.assertEqual(template_body(templates, None), "")
         self.assertEqual(template_body(templates, "missing"), "")
+
+    def test_base_branch_choices_puts_default_first_and_dedupes(self):
+        self.assertEqual(
+            base_branch_choices("main", ["feature", "main", "release"]),
+            ["main", "feature", "release"],
+        )
+
+    def test_base_branch_choices_without_default(self):
+        self.assertEqual(
+            base_branch_choices(None, ["feature", "main"]),
+            ["feature", "main"],
+        )
+        self.assertEqual(base_branch_choices(None, []), [])
 
     def test_run_rejects_unknown_action(self):
         forge = FakeForge()

@@ -50,6 +50,15 @@ def template_body(templates, name: str | None) -> str:
     return next((t.body for t in templates if t.name == name), "")
 
 
+def base_branch_choices(default_branch: str | None, branches) -> list[str]:
+    """Ordered, de-duplicated base-branch suggestions, default branch first."""
+    ordered: list[str] = []
+    for name in [default_branch, *branches]:
+        if name and name not in ordered:
+            ordered.append(name)
+    return ordered
+
+
 def create_phases(
     forge,
     root: Path,
@@ -83,6 +92,8 @@ class ChangeRequestDialog(Gtk.Window):
 
         self.branch = git.current_branch_name(self.root) if self.root else None
         self.base = git.default_branch_name(self.root) if self.root else None
+        branches = git.recent_branches(self.root) if self.root else []
+        self.base_choices = base_branch_choices(self.base, branches)
         self.templates = (
             forge.change_request_templates(str(self.root)) if self.root else []
         )
@@ -111,10 +122,14 @@ class ChangeRequestDialog(Gtk.Window):
         grid.attach(self.title_entry, 1, 0, 1, 1)
 
         grid.attach(Gtk.Label(label="Base", xalign=0), 0, 1, 1, 1)
-        self.base_entry = Gtk.Entry()
-        self.base_entry.set_text(self.base or "")
-        self.base_entry.set_placeholder_text("default branch")
-        grid.attach(self.base_entry, 1, 1, 1, 1)
+        self.base_combo = Gtk.ComboBoxText.new_with_entry()
+        for name in self.base_choices:
+            self.base_combo.append_text(name)
+        base_entry = self.base_combo.get_child()
+        base_entry.set_placeholder_text("default branch")
+        if self.base:
+            base_entry.set_text(self.base)
+        grid.attach(self.base_combo, 1, 1, 1, 1)
 
         self.template_combo = None
         if self.templates:
@@ -155,6 +170,9 @@ class ChangeRequestDialog(Gtk.Window):
     def title_text(self) -> str:
         return self.title_entry.get_text().strip()
 
+    def base_text(self) -> str:
+        return (self.base_combo.get_active_text() or "").strip()
+
     def body_text(self) -> str:
         buffer = self.body_view.get_buffer()
         return buffer.get_text(
@@ -184,7 +202,7 @@ class ChangeRequestDialog(Gtk.Window):
             self.root,
             title=self.title_text(),
             body=self.body_text(),
-            base=self.base_entry.get_text().strip(),
+            base=self.base_text(),
         )
         window = logger.LoggerWindow(
             f"Create {self.cr_label}",
