@@ -60,6 +60,56 @@ class BackendLog:
     error: str = ""
 
 
+def filter_log_entries(
+    entries: Sequence[LogEntry],
+    paths: Sequence[str],
+) -> tuple[LogEntry, ...]:
+    filters = tuple(normalize_log_filter_path(path) for path in paths if path)
+    if not filters:
+        return tuple(entries)
+
+    filtered: list[LogEntry] = []
+    for entry in entries:
+        changes = tuple(
+            change
+            for change in entry.changes
+            if log_change_matches_any_path(change, filters)
+        )
+        if changes:
+            filtered.append(
+                LogEntry(
+                    revision=entry.revision,
+                    author=entry.author,
+                    date=entry.date,
+                    summary=entry.summary,
+                    body=entry.body,
+                    changes=changes,
+                )
+            )
+    return tuple(filtered)
+
+
+def log_change_matches_any_path(change: LogChange, paths: Sequence[str]) -> bool:
+    return any(
+        log_path_matches_filter(change.path, path)
+        or (
+            change.old_path is not None
+            and log_path_matches_filter(change.old_path, path)
+        )
+        for path in paths
+    )
+
+
+def log_path_matches_filter(path: str, selected_path: str) -> bool:
+    candidate = normalize_log_filter_path(path)
+    selected = normalize_log_filter_path(selected_path)
+    return candidate == selected or candidate.startswith(f"{selected}/")
+
+
+def normalize_log_filter_path(path: str) -> str:
+    return path.strip().strip("/")
+
+
 @dataclass(frozen=True)
 class BackendChangeItem:
     backend_id: str

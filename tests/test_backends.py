@@ -727,7 +727,7 @@ class BackendRegistryTest(unittest.TestCase):
             (LogChange(action="added", path="file.txt"),),
         )
 
-    def test_git_backend_scan_log_path_filter_keeps_full_commit_changes(self):
+    def test_git_backend_scan_log_file_filter_keeps_only_selected_file(self):
         backend = GitBackend()
         root = Path("/tmp/repo")
         text = (
@@ -751,10 +751,7 @@ class BackendRegistryTest(unittest.TestCase):
         self.assertEqual(len(result.entries), 1)
         self.assertEqual(
             result.entries[0].changes,
-            (
-                LogChange(action="modified", path="src/selected.py"),
-                LogChange(action="added", path="README.md"),
-            ),
+            (LogChange(action="modified", path="src/selected.py"),),
         )
         self.assertEqual(
             run_git.call_args_list[0].args[1],
@@ -770,6 +767,39 @@ class BackendRegistryTest(unittest.TestCase):
                 "--name-status",
                 "abc123",
             ],
+        )
+
+    def test_git_backend_scan_log_directory_filter_keeps_descendants(self):
+        backend = GitBackend()
+        root = Path("/tmp/repo")
+        text = (
+            LOG_RECORD_SEP
+            + LOG_FIELD_SEP.join(
+                ["abc123", "Alice", "2024-01-02T03:04:05+00:00", "Many", ""]
+            )
+            + LOG_HEADER_END
+            + "\nM\tsrc/selected.py\nR100\told/src.py\tsrc/renamed.py\nA\tREADME.md\n"
+        )
+
+        with mock.patch("nemovcs.git.run_git") as run_git:
+            run_git.side_effect = [
+                git.GitResult(("git",), root, 0, "abc123\n", ""),
+                git.GitResult(("git",), root, 0, text, ""),
+            ]
+
+            result = backend.scan_log(root, limit=5, paths=("src",))
+
+        self.assertTrue(result.ok)
+        self.assertEqual(
+            result.entries[0].changes,
+            (
+                LogChange(action="modified", path="src/selected.py"),
+                LogChange(
+                    action="renamed",
+                    path="src/renamed.py",
+                    old_path="old/src.py",
+                ),
+            ),
         )
 
     def test_git_backend_scan_log_path_filter_returns_empty_without_revisions(self):
@@ -878,6 +908,66 @@ body paragraph</msg>
         self.assertEqual(len(result.entries), 1)
         self.assertEqual(result.entries[0].revision, "7")
         self.assertEqual(result.entries[0].summary, "tweak")
+
+    def test_svn_backend_scan_log_file_filter_keeps_only_selected_file(self):
+        backend = SvnBackend()
+        root = Path("/tmp/wc")
+        xml = (
+            '<?xml version="1.0"?>\n<log>\n'
+            '<logentry revision="7">\n<author>al</author>\n'
+            "<date>2024-05-05T00:00:00.0Z</date>\n"
+            "<paths>\n"
+            '<path action="M">/trunk/src/selected.py</path>\n'
+            '<path action="A">/trunk/README.md</path>\n'
+            "</paths>\n"
+            "<msg>tweak</msg>\n</logentry>\n</log>\n"
+        )
+
+        with mock.patch.object(backend, "run") as run:
+            run.side_effect = [
+                SvnResult(("svn", "log"), root, 0, xml, ""),
+                SvnResult(("svn", "info"), root, 0, "^/trunk\n", ""),
+            ]
+
+            result = backend.scan_log(root, limit=5, paths=("src/selected.py",))
+
+        self.assertTrue(result.ok)
+        self.assertEqual(
+            result.entries[0].changes,
+            (LogChange(action="modified", path="/trunk/src/selected.py"),),
+        )
+
+    def test_svn_backend_scan_log_directory_filter_keeps_descendants(self):
+        backend = SvnBackend()
+        root = Path("/tmp/wc")
+        xml = (
+            '<?xml version="1.0"?>\n<log>\n'
+            '<logentry revision="7">\n<author>al</author>\n'
+            "<date>2024-05-05T00:00:00.0Z</date>\n"
+            "<paths>\n"
+            '<path action="M">/trunk/src/selected.py</path>\n'
+            '<path action="D">/trunk/src/deleted.py</path>\n'
+            '<path action="A">/trunk/README.md</path>\n'
+            "</paths>\n"
+            "<msg>tweak</msg>\n</logentry>\n</log>\n"
+        )
+
+        with mock.patch.object(backend, "run") as run:
+            run.side_effect = [
+                SvnResult(("svn", "log"), root, 0, xml, ""),
+                SvnResult(("svn", "info"), root, 0, "^/trunk\n", ""),
+            ]
+
+            result = backend.scan_log(root, limit=5, paths=("src",))
+
+        self.assertTrue(result.ok)
+        self.assertEqual(
+            result.entries[0].changes,
+            (
+                LogChange(action="modified", path="/trunk/src/selected.py"),
+                LogChange(action="deleted", path="/trunk/src/deleted.py"),
+            ),
+        )
 
     def test_git_backend_builds_identity_from_rev_parse(self):
         backend = GitBackend()

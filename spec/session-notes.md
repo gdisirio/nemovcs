@@ -184,9 +184,12 @@ sessions. Update this file before pushing changes.
 - The Log dialog can filter revision history by the selected paths, so opening
   it on a file or subdirectory shows relevant history instead of always showing
   whole-repository history.
-- Git Log dialog path-filtered history now matches SVN behavior more closely:
-  selected paths filter which revisions are listed, but each listed Git
-  revision shows the full set of files changed in that revision.
+- Git/SVN Log dialog path-filtered history now filters both the listed
+  revisions and each revision's changed-file list. Selecting a file shows only
+  that file in the changed-files pane; selecting a directory shows affected
+  descendants. Rename/copy source paths are considered when matching. Verified
+  with unit tests and a live Git sanity check on `src/nemovcs/backends/git.py`;
+  user tested from Nemo and approved the behavior.
 - The Log dialog changed-files context menu has `Diff with previous...`,
   `Diff with current...`, a separator, and `Save as...`. Git file-level
   `Diff with current...` handles added files with `/dev/null` on the left and

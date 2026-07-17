@@ -18,6 +18,7 @@ from nemovcs.backends.base import (
     BackendWorktreeIdentity,
     LogChange,
     LogEntry,
+    filter_log_entries,
 )
 
 
@@ -100,6 +101,16 @@ def has_svn_metadata_ancestor(path: str | Path) -> bool:
         if (directory / ".svn").is_dir():
             return True
     return False
+
+
+def join_svn_paths(root_path: str, relpath: str) -> str:
+    root = root_path.strip("/")
+    rel = relpath.strip("/")
+    if not root:
+        return rel
+    if not rel:
+        return root
+    return f"{root}/{rel}"
 
 
 class SvnBackend:
@@ -222,7 +233,36 @@ class SvnBackend:
                 ok=False,
                 error=result.stderr.strip() or result.stdout.strip(),
             )
-        return BackendLog(ok=True, entries=tuple(parse_svn_log(result.stdout)))
+        entries = tuple(parse_svn_log(result.stdout))
+        if paths:
+            entries = filter_log_entries(
+                entries,
+                self.repository_log_paths(root, paths),
+            )
+        return BackendLog(ok=True, entries=entries)
+
+    def repository_log_paths(
+        self,
+        root: str | Path,
+        paths: Sequence[str],
+    ) -> tuple[str, ...]:
+        root_path = self.repository_root_path(root)
+        return tuple(
+            join_svn_paths(root_path, path)
+            for path in paths
+            if path and path != "."
+        )
+
+    def repository_root_path(self, root: str | Path) -> str:
+        result = self.run(root, ["info", "--show-item", "relative-url"])
+        if not result.ok:
+            return ""
+        text = result.stdout.strip()
+        if text.startswith("^/"):
+            return text[2:]
+        if text.startswith("/"):
+            return text[1:]
+        return text
 
     def commit_items(
         self,

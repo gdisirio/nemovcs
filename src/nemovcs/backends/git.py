@@ -20,6 +20,7 @@ from nemovcs.backends.base import (
     BackendWorktreeIdentity,
     LogChange,
     LogEntry,
+    filter_log_entries,
 )
 
 
@@ -233,7 +234,10 @@ class GitBackend:
                     ok=False,
                     error=result.stderr.strip() or result.stdout.strip(),
                 )
-            return BackendLog(ok=True, entries=tuple(parse_git_log(result.stdout)))
+            return BackendLog(
+                ok=True,
+                entries=filter_log_entries(parse_git_log(result.stdout), paths),
+            )
 
         args = [
             "log",
