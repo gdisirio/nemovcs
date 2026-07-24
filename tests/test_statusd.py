@@ -153,6 +153,23 @@ class WorktreeIdentityTest(unittest.TestCase):
 
         self.assertEqual(core.status_record(self.root)["head"], "feature")
 
+    def test_stale_scan_evicts_removed_worktree(self):
+        changed: list[tuple[str, list[str]]] = []
+        core = statusd.StatusDaemonCore(
+            status_changed_callback=lambda worktree_id, paths: changed.append(
+                (worktree_id, paths)
+            ),
+        )
+        worktree_id = f"git:{self.root}"
+
+        self.assertEqual(core.seen([self.root]), [worktree_id])
+
+        shutil.rmtree(self.root)
+        self.assertTrue(core.mark_stale(worktree_id))
+
+        self.assertIsNone(core.cache.entry_by_key(worktree_id))
+        self.assertEqual(changed, [(worktree_id, [str(self.root)])])
+
 
 class WorktreeCacheTest(unittest.TestCase):
     def test_seen_worktree_inserts_entry(self):
@@ -238,6 +255,23 @@ class WorktreeCacheTest(unittest.TestCase):
     def test_invalid_cache_size_is_rejected(self):
         with self.assertRaises(ValueError):
             statusd.WorktreeCache(max_worktrees=0)
+
+    def test_remove_evicts_entry(self):
+        evicted: list[statusd.WorktreeIdentity] = []
+
+        class TrackingCache(statusd.WorktreeCache):
+            def on_evict(self, entry: statusd.WorktreeEntry) -> None:
+                evicted.append(entry.identity)
+
+        cache = TrackingCache()
+        first = identity("one")
+        cache.touch(first)
+
+        removed = cache.remove(first.cache_key)
+
+        self.assertIsNotNone(removed)
+        self.assertNotIn(first, cache)
+        self.assertEqual(evicted, [first])
 
 
 class StatusDaemonSchedulerTest(unittest.TestCase):
@@ -413,6 +447,36 @@ class StatusDaemonSchedulerTest(unittest.TestCase):
         self.assertEqual(entry.identity.head_label, "feature")
         self.assertEqual(core.status_record(first.root)["head"], "feature")
 
+    def test_async_scan_completion_evicts_vanished_worktree(self):
+        changed: list[tuple[str, list[str]]] = []
+        scheduler = FakeScanScheduler()
+        first = identity("one")
+        cache = statusd.WorktreeCache()
+
+        def scan(_entry: statusd.WorktreeEntry) -> None:
+            _entry.scanned = True
+            _entry.vanished = True
+            _entry.error = "worktree no longer exists"
+
+        core = statusd.StatusDaemonCore(
+            cache,
+            scan_scheduler=scheduler,
+            scan_func=scan,
+            status_changed_callback=lambda worktree_id, paths: changed.append(
+                (worktree_id, paths)
+            ),
+        )
+
+        with mock.patch("nemovcs.statusd.identify_worktree", return_value=first):
+            self.assertEqual(core.seen([first.root]), [first.cache_key])
+
+        self.assertIsNotNone(cache.entry_by_key(first.cache_key))
+
+        scheduler.run_next()
+
+        self.assertIsNone(cache.entry_by_key(first.cache_key))
+        self.assertEqual(changed, [(first.cache_key, [str(first.root)])])
+
     def test_seen_during_initial_scan_does_not_request_rescan(self):
         scheduler = FakeScanScheduler()
         first = identity("one")
@@ -572,6 +636,51 @@ class StatusDaemonSchedulerTest(unittest.TestCase):
 
         self.assertEqual(scans, [first])
         self.assertFalse(entry.stale)
+
+    def test_scan_identity_mismatch_marks_worktree_vanished(self):
+        first = identity("one")
+        parent = statusd.WorktreeIdentity(
+            root=Path("/tmp"),
+            gitdir=Path("/tmp") / ".git",
+            common_gitdir=Path("/tmp") / ".git",
+            head_label="main",
+        )
+        entry = statusd.WorktreeEntry(first)
+
+        with mock.patch("nemovcs.statusd.identify_worktree", return_value=parent):
+            with mock.patch("nemovcs.statusd.backends.backend_by_id") as backend_by_id:
+                statusd.scan_worktree(entry)
+
+        backend_by_id.assert_not_called()
+        self.assertTrue(entry.vanished)
+        self.assertTrue(entry.scanned)
+        self.assertEqual(entry.error, "worktree no longer exists")
+
+    def test_scan_valid_identity_reports_backend_error(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            first = statusd.WorktreeIdentity(
+                root=Path(tmp),
+                gitdir=Path(tmp) / ".git",
+                common_gitdir=Path(tmp) / ".git",
+                head_label="main",
+            )
+            entry = statusd.WorktreeEntry(first)
+            backend = mock.Mock(
+                scan_status=mock.Mock(
+                    return_value=BackendStatusScan(ok=False, error="broken checkout")
+                )
+            )
+
+            with mock.patch("nemovcs.statusd.identify_worktree", return_value=first):
+                with mock.patch(
+                    "nemovcs.statusd.backends.backend_by_id",
+                    return_value=backend,
+                ):
+                    statusd.scan_worktree(entry)
+
+        self.assertFalse(entry.vanished)
+        self.assertTrue(entry.scanned)
+        self.assertEqual(entry.error, "broken checkout")
 
     def test_async_scheduled_scan_updates_after_timer_and_completion(self):
         changed: list[tuple[str, list[str]]] = []
@@ -1188,8 +1297,12 @@ class WorktreeScanTest(unittest.TestCase):
                 backend_id="svn",
             )
         )
-        with mock.patch("nemovcs.statusd.backends.backend_by_id", return_value=None):
-            statusd.scan_worktree(failed)
+        with mock.patch(
+            "nemovcs.statusd.identify_worktree",
+            return_value=failed.identity,
+        ):
+            with mock.patch("nemovcs.statusd.backends.backend_by_id", return_value=None):
+                statusd.scan_worktree(failed)
 
         self.assertTrue(failed.scanned)
         self.assertEqual(failed.error, "unknown backend: svn")

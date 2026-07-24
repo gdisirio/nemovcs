@@ -78,6 +78,7 @@ class WorktreeEntry:
     rescan_needed: bool = False
     last_scanned_at: float | None = None
     remote_url: str = ""
+    vanished: bool = False
 
 
 ScanWork = Callable[[], WorktreeEntry]
@@ -137,6 +138,12 @@ class WorktreeCache:
 
     def entry_by_key(self, worktree_id: str) -> WorktreeEntry | None:
         return self._entries.get(worktree_id)
+
+    def remove(self, worktree_id: str) -> WorktreeEntry | None:
+        entry = self._entries.pop(worktree_id, None)
+        if entry is not None:
+            self.on_evict(entry)
+        return entry
 
     def entry_for_cached_path(self, path: str | Path) -> WorktreeEntry | None:
         candidate = normalized_path(path)
@@ -363,11 +370,16 @@ class StatusDaemonCore:
         if self.cache.entry_by_key(entry.identity.cache_key) is not entry:
             return
 
+        if scanned.vanished:
+            self.finish_vanished_entry(entry, changed_paths, notify=notify)
+            return
+
         if scanned.identity.cache_key == entry.identity.cache_key:
             entry.identity = scanned.identity
         entry.statuses = dict(scanned.statuses)
         entry.tracked_paths = set(scanned.tracked_paths)
         entry.remote_url = scanned.remote_url
+        entry.vanished = False
         entry.scanned = scanned.scanned
         entry.error = scanned.error
         entry.scan_in_flight = False
@@ -381,6 +393,23 @@ class StatusDaemonCore:
         if entry.rescan_needed:
             entry.rescan_needed = False
             self.mark_stale(entry.identity.cache_key)
+
+    def finish_vanished_entry(
+        self,
+        entry: WorktreeEntry,
+        changed_paths: list[str],
+        *,
+        notify: bool = True,
+    ) -> None:
+        worktree_id = entry.identity.cache_key
+        root_path = str(entry.identity.root)
+        entry.scan_in_flight = False
+        entry.scan_scheduled = False
+        entry.rescan_needed = False
+        self.cache.remove(worktree_id)
+        self.changed_worktrees.append(worktree_id)
+        if notify:
+            self.notify_status_changed(worktree_id, changed_paths or [root_path])
 
     def notify_status_changed(self, worktree_id: str, paths: list[str]) -> None:
         if self.status_changed_callback is not None:
@@ -507,11 +536,20 @@ def identify_worktree(path: str | Path) -> WorktreeIdentity | None:
 
 def scan_worktree(entry: WorktreeEntry) -> None:
     refreshed_identity = identify_worktree(entry.identity.root)
+    entry.vanished = False
     if (
-        refreshed_identity is not None
-        and refreshed_identity.cache_key == entry.identity.cache_key
+        refreshed_identity is None
+        or refreshed_identity.cache_key != entry.identity.cache_key
     ):
-        entry.identity = refreshed_identity
+        entry.statuses.clear()
+        entry.tracked_paths.clear()
+        entry.remote_url = ""
+        entry.scanned = True
+        entry.error = "worktree no longer exists"
+        entry.vanished = True
+        return
+
+    entry.identity = refreshed_identity
 
     backend = backends.backend_by_id(entry.identity.backend_id)
     if backend is None:

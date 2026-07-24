@@ -12,6 +12,9 @@ sessions. Update this file before pushing changes.
 - Current performance focus: keep Nemo extension callbacks from triggering
   repeated synchronous status work during directory enumeration and keep DBus
   failures visible instead of silently masking unexpected problems.
+- Current statusd lifecycle focus: refresh cached worktree identity after
+  external branch changes and remove vanished worktrees together with their
+  filesystem monitors.
 
 ## Last Known State
 
@@ -21,7 +24,7 @@ sessions. Update this file before pushing changes.
 - Nemo and `nemovcs statusd` were restarted after the update.
 - Tests passed with:
   `PYTHONPATH=src python3 -m unittest discover -s tests`
-  and `python3 -m compileall -q src tests scripts`.
+  (464 tests) and `python3 -m compileall -q src tests`.
 - Opening large directories is more responsive after changing statusd `Seen()`
   handling so fresh, already-scanned worktrees are not rescanned for every
   visible file.
@@ -75,6 +78,14 @@ sessions. Update this file before pushing changes.
   the new `nemovcs-problems` emblem. Non-worktree "not versioned" errors remain
   quiet. The client validates daemon status records and synthesizes a problem
   record only when local marker detection indicates a real Git/SVN worktree.
+- Completed scans now copy a refreshed worktree identity back into the cache,
+  so an external Git branch switch updates the branch shown in the repository
+  context bar after monitor or TTL invalidation.
+- A stale scan that finds its worktree missing, or resolving to a different
+  worktree identity, now evicts the old cache entry through the normal eviction
+  hook. This also stops its filesystem monitors and prevents polling a removed
+  worktree from becoming a CPU-intensive loop. Backend scan failures for a
+  still-valid worktree remain cached as errors instead of being evicted.
 
 ## Recent Changes To Keep In Mind
 
@@ -267,8 +278,22 @@ sessions. Update this file before pushing changes.
   `Forge.run(action_id, root)`. GitHub advertises one action so far, `open`
   (`gh browse`). Verified live: detection + actions + run resolve for this repo.
 
+## Known Issues
+
+- The external branch-switch refresh and vanished-worktree eviction paths have
+  unit coverage but still need live validation through the installed daemon,
+  especially removal of SVN working copies and linked Git worktrees while Nemo
+  is open.
+- The status daemon still relies on monitor invalidation plus the scan TTL for
+  freshness; the TTL bounds missed filesystem events but does not make updates
+  immediate when a monitor event is lost.
+
 ## Next Likely Tasks
 
+- Reinstall/restart Nemo and exercise external branch switches plus removal of
+  cached Git and SVN worktrees. Confirm the context bar branch changes, removed
+  roots disappear from the settings cache view, and `nemovcs-statusd` settles
+  without CPU churn.
 - Forge integration next steps: add the remaining common capability verbs
   beyond open-in-browser and publish (list/create/checkout change request, show
   active account) with per-adapter capability advertisement so the submenu only
