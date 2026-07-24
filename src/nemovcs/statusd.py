@@ -363,6 +363,8 @@ class StatusDaemonCore:
         if self.cache.entry_by_key(entry.identity.cache_key) is not entry:
             return
 
+        if scanned.identity.cache_key == entry.identity.cache_key:
+            entry.identity = scanned.identity
         entry.statuses = dict(scanned.statuses)
         entry.tracked_paths = set(scanned.tracked_paths)
         entry.remote_url = scanned.remote_url
@@ -504,6 +506,13 @@ def identify_worktree(path: str | Path) -> WorktreeIdentity | None:
 
 
 def scan_worktree(entry: WorktreeEntry) -> None:
+    refreshed_identity = identify_worktree(entry.identity.root)
+    if (
+        refreshed_identity is not None
+        and refreshed_identity.cache_key == entry.identity.cache_key
+    ):
+        entry.identity = refreshed_identity
+
     backend = backends.backend_by_id(entry.identity.backend_id)
     if backend is None:
         entry.statuses.clear()

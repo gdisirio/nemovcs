@@ -135,6 +135,24 @@ class WorktreeIdentityTest(unittest.TestCase):
 
         self.assertIsNone(statusd.identify_worktree(outside))
 
+    def test_scan_refreshes_cached_head_label_after_branch_switch(self):
+        core = statusd.StatusDaemonCore()
+        worktree_id = f"git:{self.root}"
+
+        self.assertEqual(core.seen([self.root]), [worktree_id])
+        self.assertEqual(core.status_record(self.root)["head"], "main")
+
+        subprocess.run(
+            ["git", "switch", "-c", "feature"],
+            cwd=self.root,
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        self.assertTrue(core.mark_stale(worktree_id))
+
+        self.assertEqual(core.status_record(self.root)["head"], "feature")
+
 
 class WorktreeCacheTest(unittest.TestCase):
     def test_seen_worktree_inserts_entry(self):
@@ -361,6 +379,39 @@ class StatusDaemonSchedulerTest(unittest.TestCase):
             core.get_status([first.root / "file.txt"])[0]["status"],
             statusd.EmblemStatus.MODIFIED,
         )
+
+    def test_async_scan_completion_refreshes_cached_head_label(self):
+        scheduler = FakeScanScheduler()
+        first = identity("one")
+        cache = statusd.WorktreeCache()
+        refreshed = statusd.WorktreeIdentity(
+            root=first.root,
+            gitdir=first.gitdir,
+            common_gitdir=first.common_gitdir,
+            head_label="feature",
+        )
+
+        def scan(_entry: statusd.WorktreeEntry) -> None:
+            _entry.identity = refreshed
+            _entry.scanned = True
+
+        core = statusd.StatusDaemonCore(
+            cache,
+            scan_scheduler=scheduler,
+            scan_func=scan,
+        )
+
+        with mock.patch("nemovcs.statusd.identify_worktree", return_value=first):
+            self.assertEqual(core.seen([first.root]), [first.cache_key])
+
+        entry = cache.entry_by_key(first.cache_key)
+        assert entry is not None
+        self.assertEqual(entry.identity.head_label, "main")
+
+        scheduler.run_next()
+
+        self.assertEqual(entry.identity.head_label, "feature")
+        self.assertEqual(core.status_record(first.root)["head"], "feature")
 
     def test_seen_during_initial_scan_does_not_request_rescan(self):
         scheduler = FakeScanScheduler()
