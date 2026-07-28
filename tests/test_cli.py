@@ -1,6 +1,7 @@
 import argparse
 import io
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -341,7 +342,35 @@ class CliParserTest(unittest.TestCase):
             self.assertEqual(cmd_diff_dialog(args), 0)
 
         diff_commands.assert_called_once_with(["/tmp/example"])
-        popen.assert_called_once_with(command.args, cwd=str(command.cwd))
+        popen.assert_called_once_with(list(command.args), cwd=str(command.cwd))
+
+    def test_diff_dialog_runs_internal_backend_command_with_current_python(self):
+        parser = build_parser()
+        args = parser.parse_args(["diff-dialog", "/tmp/example/file.txt"])
+        command = git.GitResult(
+            ("nemovcs", "svn-meld-diff", "/tmp/example/file.txt"),
+            Path("/tmp/example"),
+            0,
+            "",
+            "",
+        )
+
+        with mock.patch(
+            "nemovcs.cli.backends.diff_commands",
+            return_value=[command],
+        ), mock.patch("nemovcs.cli.subprocess.Popen") as popen:
+            self.assertEqual(cmd_diff_dialog(args), 0)
+
+        popen.assert_called_once_with(
+            [
+                sys.executable,
+                "-m",
+                "nemovcs",
+                "svn-meld-diff",
+                "/tmp/example/file.txt",
+            ],
+            cwd="/tmp/example",
+        )
 
     def test_svn_meld_diff_exports_base_then_launches_meld(self):
         parser = build_parser()

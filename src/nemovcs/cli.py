@@ -13,6 +13,7 @@ from typing import Any, Callable, Protocol, Sequence
 from . import __version__
 from . import backends
 from .backends.base import BackendCommandPhase
+from .launch import resolved_command
 
 
 class CommandResult(Protocol):
@@ -127,7 +128,10 @@ def cmd_diff_dialog(args: argparse.Namespace) -> int:
             )
             continue
         try:
-            subprocess.Popen(command.args, cwd=str(command.cwd))
+            subprocess.Popen(
+                resolved_command(command.args),
+                cwd=str(command.cwd),
+            )
         except OSError as exc:
             info_dialog.show_error("Unable to open diff", str(exc))
             exit_code = 127

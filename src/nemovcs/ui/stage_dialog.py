@@ -17,6 +17,7 @@ from gi.repository import Pango  # noqa: E402
 
 from nemovcs import backends
 from nemovcs.backends.base import BackendChangeItem, BackendCommandPhase
+from nemovcs.launch import resolved_command
 from nemovcs.ui import logger
 
 
@@ -495,7 +496,7 @@ class StageDialog(Gtk.Window):
 
     def spawn(self, command: Sequence[str]) -> None:
         try:
-            subprocess.Popen(command)
+            subprocess.Popen(resolved_command(command))
         except OSError as exc:
             self.show_error(str(exc))
 

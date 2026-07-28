@@ -507,7 +507,7 @@ def diff_tool_args(root: str | Path, relpaths: Sequence[str]) -> list[str]:
     args = ["difftool", "--tool=meld"]
     if diff_uses_dir_mode(root, relpaths):
         args.append("--dir-diff")
-    args.extend(["--no-prompt", "--", *relpaths])
+    args.extend(["--no-prompt", "HEAD", "--", *relpaths])
     return args
 
 

@@ -15,6 +15,8 @@ sessions. Update this file before pushing changes.
 - Current statusd lifecycle focus: refresh cached worktree identity after
   external branch changes and remove vanished worktrees together with their
   filesystem monitors.
+- Current diff focus: make Meld launches independent of stale source-tree
+  wrappers and show all tracked Git changes since `HEAD`.
 
 ## Last Known State
 
@@ -24,7 +26,7 @@ sessions. Update this file before pushing changes.
 - Nemo and `nemovcs statusd` were restarted after the update.
 - Tests passed with:
   `PYTHONPATH=src python3 -m unittest discover -s tests`
-  (464 tests) and `python3 -m compileall -q src tests`.
+  (465 tests) and `python3 -m compileall -q src tests`.
 - Opening large directories is more responsive after changing statusd `Seen()`
   handling so fresh, already-scanned worktrees are not rescanned for every
   visible file.
@@ -86,6 +88,14 @@ sessions. Update this file before pushing changes.
   hook. This also stops its filesystem monitors and prevents polling a removed
   worktree from becoming a CPU-intensive loop. Backend scan failures for a
   still-valid worktree remain cached as errors instead of being evicted.
+- Internal `nemovcs` child commands now run through the current Python
+  interpreter and module environment. This fixes SVN Meld actions when a stale
+  external `nemovcs` launcher points at a moved source checkout, including
+  diffs launched from the top-level menu and the Status, Commit, and Stage
+  dialogs.
+- Git `Diff...` now compares the working copy to `HEAD`, so staged-only,
+  unstaged, and mixed changes are all shown as uncommitted changes. Verified
+  against the staged-only `os/xhal/xhal.mk` in the `chibios-vfs-dev` worktree.
 
 ## Recent Changes To Keep In Mind
 
@@ -287,6 +297,9 @@ sessions. Update this file before pushing changes.
 - The status daemon still relies on monitor invalidation plus the scan TTL for
   freshness; the TTL bounds missed filesystem events but does not make updates
   immediate when a monitor event is lost.
+- This machine's standalone `~/.local/bin/nemovcs` launcher still references a
+  moved source checkout. Nemo actions no longer depend on it, but the
+  development CLI install should be refreshed before direct shell use.
 
 ## Next Likely Tasks
 
@@ -294,6 +307,8 @@ sessions. Update this file before pushing changes.
   cached Git and SVN worktrees. Confirm the context bar branch changes, removed
   roots disappear from the settings cache view, and `nemovcs-statusd` settles
   without CPU churn.
+- Refresh the standalone development CLI install and manually recheck Meld for
+  staged-only, unstaged, mixed Git changes, and SVN files.
 - Forge integration next steps: add the remaining common capability verbs
   beyond open-in-browser and publish (list/create/checkout change request, show
   active account) with per-adapter capability advertisement so the submenu only

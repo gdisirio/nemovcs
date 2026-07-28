@@ -13,12 +13,12 @@ import json
 import os
 from pathlib import Path
 import subprocess
-import sys
 import time
 from typing import Sequence
 from urllib.parse import unquote, urlparse
 
 from . import status_client
+from .launch import resolved_command
 
 
 DEFAULT_MAX_VISIBLE_ITEMS = 2048
@@ -956,9 +956,7 @@ def subscribe_daemon_status_changed(callback):
 
 
 def menu_launch_command(command: Sequence[str]) -> list[str]:
-    if command and command[0] == "nemovcs":
-        return [sys.executable, "-m", *command]
-    return list(command)
+    return resolved_command(command)
 
 
 def menu_launch_env(command: Sequence[str]) -> dict[str, str] | None:
