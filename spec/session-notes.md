@@ -26,7 +26,7 @@ sessions. Update this file before pushing changes.
 - Nemo and `nemovcs statusd` were restarted after the update.
 - Tests passed with:
   `PYTHONPATH=src python3 -m unittest discover -s tests`
-  (468 tests) and `python3 -m compileall -q src tests scripts`.
+  (479 tests) and `python3 -m compileall -q src tests scripts`.
 - The default worktree cache limit is now `32`, including the settings-dialog
   fallback. Existing persisted settings are not migrated automatically; the
   live user setting was changed from `16` to `32` during installation.
@@ -113,6 +113,10 @@ sessions. Update this file before pushing changes.
 
 ## Recent Changes To Keep In Mind
 
+- `Delete...` is available for Git and SVN file/directory selections, supports
+  multiple paths, confirms with a destructive-action dialog, and streams the
+  VCS operation through the logger. It uses non-forced `git rm -r` or
+  `svn delete`, and working-copy roots are rejected.
 - `Rename...` is available for single Git/SVN selections.
 - `Settings...` opens a GTK settings panel for status daemon status/cache
   inspection and settings.

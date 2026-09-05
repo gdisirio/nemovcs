@@ -14,6 +14,7 @@ def confirm(
     *,
     detail: str = "",
     ok_label: str = "Continue",
+    action_style: str = "suggested-action",
 ) -> bool:
     """Show a modal warning and return True only if the user accepts.
 
@@ -33,7 +34,8 @@ def confirm(
         dialog.format_secondary_text(message)
     dialog.add_button("Cancel", Gtk.ResponseType.CANCEL)
     ok_button = dialog.add_button(ok_label, Gtk.ResponseType.OK)
-    ok_button.get_style_context().add_class("suggested-action")
+    if action_style:
+        ok_button.get_style_context().add_class(action_style)
     dialog.set_default_response(Gtk.ResponseType.CANCEL)
 
     response = dialog.run()

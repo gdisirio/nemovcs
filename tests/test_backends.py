@@ -249,6 +249,40 @@ class BackendRegistryTest(unittest.TestCase):
 
         rename_phases.assert_called_once_with(root, "src/app.py", "src/main.py")
 
+    def test_delete_phases_uses_grouped_backend(self):
+        root = Path("/tmp/repo")
+        backend = GitBackend()
+        phase = BackendCommandPhase(
+            title="Delete from repo",
+            cwd=root,
+            command=("fake", "delete"),
+        )
+        grouped = {backend: {root: ["src/app.py"]}}
+
+        with mock.patch(
+            "nemovcs.backends.group_by_backend",
+            return_value=grouped,
+        ), mock.patch.object(
+            backend,
+            "delete_phases",
+            return_value=[phase],
+        ) as delete_phases:
+            self.assertEqual(backends.delete_phases([root / "src/app.py"]), [phase])
+
+        delete_phases.assert_called_once_with({root: ["src/app.py"]})
+
+    def test_delete_phases_rejects_worktree_root(self):
+        root = Path("/tmp/repo")
+        backend = GitBackend()
+
+        with mock.patch(
+            "nemovcs.backends.group_by_backend",
+            return_value={backend: {root: ["."]}},
+        ), mock.patch.object(backend, "delete_phases") as delete_phases:
+            self.assertEqual(backends.delete_phases([root]), [])
+
+        delete_phases.assert_not_called()
+
     def test_git_backend_delegates_status_to_existing_git_helpers(self):
         backend = GitBackend()
         expected = object()
@@ -426,6 +460,26 @@ class BackendRegistryTest(unittest.TestCase):
                 "--",
                 "src/app.py",
                 "README.md",
+            ),
+        )
+
+    def test_git_backend_builds_delete_phases(self):
+        backend = GitBackend()
+        root = Path("/tmp/repo")
+
+        phases = backend.delete_phases({root: ["src/app.py", "docs"]})
+
+        self.assertEqual(
+            phases[0].command,
+            (
+                "git",
+                "-C",
+                str(root),
+                "rm",
+                "-r",
+                "--",
+                "src/app.py",
+                "docs",
             ),
         )
 
@@ -1195,12 +1249,14 @@ body paragraph</msg>
         commit = backend.commit_phases(root, ["new.txt"], "message")
         update = backend.update_phases({root: ["."]})
         revert = backend.revert_phases({root: ["modified.txt"]})
+        delete = backend.delete_phases({root: ["removed.txt"]})
         rename = backend.rename_phases(root, "old.txt", "new.txt")
 
         self.assertEqual(add[0].command, ("svn", "add", "--parents", "new.txt"))
         self.assertEqual(commit[0].command, ("svn", "commit", "-m", "message", "new.txt"))
         self.assertEqual(update[0].command, ("svn", "update"))
         self.assertEqual(revert[0].command, ("svn", "revert", "modified.txt"))
+        self.assertEqual(delete[0].command, ("svn", "delete", "--", "removed.txt"))
         self.assertEqual(rename[0].command, ("svn", "move", "old.txt", "new.txt"))
 
 

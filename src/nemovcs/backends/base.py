@@ -214,6 +214,11 @@ class Backend(Protocol):
         paths_by_root: dict[Path, Sequence[str]],
     ) -> list[BackendCommandPhase]: ...
 
+    def delete_phases(
+        self,
+        paths_by_root: dict[Path, Sequence[str]],
+    ) -> list[BackendCommandPhase]: ...
+
     def rename_phases(
         self,
         root: str | Path,

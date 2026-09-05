@@ -353,6 +353,20 @@ class SvnBackend:
             if relpaths
         ]
 
+    def delete_phases(
+        self,
+        paths_by_root: dict[Path, Sequence[str]],
+    ) -> list[BackendCommandPhase]:
+        return [
+            self.phase(
+                f"Delete from {root.name}",
+                root,
+                ["delete", "--", *relpaths],
+            )
+            for root, relpaths in paths_by_root.items()
+            if relpaths
+        ]
+
     def rename_phases(
         self,
         root: str | Path,

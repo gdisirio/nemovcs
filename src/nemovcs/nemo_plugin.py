@@ -39,6 +39,7 @@ ABOUT_ICON = MENU_ICON
 ADD_ICON = "nemovcs-add"
 CHECKOUT_ICON = "nemovcs-checkout"
 COMMIT_ICON = "nemovcs-commit"
+DELETE_ICON = "edit-delete"
 DIFF_ICON = "nemovcs-diff"
 GIT_ICON = "nemovcs-git"
 LOG_ICON = "nemovcs-show-log"
@@ -1259,6 +1260,16 @@ def git_menu_specs(
         specs.append(
             action("GitRename", "Rename...", ["rename-dialog", *paths], icon=RENAME_ICON)
         )
+    if not any(is_backend_root_path(path, "git") for path in paths):
+        specs.append(
+            action(
+                "GitDelete",
+                "Delete...",
+                ["delete-dialog", *paths],
+                icon=DELETE_ICON,
+            )
+        )
+    if len(paths) == 1:
         switch_spec = git_switch_branch_menu_spec(paths[0])
         if switch_spec is not None:
             specs.append(switch_spec)
@@ -1396,6 +1407,15 @@ def svn_menu_specs(paths: Sequence[str]) -> list[MenuActionSpec]:
         specs.append(
             action("SvnRename", "Rename...", ["rename-dialog", *paths], icon=RENAME_ICON)
         )
+    if not any(is_backend_root_path(path, "svn") for path in paths):
+        specs.append(
+            action(
+                "SvnDelete",
+                "Delete...",
+                ["delete-dialog", *paths],
+                icon=DELETE_ICON,
+            )
+        )
     specs.extend(
         [
             action(
@@ -1477,6 +1497,20 @@ def action(
 
 def separator(name: str) -> MenuActionSpec:
     return MenuActionSpec(name=f"NemoVCS::{name}", label="", separator=True)
+
+
+def is_backend_root_path(path: str | Path, backend_id: str) -> bool:
+    candidate = Path(path).expanduser()
+    if not candidate.is_absolute():
+        candidate = Path.cwd() / candidate
+    candidate = candidate.resolve(strict=False)
+    if not candidate.is_dir():
+        return False
+    if backend_id == "git":
+        return is_git_marker(candidate / ".git")
+    if backend_id == "svn":
+        return is_svn_marker(candidate / ".svn")
+    return False
 
 
 def menu_name_fragment(text: str) -> str:

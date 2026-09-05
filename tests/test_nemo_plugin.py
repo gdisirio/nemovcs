@@ -1163,6 +1163,10 @@ class NemoVCSInfoProviderCoreTest(unittest.TestCase):
             commands,
         )
         self.assertIn(
+            ("nemovcs", "delete-dialog", "/tmp/repo/src/app.py"),
+            commands,
+        )
+        self.assertIn(
             ("nemovcs", "rename-dialog", "/tmp/repo/src/app.py"),
             commands,
         )
@@ -1174,6 +1178,7 @@ class NemoVCSInfoProviderCoreTest(unittest.TestCase):
         self.assertEqual(icons_by_label["Update..."], "nemovcs-update")
         self.assertEqual(icons_by_label["Stage..."], "nemovcs-add")
         self.assertEqual(icons_by_label["Rename..."], "nemovcs-rename")
+        self.assertEqual(icons_by_label["Delete..."], "edit-delete")
         self.assertEqual(icons_by_label["Revert..."], "nemovcs-revert")
         self.assertEqual(icons_by_label["Push..."], "nemovcs-push")
         self.assertEqual(icons_by_label["Status..."], "nemovcs-status")
@@ -1223,6 +1228,15 @@ class NemoVCSInfoProviderCoreTest(unittest.TestCase):
             switch.children[-1].command,
             ("nemovcs", "switch-branch-dialog", "/tmp/repo"),
         )
+
+    def test_git_submenu_omits_delete_for_worktree_root(self):
+        with mock.patch(
+            "nemovcs.nemo_plugin.is_backend_root_path",
+            return_value=True,
+        ):
+            specs = nemo_plugin.git_menu_specs(["/tmp/repo"])
+
+        self.assertNotIn("Delete...", [spec.label for spec in specs])
 
     def test_git_switch_branch_menu_stays_active_with_single_branch(self):
         core = nemo_plugin.NemoVCSInfoProviderCore()
@@ -1505,6 +1519,10 @@ class NemoVCSInfoProviderCoreTest(unittest.TestCase):
             commands,
         )
         self.assertIn(
+            ("nemovcs", "delete-dialog", "/tmp/wc/tracked.c"),
+            commands,
+        )
+        self.assertIn(
             ("nemovcs", "rename-dialog", "/tmp/wc/tracked.c"),
             commands,
         )
@@ -1516,6 +1534,7 @@ class NemoVCSInfoProviderCoreTest(unittest.TestCase):
         self.assertEqual(icons_by_label["Update..."], "nemovcs-update")
         self.assertEqual(icons_by_label["Add..."], "nemovcs-add")
         self.assertEqual(icons_by_label["Rename..."], "nemovcs-rename")
+        self.assertEqual(icons_by_label["Delete..."], "edit-delete")
         self.assertEqual(icons_by_label["Revert..."], "nemovcs-revert")
         self.assertEqual(icons_by_label["Status..."], "nemovcs-status")
         self.assertEqual(icons_by_label["Log..."], "nemovcs-show-log")

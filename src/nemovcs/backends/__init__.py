@@ -200,6 +200,22 @@ def revert_phases(
     return phases
 
 
+def delete_phases(paths: Sequence[str | Path]) -> list[BackendCommandPhase]:
+    grouped = group_by_backend(paths or [Path.cwd()])
+    if any(
+        relpath == "."
+        for roots in grouped.values()
+        for relpaths in roots.values()
+        for relpath in relpaths
+    ):
+        return []
+
+    phases: list[BackendCommandPhase] = []
+    for backend, paths_by_root in grouped.items():
+        phases.extend(backend.delete_phases(paths_by_root))
+    return phases
+
+
 def rename_phases(
     root: str | Path,
     source_relpath: str,

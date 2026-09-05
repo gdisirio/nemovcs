@@ -345,6 +345,20 @@ class GitBackend:
             if relpaths
         ]
 
+    def delete_phases(
+        self,
+        paths_by_root: dict[Path, Sequence[str]],
+    ) -> list[BackendCommandPhase]:
+        return [
+            self._git_phase(
+                f"Delete from {root.name}",
+                root,
+                ["rm", "-r", "--", *relpaths],
+            )
+            for root, relpaths in paths_by_root.items()
+            if relpaths
+        ]
+
     def rename_phases(
         self,
         root: str | Path,

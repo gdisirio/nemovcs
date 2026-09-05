@@ -14,6 +14,7 @@ from nemovcs.cli import (
     clone_target_visible,
     cmd_action_visible,
     cmd_commit,
+    cmd_delete_dialog,
     cmd_diff,
     cmd_diff_dialog,
     cmd_forge,
@@ -594,6 +595,14 @@ class CliParserTest(unittest.TestCase):
         self.assertEqual(args.command, "revert-dialog")
         self.assertEqual(args.paths, ["/tmp/example"])
 
+    def test_delete_dialog_accepts_paths(self):
+        parser = build_parser()
+
+        args = parser.parse_args(["delete-dialog", "/tmp/example"])
+
+        self.assertEqual(args.command, "delete-dialog")
+        self.assertEqual(args.paths, ["/tmp/example"])
+
     def test_rename_dialog_accepts_single_path(self):
         parser = build_parser()
 
@@ -704,6 +713,32 @@ class CliParserTest(unittest.TestCase):
             new=io.StringIO(),
         ):
             self.assertEqual(cmd_revert_dialog(args), 1)
+
+    def test_delete_dialog_runs_dialog_inside_worktree(self):
+        parser = build_parser()
+        args = parser.parse_args(["delete-dialog", "/tmp/example"])
+
+        with mock.patch("nemovcs.cli.backends.group_by_backend") as group_by_backend, (
+            mock.patch(
+                "nemovcs.ui.delete_dialog.run",
+                return_value=0,
+            )
+        ) as run_dialog:
+            group_by_backend.return_value = {object(): {Path("/tmp/example"): ["file"]}}
+
+            self.assertEqual(cmd_delete_dialog(args), 0)
+
+        run_dialog.assert_called_once_with(["/tmp/example"])
+
+    def test_delete_dialog_rejects_paths_outside_worktree(self):
+        parser = build_parser()
+        args = parser.parse_args(["delete-dialog", "/tmp/example"])
+
+        with mock.patch(
+            "nemovcs.cli.backends.group_by_backend",
+            return_value={},
+        ), mock.patch("sys.stderr", new=io.StringIO()):
+            self.assertEqual(cmd_delete_dialog(args), 1)
 
     def test_rename_dialog_runs_dialog_inside_worktree(self):
         parser = build_parser()

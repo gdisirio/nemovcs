@@ -112,6 +112,7 @@ Working-tree actions:
 - `Update...`
 - `Stage...` / `Add...`
 - `Rename...` (single selection)
+- `Delete...`
 - `Switch Branch` (Git, single selection; submenu of recent branches)
 - `Revert...`
 - `Push...`

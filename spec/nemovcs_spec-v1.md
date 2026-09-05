@@ -348,10 +348,10 @@ commands should appear under backend submenus to avoid clutter.
 current v1 default placement:
 
 - first level: diff
-- `Git NemoVCS` submenu: commit, update, stage, revert, push, status, log,
-  settings, about
-- `SVN NemoVCS` submenu: commit, update, add, revert, status, log, settings,
-  about
+- `Git NemoVCS` submenu: commit, update, stage, rename, delete, revert, push,
+  status, log, settings, about
+- `SVN NemoVCS` submenu: commit, update, add, rename, delete, revert, status,
+  log, settings, about
 
 The first-level versus submenu placement should be modeled as action metadata,
 not hard-coded deep inside command handlers. User-configurable placement is a
@@ -1020,6 +1020,83 @@ Tests:
 
 This section is for ideas that may be useful later but are not committed product
 direction yet.
+
+### Custom Script Actions
+
+NemoVCS could load declarative custom actions instead of requiring every menu
+entry to be implemented in the extension. An action may invoke any executable;
+"script" does not imply a particular language.
+
+Possible initial design:
+
+- Load multiple JSON manifests from
+  `$XDG_DATA_HOME/nemovcs/actions.d/` and, for packaged actions,
+  `/usr/share/nemovcs/actions.d/`.
+- Allow each manifest to define one or more actions with a unique, namespaced
+  ID, label, icon-theme name, ordering, menu placement, command, run mode, and
+  applicability rules.
+- Keep core Git/SVN operations hardcoded initially. Custom actions would be
+  appended in a separate section of the applicable backend menu.
+- Convert matching declarations to the existing internal `MenuActionSpec`
+  representation so custom and built-in entries use the same Nemo renderer.
+- Cache parsed manifests and evaluate rules only from the selection context and
+  already-cached daemon status. Menu construction must not execute scripts or
+  issue one Git/SVN command per action.
+- Validate actions independently so one malformed declaration does not disable
+  unrelated actions.
+
+Example manifest shape:
+
+```json
+{
+  "version": 1,
+  "actions": [
+    {
+      "id": "local.run-tests",
+      "label": "Run Tests...",
+      "icon": "system-run",
+      "placement": "backend-menu",
+      "command": ["./run-tests.sh"],
+      "run": "logger",
+      "cwd": "worktree",
+      "refresh": "worktree",
+      "when": {
+        "backend": ["git"],
+        "contexts": ["selection", "background"],
+        "item_types": ["file", "directory"],
+        "same_worktree": true,
+        "min_paths": 1
+      }
+    }
+  ]
+}
+```
+
+Actions should run through a separate `nemovcs run-action ACTION_ID` process,
+never inside Nemo. Commands must use argument arrays without shell
+interpolation. Selected paths would be appended as individual arguments. A
+small versioned environment and a temporary JSON context file could provide
+additional information:
+
+```text
+NEMOVCS_ACTION_API=1
+NEMOVCS_BACKEND=git
+NEMOVCS_WORKTREE=/path/to/root
+NEMOVCS_CURRENT_DIRECTORY=/path/currently/shown
+NEMOVCS_CONTEXT_FILE=/run/user/.../context.json
+```
+
+The context file could include selected paths, invocation type, branch or head,
+remote, and cached status records. Proposed run modes are `logger` for live
+output in the NemoVCS logger, `terminal` for terminal-backed commands, and
+`detached` for tools that provide their own UI. A `refresh` policy would tell
+NemoVCS whether to invalidate the selection or whole worktree after completion.
+
+Repository-local manifests such as `.nemovcs/actions.d/` must not be enabled
+automatically. A cloned repository could otherwise add an innocent-looking
+menu item that executes arbitrary code. Repository-local actions require an
+explicit trust mechanism and should be deferred until user/system actions are
+proven.
 
 ### Repository Metadata Filesystem
 

@@ -553,6 +553,15 @@ def cmd_revert_dialog(args: argparse.Namespace) -> int:
     return revert_dialog.run(args.paths or ["."])
 
 
+def cmd_delete_dialog(args: argparse.Namespace) -> int:
+    from .ui import delete_dialog
+
+    if not backends.group_by_backend(args.paths or [Path.cwd()]):
+        print("not inside a versioned working tree", file=sys.stderr)
+        return 1
+    return delete_dialog.run(args.paths or ["."])
+
+
 def cmd_rename_dialog(args: argparse.Namespace) -> int:
     from .ui import rename_dialog
 
@@ -870,6 +879,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     revert_dialog.add_argument("paths", nargs="*")
     revert_dialog.set_defaults(func=cmd_revert_dialog)
+
+    delete_dialog = subparsers.add_parser(
+        "delete-dialog",
+        help="confirm and schedule selected paths for deletion",
+    )
+    delete_dialog.add_argument("paths", nargs="*")
+    delete_dialog.set_defaults(func=cmd_delete_dialog)
 
     rename_dialog = subparsers.add_parser(
         "rename-dialog",
