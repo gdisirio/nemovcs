@@ -6,6 +6,9 @@ from nemovcs import config
 
 
 class ConfigTest(unittest.TestCase):
+    def test_default_cache_holds_32_worktrees(self):
+        self.assertEqual(config.DEFAULT_MAX_WORKTREES, 32)
+
     def test_load_statusd_settings_creates_default_file(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "settings.json"

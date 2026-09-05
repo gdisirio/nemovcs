@@ -597,7 +597,7 @@ Initial cache policy:
 - Treat linked worktrees as full worktrees, not as secondary views of the main
   checkout.
 - Use an LRU-style "seen worktrees" cache.
-- Default maximum cached worktrees: `12`.
+- Default maximum cached worktrees: `32`.
 - Make the maximum configurable later.
 - When Nemo visits a path inside a worktree, move that worktree to the front of
   the cache.
@@ -677,7 +677,7 @@ monitoring.
 
 Implementation:
 
-- Add a configurable maximum cache size, defaulting to `12`.
+- Add a configurable maximum cache size, defaulting to `32`.
 - Add `seen(paths)` behavior that discovers worktrees and moves them to the
   front of the cache.
 - Evict the least recently seen worktree when over the limit.
@@ -687,7 +687,7 @@ Tests:
 
 - Seeing a worktree inserts it.
 - Seeing it again moves it to the front.
-- Adding the thirteenth worktree evicts the oldest with the default limit.
+- Adding the thirty-third worktree evicts the oldest with the default limit.
 - Linked worktrees occupy separate cache entries.
 
 #### Milestone 3: One-Shot Status Scan
@@ -748,6 +748,8 @@ Initial DBus shape:
 Behavior:
 
 - `Seen` updates the worktree LRU and schedules scans.
+- Status scans run in a bounded four-worker pool, with completions applied on
+  the GLib main loop.
 - `GetStatus` returns quickly from cache with `ok`, `modified`, `conflicted`,
   `loading`, `stale`, or `error`.
 - `StatusChanged` is an invalidation signal, not a full UI-state push.

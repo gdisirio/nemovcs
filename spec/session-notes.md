@@ -26,7 +26,21 @@ sessions. Update this file before pushing changes.
 - Nemo and `nemovcs statusd` were restarted after the update.
 - Tests passed with:
   `PYTHONPATH=src python3 -m unittest discover -s tests`
-  (465 tests) and `python3 -m compileall -q src tests`.
+  (468 tests) and `python3 -m compileall -q src tests scripts`.
+- The default worktree cache limit is now `32`, including the settings-dialog
+  fallback. Existing persisted settings are not migrated automatically; the
+  live user setting was changed from `16` to `32` during installation.
+- Async status scans now use a bounded four-worker pool instead of starting one
+  thread per worktree. Completion still returns to the GLib main loop before
+  daemon state changes or DBus signals are emitted.
+- Fixed a Nemo/statusd feedback loop exposed by opening a directory containing
+  more Git worktrees than the daemon cache limit. `StatusChanged` handling now
+  fetches completed records into the plugin cache before invalidating Nemo
+  items, so the repaint does not issue another round of `QueryStatus` calls.
+- Live verification used the 15-worktree `chibios-git` directory. With the
+  recorded `max_worktrees=32` setting, every worktree reached a final status,
+  a five-second DBus sample stayed idle, and Nemo/statusd CPU returned to normal
+  startup-idle levels.
 - Opening large directories is more responsive after changing statusd `Seen()`
   handling so fresh, already-scanned worktrees are not rescanned for every
   visible file.

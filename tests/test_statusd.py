@@ -233,7 +233,7 @@ class WorktreeCacheTest(unittest.TestCase):
 
         identify.assert_called_once_with(nested / "file.txt")
 
-    def test_default_limit_evicts_oldest_thirteenth_worktree(self):
+    def test_default_limit_evicts_oldest_worktree(self):
         evicted: list[statusd.WorktreeIdentity] = []
 
         class TrackingCache(statusd.WorktreeCache):
@@ -241,7 +241,10 @@ class WorktreeCacheTest(unittest.TestCase):
                 evicted.append(entry.identity)
 
         cache = TrackingCache()
-        identities = [identity(f"repo-{idx}") for idx in range(13)]
+        identities = [
+            identity(f"repo-{idx}")
+            for idx in range(statusd.DEFAULT_MAX_WORKTREES + 1)
+        ]
 
         for item in identities:
             entry = cache.touch(item)

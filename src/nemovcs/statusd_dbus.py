@@ -2,11 +2,16 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from concurrent.futures import Future, ThreadPoolExecutor
 from typing import Sequence
 
 from . import config
 from . import statusd
 from . import statusd_monitor
+
+
+DEFAULT_SCAN_WORKERS = 4
 
 
 INTROSPECTION_XML = f"""<!DOCTYPE node PUBLIC
@@ -70,9 +75,10 @@ def run_foreground() -> int:
     dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
     bus = dbus.SessionBus()
     bus_name = dbus.service.BusName(statusd.DBUS_BUS_NAME, bus=bus)
+    scan_scheduler = GlibScanScheduler()
     core = statusd.StatusDaemonCore.from_config(
         timer=glib_timer,
-        scan_scheduler=threaded_glib_scan_scheduler,
+        scan_scheduler=scan_scheduler,
     )
     monitor_manager = statusd_monitor.WorktreeMonitorManager(core)
     core.set_monitor_manager(monitor_manager)
@@ -104,6 +110,7 @@ def run_foreground() -> int:
         loop.quit()
     finally:
         monitor_manager.stop_all()
+        scan_scheduler.shutdown()
         bus_name.__del__()
     return 0
 
@@ -118,22 +125,48 @@ def glib_timer(delay_seconds, callback):
     return GLib.timeout_add(int(delay_seconds * 1000), on_timeout)
 
 
-def threaded_glib_scan_scheduler(work, complete):
-    import threading
-    from gi.repository import GLib
+class GlibScanScheduler:
+    def __init__(
+        self,
+        *,
+        max_workers: int = DEFAULT_SCAN_WORKERS,
+        idle_add: Callable[[Callable[[], bool]], object] | None = None,
+    ):
+        if max_workers < 1:
+            raise ValueError("max_workers must be at least 1")
+        self.max_workers = max_workers
+        self.idle_add = idle_add or glib_idle_add
+        self.executor = ThreadPoolExecutor(
+            max_workers=max_workers,
+            thread_name_prefix="nemovcs-scan",
+        )
 
-    def run():
-        result = work()
+    def __call__(self, work, complete) -> Future:
+        future = self.executor.submit(work)
+        future.add_done_callback(
+            lambda completed: self.schedule_completion(completed, complete)
+        )
+        return future
+
+    def schedule_completion(self, future: Future, complete) -> None:
+        if future.cancelled():
+            return
+        result = future.result()
 
         def on_complete():
             complete(result)
             return False
 
-        GLib.idle_add(on_complete)
+        self.idle_add(on_complete)
 
-    thread = threading.Thread(target=run, daemon=True)
-    thread.start()
-    return thread
+    def shutdown(self) -> None:
+        self.executor.shutdown(wait=True, cancel_futures=True)
+
+
+def glib_idle_add(callback):
+    from gi.repository import GLib
+
+    return GLib.idle_add(callback)
 
 
 def call_seen(paths: Sequence[str]) -> list[str]:

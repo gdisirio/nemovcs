@@ -1,3 +1,4 @@
+import threading
 import unittest
 from unittest import mock
 
@@ -42,6 +43,65 @@ class NemoNameLostTest(unittest.TestCase):
         self.assertFalse(
             statusd_dbus.nemo_name_lost("org.NemoDesktop", ":1.63", "")
         )
+
+
+class GlibScanSchedulerTest(unittest.TestCase):
+    def test_default_pool_runs_at_most_four_scans_concurrently(self):
+        condition = threading.Condition()
+        release = threading.Event()
+        started = 0
+        active = 0
+        max_active = 0
+        idle_callbacks = []
+        completed = []
+
+        def idle_add(callback):
+            with condition:
+                idle_callbacks.append(callback)
+                condition.notify_all()
+
+        def work():
+            nonlocal started, active, max_active
+            with condition:
+                started += 1
+                active += 1
+                max_active = max(max_active, active)
+                condition.notify_all()
+            release.wait(timeout=2)
+            with condition:
+                active -= 1
+            return started
+
+        scheduler = statusd_dbus.GlibScanScheduler(idle_add=idle_add)
+        futures = []
+        try:
+            futures = [scheduler(work, completed.append) for _ in range(8)]
+            with condition:
+                self.assertTrue(
+                    condition.wait_for(
+                        lambda: started >= statusd_dbus.DEFAULT_SCAN_WORKERS,
+                        timeout=2,
+                    )
+                )
+                self.assertEqual(active, statusd_dbus.DEFAULT_SCAN_WORKERS)
+                self.assertEqual(max_active, statusd_dbus.DEFAULT_SCAN_WORKERS)
+
+            release.set()
+            for future in futures:
+                future.result(timeout=2)
+            with condition:
+                self.assertTrue(
+                    condition.wait_for(lambda: len(idle_callbacks) == 8, timeout=2)
+                )
+
+            self.assertEqual(completed, [])
+            for callback in idle_callbacks:
+                self.assertFalse(callback())
+            self.assertEqual(len(completed), 8)
+            self.assertEqual(max_active, statusd_dbus.DEFAULT_SCAN_WORKERS)
+        finally:
+            release.set()
+            scheduler.shutdown()
 
 
 class StatusDaemonCoreTest(unittest.TestCase):

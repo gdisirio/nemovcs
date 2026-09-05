@@ -109,10 +109,25 @@ class FakeWidget:
 class FakeCore:
     def __init__(self):
         self.changed_calls = []
+        self.last_error = ""
 
-    def on_status_changed(self, worktree_id, changed_paths):
-        self.changed_calls.append((worktree_id, list(changed_paths)))
+    def affected_visible_paths(self, _worktree_id, _changed_paths):
+        return ["/tmp/repo"]
+
+    def on_status_changed(
+        self,
+        worktree_id,
+        changed_paths,
+        *,
+        refreshed_records=None,
+    ):
+        self.changed_calls.append(
+            (worktree_id, list(changed_paths), refreshed_records)
+        )
         return ["invalidated"]
+
+    def log(self, _event, **_fields):
+        pass
 
 
 class NemoVCSInfoProviderCoreTest(unittest.TestCase):
@@ -178,6 +193,40 @@ class NemoVCSInfoProviderCoreTest(unittest.TestCase):
         self.assertEqual(len(invalidated), 1)
         self.assertEqual(item.invalidated, 1)
         self.assertIsNone(core.cache.get("/tmp/newrepo"))
+
+    def test_status_changed_primes_client_cache_before_repainting_item(self):
+        core = nemo_plugin.NemoVCSInfoProviderCore(
+            query_status=lambda _paths: self.fail("status should remain cached")
+        )
+        item = FakeItem("/tmp/repo")
+        core.track_visible_item(item.path, item)
+        core.cache.update(
+            [
+                {
+                    "path": item.path,
+                    "backend": "git",
+                    "worktree_id": "git:/tmp/repo",
+                    "status": "loading",
+                }
+            ]
+        )
+        refreshed = {
+            "path": item.path,
+            "backend": "git",
+            "worktree_id": "git:/tmp/repo",
+            "status": "ok",
+        }
+
+        invalidated = core.on_status_changed(
+            "git:/tmp/repo",
+            [item.path],
+            refreshed_records=[refreshed],
+        )
+        record = core.update_item(item)
+
+        self.assertEqual(invalidated, [item.path])
+        self.assertEqual(item.invalidated, 1)
+        self.assertEqual(record, refreshed)
 
     def test_update_item_uses_single_query_status_call(self):
         query_calls = []
@@ -673,14 +722,28 @@ class NemoVCSInfoProviderCoreTest(unittest.TestCase):
 
         provider.schedule_location_widget_refresh = schedule
 
-        invalidated = nemo_plugin.NemoVCSInfoProviderMixin.on_daemon_status_changed(
-            provider,
-            "git:/tmp/repo",
-            ["/tmp/repo"],
-        )
+        record = {
+            "path": "/tmp/repo",
+            "backend": "git",
+            "worktree_id": "git:/tmp/repo",
+            "status": "ok",
+        }
+        with mock.patch(
+            "nemovcs.nemo_plugin.default_get_status",
+            return_value=[record],
+        ) as get_status:
+            invalidated = nemo_plugin.NemoVCSInfoProviderMixin.on_daemon_status_changed(
+                provider,
+                "git:/tmp/repo",
+                ["/tmp/repo"],
+            )
 
         self.assertEqual(invalidated, ["invalidated"])
-        self.assertEqual(provider.nemovcs_core.changed_calls, [("git:/tmp/repo", ["/tmp/repo"])])
+        get_status.assert_called_once_with(["/tmp/repo"])
+        self.assertEqual(
+            provider.nemovcs_core.changed_calls,
+            [("git:/tmp/repo", ["/tmp/repo"], [record])],
+        )
         self.assertEqual(scheduled, [("git:/tmp/repo", ["/tmp/repo"])])
 
     def test_location_widget_spec_reads_remote_from_record(self):

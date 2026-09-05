@@ -10,6 +10,8 @@ from typing import Callable, Sequence
 
 import gi
 
+from .. import config
+
 gi.require_version("GdkPixbuf", "2.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import GdkPixbuf, GLib, Gtk  # noqa: E402
@@ -299,7 +301,13 @@ class StatusdSettingsPage(Gtk.Box):
 
     def apply_status_settings(self, settings: SettingsRecord) -> None:
         self.cache_size_spin.set_value(
-            parse_int(settings.get("max_worktrees", "12"), fallback=12)
+            parse_int(
+                settings.get(
+                    "max_worktrees",
+                    str(config.DEFAULT_MAX_WORKTREES),
+                ),
+                fallback=config.DEFAULT_MAX_WORKTREES,
+            )
         )
         self.debounce_spin.set_value(
             parse_float(settings.get("debounce_seconds", "0.75"), fallback=0.75)

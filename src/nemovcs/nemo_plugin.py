@@ -267,9 +267,13 @@ class NemoVCSInfoProviderCore:
         self,
         worktree_id: str,
         changed_paths,
+        *,
+        refreshed_records: Sequence[dict[str, str]] | None = None,
     ) -> list[str]:
         affected_paths = self.affected_visible_paths(worktree_id, changed_paths)
         removed = self.cache.invalidate(worktree_id, changed_paths)
+        if refreshed_records is not None:
+            self.cache.update(refreshed_records)
         invalidated = [
             path
             for path in affected_paths
@@ -695,7 +699,27 @@ class NemoVCSInfoProviderMixin:
 
     def on_daemon_status_changed(self, worktree_id, changed_paths) -> list[str]:
         changed = [str(path) for path in changed_paths]
-        invalidated = self.nemovcs_core.on_status_changed(str(worktree_id), changed)
+        worktree_id = str(worktree_id)
+        affected = self.nemovcs_core.affected_visible_paths(worktree_id, changed)
+        refreshed_records = None
+        if affected:
+            try:
+                refreshed_records = validate_status_records(
+                    affected,
+                    default_get_status(affected),
+                )
+            except Exception as exc:
+                self.nemovcs_core.last_error = str(exc)
+                self.nemovcs_core.log(
+                    "status-changed-refresh-error",
+                    worktree_id=worktree_id,
+                    error=str(exc),
+                )
+        invalidated = self.nemovcs_core.on_status_changed(
+            worktree_id,
+            changed,
+            refreshed_records=refreshed_records,
+        )
         self.schedule_location_widget_refresh(str(worktree_id), changed)
         return invalidated
 

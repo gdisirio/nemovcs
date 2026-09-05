@@ -28,7 +28,7 @@ manual testing and hardening before unattended daily use.
   - conflicted paths and folders,
   - unversioned paths and folders.
 - DBus-activated status daemon with cached status, filesystem monitoring, TTL
-  revalidation, and async scans.
+  revalidation, and a bounded four-worker scan pool.
 - Linked Git worktrees are treated as independent worktrees.
 
 ## Dependencies
