@@ -17,6 +17,9 @@ sessions. Update this file before pushing changes.
   filesystem monitors.
 - Current diff focus: make Meld launches independent of stale source-tree
   wrappers and show all tracked Git changes since `HEAD`.
+- Current responsiveness focus: keep `StatusChanged` handling on Nemo's main
+  thread cheap regardless of how long Nemo has been open or how many
+  repositories it has visited.
 
 ## Last Known State
 
@@ -26,7 +29,7 @@ sessions. Update this file before pushing changes.
 - Nemo and `nemovcs statusd` were restarted after the update.
 - Tests passed with:
   `PYTHONPATH=src python3 -m unittest discover -s tests`
-  (479 tests) and `python3 -m compileall -q src tests scripts`.
+  (488 tests) and `python3 -m compileall -q src tests scripts`.
 - The default worktree cache limit is now `32`, including the settings-dialog
   fallback. Existing persisted settings are not migrated automatically; the
   live user setting was changed from `16` to `32` during installation.
@@ -110,6 +113,21 @@ sessions. Update this file before pushing changes.
 - Git `Diff...` now compares the working copy to `HEAD`, so staged-only,
   unstaged, and mixed changes are all shown as uncommitted changes. Verified
   against the staged-only `os/xhal/xhal.mk` in the `chibios-vfs-dev` worktree.
+- Fixed a slow degradation of Nemo responsiveness (1-2 second click delays
+  after a while in a directory with many repositories, e.g. the 17-worktree
+  `chibios-git`). Cause: `StatusClientCache.invalidate` and
+  `affected_visible_paths` compared every cached record against every changed
+  path with `Path.resolve()` on both sides, inside the synchronous
+  `StatusChanged` handler on Nemo's main thread, and the client record cache
+  had no size bound so it grew with every path ever visited. Measured with
+  real `chibios-git` paths: 3000 records x 50 changed paths took 14.4 s per
+  signal (1000 x 50 took 4.8 s). Fix: `PathOverlapIndex` precomputes the
+  changed paths and their ancestors as sets so each record is an O(depth)
+  string lookup; the same case now takes 11 ms. The record cache is an LRU
+  bounded by `DEFAULT_MAX_RECORDS` (4096). Semantics are unchanged: match by
+  path overlap for pathful signals, by worktree id for pathless ones, with
+  no false positives on name-prefix siblings (`dir` vs `dir2`). Unit-tested;
+  needs a Nemo restart (`nemo --quit`) and a live recheck on `chibios-git`.
 
 ## Recent Changes To Keep In Mind
 
@@ -321,6 +339,12 @@ sessions. Update this file before pushing changes.
 
 ## Next Likely Tasks
 
+- Restart Nemo and leave it open on `chibios-git` for a while, then confirm
+  clicks stay responsive. If stalls remain, the next suspects in the same
+  `on_daemon_status_changed` path are the synchronous `GetStatus` DBus round
+  trip for affected items and the location widget refresh, which re-queries
+  the daemon with the cache bypassed and re-runs forge detection per signal.
+  `NEMOVCS_PLUGIN_LOG=<file>` in Nemo's environment records per-event timing.
 - Reinstall/restart Nemo and exercise external branch switches plus removal of
   cached Git and SVN worktrees. Confirm the context bar branch changes, removed
   roots disappear from the settings cache view, and `nemovcs-statusd` settles

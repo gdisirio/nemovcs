@@ -291,20 +291,19 @@ class NemoVCSInfoProviderCore:
         return invalidated
 
     def affected_visible_paths(self, worktree_id: str, changed_paths) -> list[str]:
-        changed = [status_client.normalize_path(path) for path in changed_paths]
+        # Match by path so an item whose worktree membership just changed
+        # (e.g. a directory that became a repository) is refreshed even
+        # though its cached record still names the old/empty worktree. Only
+        # fall back to the worktree id for pathless whole-worktree signals.
+        # Visible item keys are already normalized, so this is a set-lookup
+        # walk that stays cheap on Nemo's main thread.
+        index = status_client.PathOverlapIndex(changed_paths)
         affected: list[str] = []
         for path in self.visible_items:
-            record = self.cache.get(path)
-            # Match by path so an item whose worktree membership just changed
-            # (e.g. a directory that became a repository) is refreshed even
-            # though its cached record still names the old/empty worktree. Only
-            # fall back to the worktree id for pathless whole-worktree signals.
-            if changed:
-                matched = any(
-                    status_client.paths_overlap(path, changed_path)
-                    for changed_path in changed
-                )
+            if index:
+                matched = index.overlaps(path)
             else:
+                record = self.cache.get(path)
                 matched = (
                     record is not None
                     and record.get("worktree_id") == str(worktree_id)

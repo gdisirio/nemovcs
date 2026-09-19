@@ -161,6 +161,91 @@ class StatusClientCacheTest(unittest.TestCase):
         self.assertEqual(removed, [str(root)])
         self.assertIsNone(cache.get(root))
 
+    def test_invalidate_ignores_sibling_with_common_name_prefix(self):
+        cache = status_client.StatusClientCache()
+        root = Path("/tmp/repo")
+        cache.update(
+            [
+                {"path": str(root / "dir"), "worktree_id": "w", "status": "ok"},
+                {"path": str(root / "dir2"), "worktree_id": "w", "status": "ok"},
+                {
+                    "path": str(root / "dir" / "a.txt"),
+                    "worktree_id": "w",
+                    "status": "ok",
+                },
+                {
+                    "path": str(root / "dir" / "a.txt.bak"),
+                    "worktree_id": "w",
+                    "status": "ok",
+                },
+            ]
+        )
+
+        removed = cache.invalidate("w", [root / "dir" / "a.txt"])
+
+        self.assertEqual(removed, [str(root / "dir"), str(root / "dir" / "a.txt")])
+        self.assertIsNotNone(cache.get(root / "dir2"))
+        self.assertIsNotNone(cache.get(root / "dir" / "a.txt.bak"))
+
+    def test_records_are_bounded_least_recently_used_first(self):
+        cache = status_client.StatusClientCache(max_records=2)
+        cache.update(
+            [
+                {"path": "/tmp/a", "status": "ok"},
+                {"path": "/tmp/b", "status": "ok"},
+            ]
+        )
+        # Reading a record makes it recently used.
+        self.assertIsNotNone(cache.get("/tmp/a"))
+
+        cache.update([{"path": "/tmp/c", "status": "ok"}])
+
+        self.assertIsNone(cache.get("/tmp/b"))
+        self.assertIsNotNone(cache.get("/tmp/a"))
+        self.assertIsNotNone(cache.get("/tmp/c"))
+        self.assertEqual(len(cache.records), 2)
+
+    def test_max_records_must_be_positive(self):
+        with self.assertRaises(ValueError):
+            status_client.StatusClientCache(max_records=0)
+
+
+class PathOverlapIndexTest(unittest.TestCase):
+    def test_matches_equal_ancestor_and_descendant_paths(self):
+        index = status_client.PathOverlapIndex(["/tmp/repo/dir/file.txt"])
+
+        self.assertTrue(index)
+        self.assertTrue(index.overlaps("/tmp/repo/dir/file.txt"))
+        self.assertTrue(index.overlaps("/tmp/repo/dir"))
+        self.assertTrue(index.overlaps("/tmp/repo"))
+        self.assertTrue(index.overlaps("/"))
+
+    def test_rejects_unrelated_and_name_prefix_paths(self):
+        index = status_client.PathOverlapIndex(["/tmp/repo/dir/file.txt"])
+
+        self.assertFalse(index.overlaps("/tmp/repo2"))
+        self.assertFalse(index.overlaps("/tmp/repo/dir2/file.txt"))
+        self.assertFalse(index.overlaps("/tmp/repo/dir/file.txt.bak"))
+        self.assertFalse(index.overlaps("/tmp/other/dir/file.txt"))
+
+    def test_directory_change_covers_descendants(self):
+        index = status_client.PathOverlapIndex(["/tmp/repo/dir"])
+
+        self.assertTrue(index.overlaps("/tmp/repo/dir/deep/nested.txt"))
+        self.assertFalse(index.overlaps("/tmp/repo/other.txt"))
+
+    def test_empty_index_is_falsy(self):
+        index = status_client.PathOverlapIndex([])
+
+        self.assertFalse(index)
+        self.assertFalse(index.overlaps("/tmp/repo"))
+
+    def test_paths_overlap_helper_normalizes_both_sides(self):
+        self.assertTrue(
+            status_client.paths_overlap(Path("/tmp/repo/dir"), "/tmp/repo/dir/x")
+        )
+        self.assertFalse(status_client.paths_overlap("/tmp/repo", "/tmp/repo2"))
+
 
 if __name__ == "__main__":
     unittest.main()

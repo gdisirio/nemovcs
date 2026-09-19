@@ -952,6 +952,23 @@ class NemoVCSInfoProviderCoreTest(unittest.TestCase):
         self.assertEqual(invalidated, [folder.path])
         self.assertEqual(folder.invalidated, 1)
 
+    def test_status_changed_ignores_sibling_with_common_name_prefix(self):
+        core = nemo_plugin.NemoVCSInfoProviderCore()
+        sibling = FakeItem("/tmp/repo/dir2")
+        core.track_visible_item(sibling.path, sibling)
+        core.cache.update(
+            [{"path": sibling.path, "worktree_id": "/tmp/repo", "status": "ok"}]
+        )
+
+        invalidated = core.on_status_changed(
+            "/tmp/repo",
+            ["/tmp/repo/dir/nested.txt"],
+        )
+
+        self.assertEqual(invalidated, [])
+        self.assertEqual(sibling.invalidated, 0)
+        self.assertIsNotNone(core.cache.get(sibling.path))
+
     def test_status_changed_ignores_other_worktree_items(self):
         core = nemo_plugin.NemoVCSInfoProviderCore()
         other = FakeItem("/tmp/other/tracked.txt")
